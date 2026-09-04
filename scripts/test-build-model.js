@@ -97,9 +97,7 @@ function buildInput(fixture, core, reverse = false) {
     const geometry = core.WallGeometry.compute(new Map(walls));
     let plans = [...planSeeds.entries()].map(([id, seedCells]) => ({
         id,
-        // Thresholds are dropped from every seed list, painted included: an
-        // opening belongs to both sides and is resolved by expansion.
-        seedCells: seedCells.filter(key => !geometry.thresholds.has(key))
+        seedCells: seedCells.filter(key => fixture.origins[id] === 'painted' || !geometry.thresholds.has(key))
     }));
     if (reverse) plans = plans.reverse().map(plan => ({ ...plan, seedCells: [...plan.seedCells].reverse() }));
     return {
@@ -109,7 +107,6 @@ function buildInput(fixture, core, reverse = false) {
             width: fixture.map[0].length,
             height: fixture.map.length,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            expandCells: [...geometry.thresholds],
             plans,
             reachBlocks: fixture.reach
         }
@@ -338,28 +335,7 @@ function runGeometryContracts(core) {
         ['0,1/south/0', '0,1/south/1', '1,1/south/0', '1,1/south/1', '2,1/south/0', '2,1/south/1'],
         'section grouping returns the physical atoms it will paint');
 
-    // A closed room's south wall: the two corner cells are buried on the room
-    // side by the arms turning north, so without inheritance each end of the
-    // run breaks off as its own half-cell exterior section — a 16px paint
-    // target the player cannot colour with the wall it sits in.
-    const room = make(['####', '#..#', '####']);
-    const roomGrid = core.FloorOwnershipResolver.solve({
-        width: 4,
-        height: 3,
-        walls: new Map([...room.cells].map(([key, cell]) => [key, { ...cell, mask: room.masks.get(key) }])),
-        expandCells: [...room.thresholds],
-        plans: [{ id: 'R', seedCells: ['1,1', '2,1'] }],
-        reachBlocks: 1
-    });
-    const southWall = core.WallFaceResolver.sections(room, roomGrid, { walls: room })
-        .filter(section => section.spans.every(span => span.cell.endsWith(',2')));
-    assertEqual(southWall.length, 1, 'a wall run is one paint section from corner to corner');
-    assertEqual(southWall[0].surface.kind, 'room', 'the run paints as the room it encloses');
-    assertEqual(southWall[0].atoms,
-        ['0,2/north/1', '0,2/south/0', '1,2/north/0', '1,2/north/1',
-            '2,2/north/0', '2,2/north/1', '3,2/north/0', '3,2/south/1'],
-        'corner bands store their paint on the atom that is not buried');
-    return 8;
+    return 7;
 }
 
 function main() {

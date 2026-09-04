@@ -46,7 +46,6 @@
   --surface-tooltip: #ffffe1;
   --surface-stage: #eee;
   --build-grid-line: rgba(25, 24, 20, 0.14);
-  --build-grid-edge: rgba(25, 24, 20, 0.32);
   --surface-panel-muted: #f5f5f5;
   --surface-pill-muted: #e0e0e0;
   --surface-state-self: #e8f0fe;
@@ -198,7 +197,9 @@ textarea:focus {
 }
 
 select {
-  appearance: auto;
+  -webkit-appearance: auto;
+     -moz-appearance: auto;
+          appearance: auto;
 }
 
 .button,
@@ -211,7 +212,8 @@ button {
   border-left-color: var(--button-light);
   border-radius: var(--border-radius-outer);
   color: var(--button-text-color);
-  appearance: none;
+  -moz-appearance: none;
+       appearance: none;
   -webkit-appearance: none;
   padding: calc(var(--padding) * 2);
 }
@@ -270,7 +272,6 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
-  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -290,6 +291,15 @@ button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
 }
+.button.disabled, .button:disabled,
+input[type=submit].disabled,
+input[type=submit]:disabled,
+input[type=button].disabled,
+input[type=button]:disabled,
+button.disabled,
+button:disabled {
+  pointer-events: none;
+}
 
 input[type=range] {
   width: 100%;
@@ -300,7 +310,9 @@ input[type=range] {
 input[type=checkbox],
 input[type=radio] {
   --control-size: 18px;
-  appearance: none;
+  -webkit-appearance: none;
+     -moz-appearance: none;
+          appearance: none;
   flex: 0 0 auto;
   display: grid;
   place-content: center;
@@ -474,7 +486,8 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   -webkit-user-select: none;
 }
 
@@ -958,7 +971,8 @@ body.debug .map-object > .interactive-hitbox {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: "name thought" "meters meters";
-  column-gap: var(--space-md);
+  -moz-column-gap: var(--space-md);
+       column-gap: var(--space-md);
   row-gap: var(--space-2xs);
   align-items: baseline;
   min-width: 0;
@@ -1448,7 +1462,9 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1517,7 +1533,9 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1587,7 +1605,9 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .action-queue-panel .queue-panel-shell > summary::-webkit-details-marker {
   display: none;
@@ -1614,6 +1634,11 @@ body.debug .map-object > .interactive-hitbox {
 }
 .action-queue-panel .queue-empty-state {
   display: none;
+}
+.action-queue-panel .queue-empty-state.is-visible {
+  display: block;
+}
+.action-queue-panel .queue-empty-state {
   font-size: 10px;
   opacity: 0.55;
   padding: var(--padding);
@@ -1621,9 +1646,6 @@ body.debug .map-object > .interactive-hitbox {
   background-color: rgba(255, 255, 255, 0.85);
   border-radius: var(--border-width);
   backdrop-filter: blur(4px);
-}
-.action-queue-panel .queue-empty-state.is-visible {
-  display: block;
 }
 .action-queue-panel .queue-item {
   background-color: rgba(255, 255, 255, 0.85);
@@ -1789,6 +1811,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
+  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -2117,9 +2140,6 @@ body.debug .map-object > .interactive-hitbox {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  min-height: 0;
-  margin: 0 var(--padding) var(--padding);
-  padding: 0;
 }
 .app-shell > .sidebar > .action-controls > .action-groups::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -2131,6 +2151,11 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .sidebar > .action-controls > .action-groups::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
+}
+.app-shell > .sidebar > .action-controls > .action-groups {
+  min-height: 0;
+  margin: 0 var(--padding) var(--padding);
+  padding: 0;
 }
 .app-shell > .sidebar > .action-controls > .action-groups .action-group + .action-group {
   margin-top: var(--padding);
@@ -2276,7 +2301,9 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -2905,12 +2932,6 @@ div.surface-paint-overlay.paint-selection {
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  border-top: var(--border-width) solid var(--button-dark);
-  border-left: var(--border-width) solid var(--button-dark);
-  border-right: var(--border-width) solid var(--button-light);
-  border-bottom: var(--border-width) solid var(--button-light);
-  border-radius: var(--border-radius-outer);
-  block-size: var(--window-tab-body-size, auto);
 }
 .window-tab-body::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -2922,6 +2943,14 @@ div.surface-paint-overlay.paint-selection {
 .window-tab-body::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
+}
+.window-tab-body {
+  border-top: var(--border-width) solid var(--button-dark);
+  border-left: var(--border-width) solid var(--button-dark);
+  border-right: var(--border-width) solid var(--button-light);
+  border-bottom: var(--border-width) solid var(--button-light);
+  border-radius: var(--border-radius-outer);
+  block-size: var(--window-tab-body-size, auto);
 }
 .window-tab-body > [role=tabpanel][hidden] {
   display: none !important;
@@ -3315,9 +3344,6 @@ button.calendar__day.is-selected:not(:disabled):hover {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  list-style: none;
-  font-size: 0.75rem;
-  line-height: 1.4;
 }
 #game-log-panel .game-log-list::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -3329,6 +3355,11 @@ button.calendar__day.is-selected:not(:disabled):hover {
 #game-log-panel .game-log-list::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
+}
+#game-log-panel .game-log-list {
+  list-style: none;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 #game-log-panel .game-log-list .game-log-entry.is-first-visible {
   margin-top: auto;
@@ -4043,11 +4074,6 @@ button.calendar__day.is-selected:not(:disabled):hover {
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  padding: var(--space-sm);
-  --dither-size: 12px;
-  background-color: var(--surface-stage);
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
 }
 .world-map__canvas::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -4060,12 +4086,21 @@ button.calendar__day.is-selected:not(:disabled):hover {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
+.world-map__canvas {
+  padding: var(--space-sm);
+  --dither-size: 12px;
+  background-color: var(--surface-stage);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+}
 .world-map__canvas.is-pannable {
   cursor: grab;
 }
 .world-map__canvas.is-panning, .world-map__canvas.is-panning * {
   cursor: grabbing;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 
 .world-map__grid {
@@ -4209,7 +4244,6 @@ button.calendar__day.is-selected:not(:disabled):hover {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  padding-right: var(--space-2xs);
 }
 .world-map__rows::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -4221,6 +4255,9 @@ button.calendar__day.is-selected:not(:disabled):hover {
 .world-map__rows::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
+}
+.world-map__rows {
+  padding-right: var(--space-2xs);
 }
 
 .world-map__travel {
@@ -4355,6 +4392,7 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-xs);
+  width: -moz-max-content;
   width: max-content;
   max-width: calc(100% - var(--space-lg) * 2);
   padding: var(--space-xs) var(--space-sm);
@@ -4397,6 +4435,7 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-sm);
+  width: -moz-max-content;
   width: max-content;
   max-width: 100%;
 }
@@ -4516,12 +4555,14 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
-  cursor: not-allowed;
 }
 .app-shell > .hand-controls button:disabled .icon,
 .app-shell > .hand-controls button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
+}
+.app-shell > .hand-controls button:disabled {
+  cursor: not-allowed;
 }
 
 .app-shell[data-game-mode=build] > .hand-controls .tool-group--play {
@@ -4792,13 +4833,15 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   align-items: center;
   gap: var(--space-2xs);
   padding: var(--space-2xs);
+}
+.stage-bar__action > span {
+  display: none;
+}
+.stage-bar__action {
   font-size: var(--text-size-meta);
   line-height: 1.3;
   white-space: nowrap;
   cursor: pointer;
-}
-.stage-bar__action > span {
-  display: none;
 }
 .stage-bar__action > .icon {
   width: 12px;
@@ -4863,13 +4906,9 @@ body.debug .stage-bar__debug-only {
 .canvas.show-build-grid::after {
   content: "";
   position: absolute;
-  left: var(--build-grid-left, 0px);
-  top: var(--build-grid-top, 0px);
-  width: var(--build-grid-width, 100%);
-  height: var(--build-grid-height, 100%);
+  inset: 0;
   z-index: var(--z-overlay);
   pointer-events: none;
-  outline: 1px solid var(--build-grid-edge);
   background-image: repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)), repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));
 }
 
@@ -5629,6 +5668,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   position: absolute;
   top: var(--floating-help-paper-top, calc(100% + 8px));
   left: var(--floating-help-paper-left, 0);
+  width: -moz-max-content;
   width: max-content;
   min-width: 0;
   max-width: var(--floating-help-paper-max-width, min(280px, 100vw - var(--space-lg) * 2));
@@ -5707,7 +5747,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   font-family: inherit;
   flex-direction: column;
 }
@@ -5858,7 +5900,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -6172,6 +6216,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   display: flex;
   gap: var(--border-width);
   align-items: center;
+  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -6376,7 +6421,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grab;
   z-index: var(--z-dragged) !important;
 }
@@ -6594,11 +6641,6 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
     filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
   }
 }
-.app-shell > .app-stage {
-  --dither-size: 12px;
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
-}
 .app-shell > .app-stage.noScroll {
   overflow: hidden;
 }
@@ -6608,6 +6650,11 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage.noScroll > .canvas > .layer {
   width: calc(100% - var(--map-render-inset-left, 0px) - var(--map-render-inset-right, 0px));
   height: calc(100% - var(--map-render-inset-top, 0px) - var(--map-render-inset-bottom, 0px));
+}
+.app-shell > .app-stage {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
 }
 .app-shell > .app-stage > .crosshair {
   position: absolute;
@@ -6683,7 +6730,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.foreground .wall-decoration {
   position: absolute;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   image-rendering: pixelated;
 }
 .app-shell > .app-stage > .canvas > .layer.foreground .wall-decoration,
@@ -6716,7 +6765,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -6726,7 +6777,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -6772,7 +6825,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -6822,7 +6877,9 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 3;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer .map-environment-fill,
 .app-shell > .app-stage > .canvas > .layer .map-environment-gradient,
@@ -6985,7 +7042,9 @@ body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .dropped-
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   transition: filter 0.2s ease;
 }
 .map-object > .sprite.is-visual-placeholder {
@@ -7033,6 +7092,7 @@ body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .dropped-
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: -moz-max-content;
   min-width: max-content;
   transform: translate(-50%, calc(-100% - var(--npc-lift, 0px) - var(--space-2xs)));
   pointer-events: none;
@@ -7109,7 +7169,9 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grabbing;
   z-index: var(--z-dragged) !important;
 }
@@ -7733,4 +7795,4 @@ body.reduce-motion .item-acquisition-ghost {
 body.reduce-motion .item.is-acquired {
   animation-name: item-acquired-steady;
   animation-iteration-count: 1;
-}
+}/*# sourceMappingURL=style.css.map */

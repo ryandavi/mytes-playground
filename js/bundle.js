@@ -149,13 +149,19 @@ const SiteConfig = Object.freeze({
 		// A room with no authored floorFinishId keeps whatever the map's own
 		// tile layers already draw. Customisation is opt-in per room, so adding
 		// the system changes nothing until a room asks for it.
-		defaultFinishId: null
-		// There is no edge-bleed setting. A floor's edge sits on the CENTRELINE
-		// of the cell that bounds it — masonry, or the outermost cell the player
-		// painted — and that centreline is geometry, not taste: the wall is
-		// `thickness` centred in its cell, so its middle sits at cell / 2
-		// whatever the thickness is. Any other reach tucks past the wall's outer
-		// face or stops short of it. See FloorRenderer.CENTRELINE_BLOCKS.
+		defaultFinishId: null,
+		// Grow each room's floor by this many cells so it runs UNDER the wall
+		// that encloses it. A room's bounds stop one cell short of that wall,
+		// and the wall covers only its centred thickness, so without any bleed a
+		// strip of the map's own ground shows along every outer edge.
+		//
+		// Half a cell, because that is the wall's CENTRELINE: the wall is
+		// `thickness` centred in its cell, so its middle sits at
+		// (cell - thickness) / 2 + thickness / 2 = cell / 2, whatever the
+		// thickness is. The floor therefore ends buried under the wall — no
+		// ground strip inside, and nothing spilling past the wall's outer face
+		// onto the exterior, which is what a full cell did.
+		edgeBleedCells: 0.5
 	}),
 
 	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same
@@ -37022,8 +37028,7 @@ class BuildTransaction {
             width: this.width,
             height: this.height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            expandCells: [...geometry.thresholds],
-            plans: BuildTransaction.seedsOffThresholds(level.rooms.values(), geometry.thresholds),
+            plans: level.rooms.values(),
             reachBlocks: this.reachBlocks,
             revision
         });
@@ -37034,27 +37039,6 @@ class BuildTransaction {
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
         return Object.freeze({ geometry, grid, topology, revision });
-    }
-
-    /**
-     * Drops threshold cells from every plan's seeds before ownership is solved.
-     *
-     * A threshold is an open cell in the line of a wall — what a doorway gap
-     * is — and it belongs to both sides of that wall. Seeding it hands the
-     * whole cell to whichever plan happened to cover it, so a doorway wears one
-     * room's floor right across to the far side instead of the two floors
-     * meeting in the opening. Dropped from the seed list, it is reached by
-     * expansion from each side and splits on its centreline.
-     *
-     * Painted plans are included. Painting across a doorway says which floor
-     * goes there, not that one room now owns the whole opening.
-     */
-    static seedsOffThresholds(plans, thresholds) {
-        const list = [...plans];
-        if (!thresholds?.size) return list;
-        return list.map(plan => (plan.seedCells || []).some(key => thresholds.has(key))
-            ? { ...plan, seedCells: plan.seedCells.filter(key => !thresholds.has(key)) }
-            : plan);
     }
 
     commit(data) {
@@ -37673,21 +37657,10 @@ class RoomTopology {
         let nextRoomNumber = RoomTopology.nextRoomNumber(plans);
         const createdIds = [];
         for (const component of components) {
-            const present = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
-            // A painted plan is a footprint the player drew. Enclosing more
-            // ground around it must not silently repaint that ground: walling
-            // one tile outside a painted floor used to hand the whole ring to
-            // the floor, so editing a wall moved the floor. The ring stays bare
-            // until the player paints it, which is the same gesture that made
-            // the room in the first place.
-            const candidates = present.filter(plan => plan.origin !== 'painted');
-            // Thresholds are never proposed: they belong to both sides of the
-            // opening and are resolved by expansion, not by ownership.
-            const unowned = component.cells.filter(key =>
-                !seedOwner.has(key) && !geometry.thresholds.has(key));
+            const candidates = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
+            const unowned = component.cells.filter(key => !seedOwner.has(key));
             if (!unowned.length) continue;
             if (!candidates.length) {
-                if (present.length) continue;
                 const previousId = RoomTopology.majorityPreviousOwner(unowned, input.previousGrid);
                 const previous = byId.get(previousId);
                 const id = RoomTopology.uniqueRoomId(byId, nextRoomNumber++);
@@ -39200,21 +39173,10 @@ class WallGeometry {
         return (a.connectGroup ?? 'wall') === (b.connectGroup ?? 'wall');
     }
 
-    /**
-     * The fences a wall cell puts between its own four blocks.
-     *
-     * A cell fences the axis it runs along, so a floor either side stops on the
-     * centreline instead of leaking through. An END CAP — a lone post, or the
-     * last cell of a run, with at most one connection — fences BOTH axes: the
-     * wall stops there, and without the second fence a floor flows into the cap
-     * cell lengthwise from the room beyond the end, fills it, and shows past
-     * the rounded art as a part-tile hanging off the end of the wall.
-     */
     static fencesForMask(mask) {
-        const cap = WallGeometry.connectionCount(mask) <= 1;
         return Object.freeze({
-            horizontal: cap || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
-            vertical: cap || (mask & WallGeometry.MASK_VERTICAL) !== 0
+            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
         });
     }
 
@@ -39394,54 +39356,6 @@ class WallFaceResolver {
         return Object.freeze({ kind: 'exterior', loopId: WallFaceResolver.loopAt(bx, by, topology) ?? 'outside' });
     }
 
-    /**
-     * The atom a rendered slice shows, together with the surface it paints as.
-     *
-     * These are normally the same question, but not at a wall corner. A corner
-     * cell's band is buried on the room side by the arm turning away from the
-     * run, so classifying it on its own would make the last half-cell of every
-     * wall an exterior nub: a 16px paint target sitting at the end of a run it
-     * is visually part of, refusing the colour the rest of the wall takes. The
-     * pixels belong to the run, so the band inherits the run's surface and
-     * stores its paint on the atom that is not buried.
-     */
-    static surfaceOf(slice, grid, topology = {}) {
-        const atom = WallFaceResolver.visibleAtom(slice, grid, topology);
-        const classification = WallFaceResolver.classify(atom, grid, topology);
-        if (slice.kind !== 'horizontal-band' || classification.kind === 'room') {
-            return Object.freeze({ atom, classification });
-        }
-        const inherited = WallFaceResolver.bandRunSurface(slice, grid, topology);
-        return Object.freeze({ atom, classification: inherited || classification });
-    }
-
-    // Only a band that is genuinely buried on its room side borrows; a band
-    // with open ground on both sides is exterior and stays exterior.
-    static bandRunSurface(slice, grid, topology) {
-        const buried = ['north', 'south'].some(face => WallFaceResolver.classify(
-            { x: slice.x, y: slice.y, face, half: slice.half }, grid, topology
-        ).kind === 'buried');
-        if (!buried) return null;
-        const unit = (2 * slice.x) + slice.half;
-        for (const step of [-1, 1]) {
-            const neighbour = unit + step;
-            const x = Math.floor(neighbour / 2);
-            const half = neighbour - (2 * x);
-            const spans = WallFaceResolver.paintSpansOf(x, slice.y, topology);
-            if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
-            const classification = WallFaceResolver.classify(
-                WallFaceResolver.visibleAtom({ x, y: slice.y, kind: 'horizontal-band', half }, grid, topology),
-                grid, topology
-            );
-            if (classification.kind === 'room') return classification;
-        }
-        return null;
-    }
-
-    static paintSpansOf(x, y, topology) {
-        return topology.walls?.paintSpans?.get(BuildKeys.cell(x, y)) || [];
-    }
-
     static visibleAtom(slice, grid, topology = {}) {
         const x = slice.x;
         const y = slice.y;
@@ -39486,9 +39400,8 @@ class WallFaceResolver {
         for (const [cellKey, spans] of geometry.paintSpans || []) {
             const { x, y } = BuildKeys.parseCell(cellKey);
             for (const span of spans) {
-                const { atom, classification } = WallFaceResolver.surfaceOf(
-                    { x, y, kind: span.kind, half: span.half }, grid, topology
-                );
+                const atom = WallFaceResolver.visibleAtom({ x, y, kind: span.kind, half: span.half }, grid, topology);
+                const classification = WallFaceResolver.classify(atom, grid, topology);
                 if (classification.kind === 'buried') continue;
                 const surface = classification.kind === 'room'
                     ? `room:${classification.roomId}` : `exterior:${classification.loopId ?? 'outside'}`;
@@ -39745,11 +39658,12 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
-            const { atom, classification } = WallFaceResolver.surfaceOf(
+            const atom = WallFaceResolver.visibleAtom(
                 { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
                 cache.grid,
                 topology
             );
+            const classification = WallFaceResolver.classify(atom, cache.grid, topology);
             if (classification.kind === 'buried') return null;
             const roomId = classification.kind === 'room' ? classification.roomId : null;
             return {
@@ -44432,7 +44346,6 @@ class FloorOwnershipResolver {
         const blockHeight = height * 2;
         const reachBlocks = Math.max(0, Math.floor(Number(input?.reachBlocks) || 0));
         const walls = FloorOwnershipResolver.normalizeWallMasks(input?.walls);
-        const expandCells = new Set(input?.expandCells || []);
         const plans = FloorOwnershipResolver.normalizePlans(input?.plans);
         let owners = new Array(blockWidth * blockHeight).fill(null);
 
@@ -44458,7 +44371,6 @@ class FloorOwnershipResolver {
                 for (let bx = 0; bx < blockWidth; bx++) {
                     const targetIndex = by * blockWidth + bx;
                     if (previous[targetIndex] !== null) continue;
-                    if (!FloorOwnershipResolver.canExpandInto(bx, by, walls, expandCells)) continue;
                     const claims = new Map();
                     for (const step of FloorOwnershipResolver.STEPS) {
                         const sx = bx - step.dx;
@@ -44516,28 +44428,6 @@ class FloorOwnershipResolver {
             a.id.localeCompare(b.id);
     }
 
-    // Which sides of a wall cell a floor may run in under. A run is entered
-    // across its length, never from its end. A lone post has no length, so it
-    // takes floor from every side.
-    static canEnterWall(mask, dx, dy) {
-        if (mask === 0) return true;
-        const vertical = (mask & WallGeometry.MASK_VERTICAL) !== 0;
-        const horizontal = (mask & WallGeometry.MASK_HORIZONTAL) !== 0;
-        if (vertical && !horizontal) return dx !== 0;
-        if (horizontal && !vertical) return dy !== 0;
-        return true;
-    }
-
-    // Expansion exists to bury a room's floor under the masonry that encloses
-    // it, not to grow the room. A block on open ground is never claimed, so the
-    // floor a player paints ends exactly on the cells they painted; only wall
-    // cells (and the threshold cells a doorway gap leaves in the line of a
-    // wall) are reachable beyond the seeds.
-    static canExpandInto(bx, by, walls, expandCells) {
-        const key = BuildKeys.cell(Math.floor(bx / 2), Math.floor(by / 2));
-        return walls.has(key) || expandCells.has(key);
-    }
-
     static canStep(sx, sy, tx, ty, walls) {
         const dx = tx - sx;
         const dy = ty - sy;
@@ -44550,17 +44440,7 @@ class FloorOwnershipResolver {
         const sourceCellY = Math.floor(sy / 2);
         const targetCellX = Math.floor(tx / 2);
         const targetCellY = Math.floor(ty / 2);
-        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) {
-            // Fences only separate blocks INSIDE a cell, so they say nothing
-            // about entering one. A floor tucks under a wall from the side that
-            // wall faces; entering from its end instead fills the end cap and
-            // shows past the rounded art as a part-tile hanging off the wall.
-            const targetMask = walls.get(BuildKeys.cell(targetCellX, targetCellY));
-            if (targetMask === undefined) return true;
-            return FloorOwnershipResolver.canEnterWall(
-                targetMask, targetCellX - sourceCellX, targetCellY - sourceCellY
-            );
-        }
+        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) return true;
         const mask = walls.get(BuildKeys.cell(sourceCellX, sourceCellY));
         if (mask === undefined) return true;
         const fences = WallGeometry.fencesForMask(mask);
@@ -44616,7 +44496,6 @@ class FloorOwnershipResolver {
 /* -- js/Map/Floors/FloorRenderer.js -- */
 class FloorRenderer {
     static BLOCKS_PER_CELL = 2;
-    static CENTRELINE_BLOCKS = 1;
 
     constructor(gameMap, registry) {
         this.gameMap = gameMap;
@@ -44734,16 +44613,15 @@ class FloorRenderer {
             width,
             height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            expandCells: [...geometry.thresholds],
             plans: rooms.map(room => ({ id: room.id, seedCells: seedsByRoom.get(room.id) || [], priority: room.properties?.priority })),
             reachBlocks: this.bleedBlocks()
         }));
         return this.ownedBlocks;
     }
 
-    // Half a cell, in blocks. Not a setting: see SiteConfig.floorSystem.
     bleedBlocks() {
-        return FloorRenderer.CENTRELINE_BLOCKS;
+        const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 0.5);
+        return Math.max(0, Math.round(cells * FloorRenderer.BLOCKS_PER_CELL));
     }
 
     blocksOf(roomId) {
@@ -70732,20 +70610,8 @@ class BuildModeUI extends UIComponent {
     setGridOverlay(visible) {
         const canvas = this.container?.canvas;
         if (!canvas) return;
-        const gameMap = this.container?.gameMap;
-        const grid = gameMap?.gridSystem;
-        const cellSize = grid?.config?.cellSize;
-        // `.canvas` is the padded render area, so the grid has to be told where
-        // the gameplay grid sits inside it — otherwise it tiles across the
-        // render padding and offers cells that are not part of the map.
-        if (cellSize) {
-            const insets = gameMap?.renderInsets || { top: 0, left: 0 };
-            canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
-            canvas.style.setProperty('--build-grid-left', `${insets.left || 0}px`);
-            canvas.style.setProperty('--build-grid-top', `${insets.top || 0}px`);
-            canvas.style.setProperty('--build-grid-width', `${(grid.gridWidth || 0) * cellSize}px`);
-            canvas.style.setProperty('--build-grid-height', `${(grid.gridHeight || 0) * cellSize}px`);
-        }
+        const cellSize = this.container?.gameMap?.gridSystem?.config?.cellSize;
+        if (cellSize) canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
         canvas.classList.toggle('show-build-grid', visible === true);
     }
 

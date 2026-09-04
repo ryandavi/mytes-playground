@@ -12,11 +12,12 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
-            const { atom, classification } = WallFaceResolver.surfaceOf(
+            const atom = WallFaceResolver.visibleAtom(
                 { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
                 cache.grid,
                 topology
             );
+            const classification = WallFaceResolver.classify(atom, cache.grid, topology);
             if (classification.kind === 'buried') return null;
             const roomId = classification.kind === 'room' ? classification.roomId : null;
             return {

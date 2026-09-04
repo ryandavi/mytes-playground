@@ -102,50 +102,8 @@ function testOpeningAdjacency() {
 // Walling around a painted floor must not repaint the ground it encloses. An
 // authored plan in the same situation still fills its enclosure, which is what
 // makes "draw four walls, get a room" work.
-function testPaintedFootprintIsNotGrown() {
-    const rows = ['######', '#....#', '#....#', '#....#', '######'];
-    const geometry = core.WallGeometry.compute(wallsFrom(rows));
-    const painted = { id: 'patch', buildingId: 'house', displayName: 'Patch', origin: 'painted',
-        seedCells: ['2,2'], floorFinishId: 'tile', wallFinishId: null, properties: {} };
-    const proposal = core.RoomTopology.proposeSeeds({ width: 6, height: 5, geometry, plans: [painted] });
-    assert(proposal.plans.length === 1, 'no room is invented around a painted footprint');
-    assert(proposal.plans[0].seedCells.length === 1, 'a painted plan keeps exactly the cells it was painted on');
-    assert(proposal.createdIds.length === 0, 'enclosing a painted floor creates nothing');
-
-    const authored = { ...painted, id: 'room', origin: 'authored' };
-    const grown = core.RoomTopology.proposeSeeds({ width: 6, height: 5, geometry, plans: [authored] });
-    assert(grown.plans[0].seedCells.length === 12, 'an authored plan still fills its enclosure');
-}
-
-// Editing a wall must not cost the player a name they typed. Splitting an
-// enclosure renames nothing that already existed: the plan that kept its seeds
-// keeps its name, and only the genuinely new half gets an invented one.
-function testRenamesSurviveWallEdits() {
-    const named = { id: 'den', buildingId: 'house', displayName: "Ryan's Den",
-        authoredDisplayName: "Ryan's Den", origin: 'authored', seedCells: ['1,1'],
-        floorFinishId: 'boards', wallFinishId: 'sage', properties: {} };
-    const open = core.WallGeometry.compute(wallsFrom(['#####', '#...#', '#...#', '#...#', '#####']));
-    const before = core.RoomTopology.proposeSeeds({ width: 5, height: 5, geometry: open, plans: [named] });
-    assert(before.plans[0].displayName === "Ryan's Den", 'a rename survives the first proposal');
-
-    // Now divide it with a wall across the middle.
-    const split = core.WallGeometry.compute(wallsFrom(['#####', '#...#', '#####', '#...#', '#####']));
-    const after = core.RoomTopology.proposeSeeds({ width: 5, height: 5, geometry: split, plans: before.plans });
-    const den = after.plans.find(plan => plan.id === 'den');
-    assert(den.displayName === "Ryan's Den", 'the surviving plan keeps the name the player typed');
-    // A plan already owning both halves keeps both: the wall divided the space,
-    // not the room, so no floor moves and no room is invented behind the
-    // player's back. testSplitCreatesStablePlan covers the other case, where
-    // the far side is genuinely unowned and does become its own plan.
-    assert(after.createdIds.length === 0, 'walling through a room invents no room');
-    assert(den.seedCells.length === 6, 'both halves stay with the plan that owned them');
-    assert(den.floorFinishId === 'boards' && den.wallFinishId === 'sage',
-        'dividing a room does not redecorate it');
-}
 
 testProposalAndProjectionData();
-testRenamesSurviveWallEdits();
-testPaintedFootprintIsNotGrown();
 testSplitCreatesStablePlan();
 testOpeningAdjacency();
-console.log('Room topology tests passed: proposals, painted footprints, renames, split inheritance, footprints, shell edges, opening adjacency.');
+console.log('Room topology tests passed: proposals, split inheritance, footprints, shell edges, opening adjacency.');

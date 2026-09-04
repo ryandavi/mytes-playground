@@ -1,6 +1,5 @@
 class FloorRenderer {
     static BLOCKS_PER_CELL = 2;
-    static CENTRELINE_BLOCKS = 1;
 
     constructor(gameMap, registry) {
         this.gameMap = gameMap;
@@ -118,16 +117,15 @@ class FloorRenderer {
             width,
             height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            expandCells: [...geometry.thresholds],
             plans: rooms.map(room => ({ id: room.id, seedCells: seedsByRoom.get(room.id) || [], priority: room.properties?.priority })),
             reachBlocks: this.bleedBlocks()
         }));
         return this.ownedBlocks;
     }
 
-    // Half a cell, in blocks. Not a setting: see SiteConfig.floorSystem.
     bleedBlocks() {
-        return FloorRenderer.CENTRELINE_BLOCKS;
+        const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 0.5);
+        return Math.max(0, Math.round(cells * FloorRenderer.BLOCKS_PER_CELL));
     }
 
     blocksOf(roomId) {

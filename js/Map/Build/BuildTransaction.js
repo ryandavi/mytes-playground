@@ -140,8 +140,7 @@ class BuildTransaction {
             width: this.width,
             height: this.height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            expandCells: [...geometry.thresholds],
-            plans: BuildTransaction.seedsOffThresholds(level.rooms.values(), geometry.thresholds),
+            plans: level.rooms.values(),
             reachBlocks: this.reachBlocks,
             revision
         });
@@ -152,27 +151,6 @@ class BuildTransaction {
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
         return Object.freeze({ geometry, grid, topology, revision });
-    }
-
-    /**
-     * Drops threshold cells from every plan's seeds before ownership is solved.
-     *
-     * A threshold is an open cell in the line of a wall — what a doorway gap
-     * is — and it belongs to both sides of that wall. Seeding it hands the
-     * whole cell to whichever plan happened to cover it, so a doorway wears one
-     * room's floor right across to the far side instead of the two floors
-     * meeting in the opening. Dropped from the seed list, it is reached by
-     * expansion from each side and splits on its centreline.
-     *
-     * Painted plans are included. Painting across a doorway says which floor
-     * goes there, not that one room now owns the whole opening.
-     */
-    static seedsOffThresholds(plans, thresholds) {
-        const list = [...plans];
-        if (!thresholds?.size) return list;
-        return list.map(plan => (plan.seedCells || []).some(key => thresholds.has(key))
-            ? { ...plan, seedCells: plan.seedCells.filter(key => !thresholds.has(key)) }
-            : plan);
     }
 
     commit(data) {

@@ -57,21 +57,10 @@ class RoomTopology {
         let nextRoomNumber = RoomTopology.nextRoomNumber(plans);
         const createdIds = [];
         for (const component of components) {
-            const present = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
-            // A painted plan is a footprint the player drew. Enclosing more
-            // ground around it must not silently repaint that ground: walling
-            // one tile outside a painted floor used to hand the whole ring to
-            // the floor, so editing a wall moved the floor. The ring stays bare
-            // until the player paints it, which is the same gesture that made
-            // the room in the first place.
-            const candidates = present.filter(plan => plan.origin !== 'painted');
-            // Thresholds are never proposed: they belong to both sides of the
-            // opening and are resolved by expansion, not by ownership.
-            const unowned = component.cells.filter(key =>
-                !seedOwner.has(key) && !geometry.thresholds.has(key));
+            const candidates = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
+            const unowned = component.cells.filter(key => !seedOwner.has(key));
             if (!unowned.length) continue;
             if (!candidates.length) {
-                if (present.length) continue;
                 const previousId = RoomTopology.majorityPreviousOwner(unowned, input.previousGrid);
                 const previous = byId.get(previousId);
                 const id = RoomTopology.uniqueRoomId(byId, nextRoomNumber++);

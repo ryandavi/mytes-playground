@@ -58,13 +58,19 @@ const SiteConfig = Object.freeze({
 		// A room with no authored floorFinishId keeps whatever the map's own
 		// tile layers already draw. Customisation is opt-in per room, so adding
 		// the system changes nothing until a room asks for it.
-		defaultFinishId: null
-		// There is no edge-bleed setting. A floor's edge sits on the CENTRELINE
-		// of the cell that bounds it — masonry, or the outermost cell the player
-		// painted — and that centreline is geometry, not taste: the wall is
-		// `thickness` centred in its cell, so its middle sits at cell / 2
-		// whatever the thickness is. Any other reach tucks past the wall's outer
-		// face or stops short of it. See FloorRenderer.CENTRELINE_BLOCKS.
+		defaultFinishId: null,
+		// Grow each room's floor by this many cells so it runs UNDER the wall
+		// that encloses it. A room's bounds stop one cell short of that wall,
+		// and the wall covers only its centred thickness, so without any bleed a
+		// strip of the map's own ground shows along every outer edge.
+		//
+		// Half a cell, because that is the wall's CENTRELINE: the wall is
+		// `thickness` centred in its cell, so its middle sits at
+		// (cell - thickness) / 2 + thickness / 2 = cell / 2, whatever the
+		// thickness is. The floor therefore ends buried under the wall — no
+		// ground strip inside, and nothing spilling past the wall's outer face
+		// onto the exterior, which is what a full cell did.
+		edgeBleedCells: 0.5
 	}),
 
 	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same

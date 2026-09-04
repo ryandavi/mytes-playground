@@ -9,54 +9,6 @@ class WallFaceResolver {
         return Object.freeze({ kind: 'exterior', loopId: WallFaceResolver.loopAt(bx, by, topology) ?? 'outside' });
     }
 
-    /**
-     * The atom a rendered slice shows, together with the surface it paints as.
-     *
-     * These are normally the same question, but not at a wall corner. A corner
-     * cell's band is buried on the room side by the arm turning away from the
-     * run, so classifying it on its own would make the last half-cell of every
-     * wall an exterior nub: a 16px paint target sitting at the end of a run it
-     * is visually part of, refusing the colour the rest of the wall takes. The
-     * pixels belong to the run, so the band inherits the run's surface and
-     * stores its paint on the atom that is not buried.
-     */
-    static surfaceOf(slice, grid, topology = {}) {
-        const atom = WallFaceResolver.visibleAtom(slice, grid, topology);
-        const classification = WallFaceResolver.classify(atom, grid, topology);
-        if (slice.kind !== 'horizontal-band' || classification.kind === 'room') {
-            return Object.freeze({ atom, classification });
-        }
-        const inherited = WallFaceResolver.bandRunSurface(slice, grid, topology);
-        return Object.freeze({ atom, classification: inherited || classification });
-    }
-
-    // Only a band that is genuinely buried on its room side borrows; a band
-    // with open ground on both sides is exterior and stays exterior.
-    static bandRunSurface(slice, grid, topology) {
-        const buried = ['north', 'south'].some(face => WallFaceResolver.classify(
-            { x: slice.x, y: slice.y, face, half: slice.half }, grid, topology
-        ).kind === 'buried');
-        if (!buried) return null;
-        const unit = (2 * slice.x) + slice.half;
-        for (const step of [-1, 1]) {
-            const neighbour = unit + step;
-            const x = Math.floor(neighbour / 2);
-            const half = neighbour - (2 * x);
-            const spans = WallFaceResolver.paintSpansOf(x, slice.y, topology);
-            if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
-            const classification = WallFaceResolver.classify(
-                WallFaceResolver.visibleAtom({ x, y: slice.y, kind: 'horizontal-band', half }, grid, topology),
-                grid, topology
-            );
-            if (classification.kind === 'room') return classification;
-        }
-        return null;
-    }
-
-    static paintSpansOf(x, y, topology) {
-        return topology.walls?.paintSpans?.get(BuildKeys.cell(x, y)) || [];
-    }
-
     static visibleAtom(slice, grid, topology = {}) {
         const x = slice.x;
         const y = slice.y;
@@ -101,9 +53,8 @@ class WallFaceResolver {
         for (const [cellKey, spans] of geometry.paintSpans || []) {
             const { x, y } = BuildKeys.parseCell(cellKey);
             for (const span of spans) {
-                const { atom, classification } = WallFaceResolver.surfaceOf(
-                    { x, y, kind: span.kind, half: span.half }, grid, topology
-                );
+                const atom = WallFaceResolver.visibleAtom({ x, y, kind: span.kind, half: span.half }, grid, topology);
+                const classification = WallFaceResolver.classify(atom, grid, topology);
                 if (classification.kind === 'buried') continue;
                 const surface = classification.kind === 'room'
                     ? `room:${classification.roomId}` : `exterior:${classification.loopId ?? 'outside'}`;
