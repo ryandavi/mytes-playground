@@ -460,7 +460,7 @@ class RoomPanel extends ModalWindow {
         if (name) {
             // Not while they are still in it: writing the stored value back
             // under the cursor is how a rename undoes itself as you type.
-            if (document.activeElement !== name) name.value = room.properties?.playerName ?? '';
+            if (document.activeElement !== name) name.value = RoomPanel.playerName(room);
             name.placeholder = room.properties?.authoredDisplayName ??
                 room.properties?.displayName ?? room.id;
         }
@@ -486,7 +486,7 @@ class RoomPanel extends ModalWindow {
         const name = document.createElement('input');
         name.type = 'text';
         name.className = 'room-row__name';
-        name.value = room.properties?.playerName ?? '';
+        name.value = RoomPanel.playerName(room);
         name.placeholder = room.properties?.authoredDisplayName ?? room.properties?.displayName ?? room.id;
         name.maxLength = 24;
         name.autocomplete = 'off';
@@ -707,6 +707,20 @@ class RoomPanel extends ModalWindow {
         return this.parent?.surfaceCustomizePanel?.openRoomSurface?.(roomId, surface) ?? false;
     }
 
+    /**
+     * The name the player gave this room, as opposed to the one the map was
+     * authored with — the field's own value, with the authored name standing
+     * behind it as the placeholder. It is derived rather than stored: a rename
+     * writes `displayName` on the room plan (see `commitRoom`), and reading
+     * back a `playerName` that nothing ever writes is why a typed name
+     * reappeared blank the moment the row was redrawn.
+     */
+    static playerName(room) {
+        const authored = room?.properties?.authoredDisplayName ?? null;
+        const display = room?.properties?.displayName ?? null;
+        return display && display !== authored ? display : '';
+    }
+
     /** The wall-cell ring immediately outside the room's floor mask. */
     perimeterPlan(room) {
         const empty = { missing: [], present: 0, presentCells: [], state: 'open', label: 'Open', action: 'Enclose room', actionTitle: 'Build walls around this room' };
@@ -714,14 +728,22 @@ class RoomPanel extends ModalWindow {
         const width = this.gameMap?.gridSystem?.gridWidth ?? 0;
         const height = this.gameMap?.gridSystem?.gridHeight ?? 0;
         const walls = this.gameMap?.wallBuilder?.baseCells;
+        // A room owns the masonry that encloses it: ownership expands under the
+        // walls so a floor runs beneath them rather than stopping a half-tile
+        // short. Ringing those cells puts the perimeter one cell out beyond the
+        // walls that are already there, which is how an enclosed room came to
+        // offer Finish walls and then build a second ring around the first. The
+        // ring belongs outside the room's OPEN cells.
+        const interior = new Set([...room.shape.cells].filter(key => !walls?.has(key)));
+        if (interior.size === 0) return empty;
         const boundary = new Map();
-        for (const key of room.shape.cells) {
+        for (const key of interior) {
             const [x, y] = key.split(',').map(Number);
             for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
                 const nx = x + dx;
                 const ny = y + dy;
                 const next = `${nx},${ny}`;
-                if (room.shape.cells.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                if (interior.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
                 boundary.set(next, { x: nx, y: ny });
             }
             // Wall corners occupy their own diagonal cell. Add a diagonal only
@@ -729,8 +751,7 @@ class RoomPanel extends ModalWindow {
             // are outside the room. This closes rectangular and stepped outer
             // corners without filling the inside notch of an L-shaped room.
             for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-                if (room.shape.cells.has(`${x + dx},${y}`) ||
-                    room.shape.cells.has(`${x},${y + dy}`)) continue;
+                if (interior.has(`${x + dx},${y}`) || interior.has(`${x},${y + dy}`)) continue;
                 const nx = x + dx;
                 const ny = y + dy;
                 if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
@@ -847,7 +868,7 @@ class RoomPanel extends ModalWindow {
         if (!room || !builder || !this.gameMap?.buildTransaction || plan.missing.length === 0) return false;
         const result = builder.applyWallCellChanges(
             plan.missing.map(cell => ({ ...cell, data: {} })),
-            { label: `Enclose ${this.label(room)}` }
+            { label: `Enclose ${this.label(room)}`, adoptRoomIds: [room.id] }
         );
         if (!result?.applied.length) {
             const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';

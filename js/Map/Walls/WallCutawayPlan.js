@@ -99,13 +99,34 @@ class WallCutawayPlan extends WallRenderer {
         }
 
         const raw = this.getRawCutStates(piece, count);
-        if (!raw || !piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) return raw;
+        if (!raw) return raw;
 
         // Cutaway height belongs to the structural run, not to its render
-        // pieces. Resolve the whole horizontal chain at once so a paint/room
-        // seam cannot independently create a second transition beside the
-        // first one.
-        const chain = this.getHorizontalCellChain(piece.cells[0]);
+        // pieces, so every horizontal cell is answered by resolving the whole
+        // chain it belongs to. Per cell rather than per piece: a piece that
+        // contains a corner or a junction spans more than one chain, and it
+        // used to fall back to the raw states for all of them — which is how a
+        // lowered run inside a wrapped wall reached its end with no transition
+        // at all. Structural cells keep the raw answer; they are already
+        // standing, and they are the boundaries the chains resolve against.
+        //
+        // "Walls down" has no such need: its one standing island is the span
+        // under the moving object, and anchoring the run's ends on top of that
+        // just raises wall the player did not ask for.
+        const anchorRun = this.presentation !== 'down';
+        const chains = new Map();
+        return piece.cells.map((cell, index) => {
+            if (!this.isHorizontalOnlyCell(cell)) return raw[index];
+            const chain = this.getHorizontalCellChain(cell);
+            if (chain.length === 0) return raw[index];
+            const key = BuildKeys.cell(chain[0].x, chain[0].y);
+            if (!chains.has(key)) chains.set(key, this.resolveChain(chain, anchorRun));
+            return chains.get(key).get(BuildKeys.cell(cell.x, cell.y)) === true;
+        });
+    }
+
+    /** One horizontal run, resolved end to end, keyed by cell. */
+    resolveChain(chain, anchorRun) {
         const rawByPiece = new Map();
         const cut = chain.map(cell => {
             const host = this.findPieceForCell(cell.x, cell.y);
@@ -116,20 +137,17 @@ class WallCutawayPlan extends WallRenderer {
             const index = host.cells.findIndex(candidate => candidate.x === cell.x && candidate.y === cell.y);
             return rawByPiece.get(host)?.[index] === true;
         });
+        const resolved = this.resolveChainHeights(chain, cut, anchorRun);
+        return new Map(chain.map((cell, index) => [BuildKeys.cell(cell.x, cell.y), resolved[index]]));
+    }
 
-        // Everything from here to the transition tidy-up exists to give a
-        // cutaway somewhere sensible to return to full height. "Walls down" has
-        // no such need: its one standing island is the span under the moving
-        // object, and anchoring the run's ends on top of that just raises wall
-        // the player did not ask for.
-        const anchorRun = this.presentation !== 'down';
-
-        // Straight endpoints abutting vertical structure remain standing. Pure
-        // end caps keep their requested state: a cap can belong to a long stub
-        // run as long as that run eventually reaches one valid transition.
+    resolveChainHeights(chain, cut, anchorRun, standEndCaps = true) {
+        // Straight endpoints abutting vertical structure remain standing, and so
+        // does a free end: every lowered run climbs back to full height at both
+        // of its ends.
         if (anchorRun) {
-            this.resolveHorizontalBoundary(chain, cut, 0);
-            this.resolveHorizontalBoundary(chain, cut, cut.length - 1);
+            this.resolveHorizontalBoundary(chain, cut, 0, standEndCaps);
+            this.resolveHorizontalBoundary(chain, cut, cut.length - 1, standEndCaps);
         }
 
         // Opposing transitions may not touch. This most often happens when a
@@ -166,10 +184,43 @@ class WallCutawayPlan extends WallRenderer {
             // whenever the run beyond it is lowered.
             this.reserveTransitionBesideFullCap(chain, cut, 0, 1);
             this.reserveTransitionBesideFullCap(chain, cut, cut.length - 1, -1);
+            this.enforceTransitionBoundaries(chain, cut);
         }
+        return cut;
+    }
 
-        const resolvedByCell = new Map(chain.map((cell, index) => [`${cell.x},${cell.y}`, cut[index]]));
-        return piece.cells.map(cell => resolvedByCell.get(`${cell.x},${cell.y}`) === true);
+    /**
+     * A lowered window is a stub with a stepped transition either side of it,
+     * or it is nothing.
+     *
+     * Standing the cells at a run's ends is not enough on its own: the ramp art
+     * is a straight horizontal frame, so a cell that stands but is a corner, a
+     * junction or an end cap draws no step, and the wall drops from full height
+     * to stub in one hard edge. Rather than leave that, the window closes and
+     * the wall stays up — Ryan's call, 2026-09-05: if there is not at least one
+     * lowered cell between two transition columns, do not cut away at all.
+     */
+    enforceTransitionBoundaries(chain, cut) {
+        const carriesRamp = index => {
+            const cell = chain[index];
+            return !!cell && !cell.opening && cut[index] === false &&
+                WallBuilder.isStraightHorizontal(this.computeMask(cell));
+        };
+        for (let changed = true; changed;) {
+            changed = false;
+            for (let index = 0; index < cut.length;) {
+                if (!cut[index]) {
+                    index++;
+                    continue;
+                }
+                const from = index;
+                while (index < cut.length && cut[index]) index++;
+                if (carriesRamp(from - 1) && carriesRamp(index)) continue;
+                for (let inner = from; inner < index; inner++) cut[inner] = false;
+                changed = true;
+            }
+        }
+        return cut;
     }
 
     getRawCutStates(piece, count = piece.cells.length) {
@@ -216,15 +267,25 @@ class WallCutawayPlan extends WallRenderer {
         return WallBuilder.isHorizontalMask(mask) && !WallBuilder.isVerticalMask(mask);
     }
 
-    resolveHorizontalBoundary(chain, cut, boundaryIndex) {
+    /**
+     * A lowered run always climbs back to full height, at both of its ends.
+     *
+     * Where it meets a corner or a junction that is obvious: the structure
+     * stands and the straight cell beside it steps down. A free end used to be
+     * the exception — a cap could stay a stub as long as the run reached one
+     * valid transition somewhere — and that is the flat, unfinished end the
+     * cutaway showed wherever a wall simply stopped. The end stands too now.
+     * It cannot carry the straight ramp art itself, so `reserveTransitionBeside‑
+     * FullCap` hands the step to the cell inside it.
+     *
+     * An opening is never raised: a door standing full height in the middle of
+     * a cutaway is worse than an unfinished end.
+     */
+    resolveHorizontalBoundary(chain, cut, boundaryIndex, standEndCaps = true) {
         const boundary = chain[boundaryIndex];
-        if (!boundary) return;
-        if (!WallBuilder.isEndCapMask(this.computeMask(boundary))) {
-            // This horizontal sequence terminates at a corner, junction, or
-            // other structural boundary outside the sequence. Its boundary
-            // straight cell must stand so it can transition into the stub run.
-            if (!boundary.opening) cut[boundaryIndex] = false;
-        }
+        if (!boundary || boundary.opening) return;
+        if (!standEndCaps && WallBuilder.isEndCapMask(this.computeMask(boundary))) return;
+        cut[boundaryIndex] = false;
     }
 
     ensureHorizontalChainAnchor(chain, cut) {

@@ -11,6 +11,7 @@ const sourceFiles = [
     'js/Map/Build/WallSurfaceAtomStore.js',
     'js/Map/Walls/WallGeometry.js',
     'js/Map/Floors/FloorOwnershipResolver.js',
+    'js/Map/Walls/WallSurfaceRuns.js',
     'js/Map/Walls/WallFaceResolver.js'
 ];
 
@@ -19,7 +20,7 @@ function loadCore() {
     for (const relative of sourceFiles) {
         vm.runInContext(fs.readFileSync(path.join(repoRoot, relative), 'utf8'), context, { filename: relative });
     }
-    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, WallFaceResolver })', context);
+    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, WallFaceResolver, WallSurfaceRuns })', context);
 }
 
 function parseFixture(filePath) {
@@ -358,12 +359,63 @@ function runGeometryContracts(core) {
         ownerAt: (bx, by) => by >= 4 && bx >= 2 ? 'A' : null,
         blocksOf: roomId => roomId === 'A' ? [[2, 4], [3, 4], [4, 4], [5, 4]] : []
     };
+    // Revised 2026-09-05 with the face rule: a half that fronts outside on both
+    // sides IS outside, and takes the building's finish. Reaching over it for a
+    // room further along the run dressed the last cell of a wall in a colour
+    // nothing beside it was wearing.
     const terminalSections = core.WallFaceResolver.sections(terminal, terminalGrid, { walls: terminal });
     const terminalBand = terminalSections.find(section => section.surface.roomId === 'A');
-    assertEqual(terminalBand.spans.filter(span => span.kind === 'horizontal-band').length, 6,
-        'a terminal half outside the room footprint stays in the continuing wall section');
+    assertEqual(terminalBand.spans.filter(span => span.kind === 'horizontal-band').length, 4,
+        'the room section stops where the room does');
+    assertEqual(terminalSections.find(section => section.surface.kind === 'exterior').atoms,
+        ['0,1/south/0', '0,1/south/1'],
+        'the length of wall past the room is one exterior section');
 
-    return 11;
+    // A run between two returning walls: the middle faces outside, and both end
+    // halves are buried on both sides. They take the run's surface rather than
+    // whichever face happens to be open, or one wall reads as three.
+    const bay = make(['#.#', '###', '#.#']);
+    const bayGrid = {
+        ownerAt: (bx, by) => by < 2 && bx >= 2 && bx < 4 ? 'A' : null,
+        blocksOf: roomId => roomId === 'A' ? [[2, 0], [3, 0], [2, 1], [3, 1]] : []
+    };
+    const bayBands = core.WallFaceResolver.sections(bay, bayGrid, { walls: bay })
+        .filter(section => section.spans.some(span => span.kind === 'horizontal-band'));
+    assertEqual(bayBands.length, 1, 'a run between two returning walls is one section');
+    assertEqual(bayBands[0].surface.kind, 'exterior', 'the run keeps the surface its middle faces');
+    assertEqual(bayBands[0].atoms, ['0,1/south/1', '1,1/south/0', '1,1/south/1', '2,1/south/0'],
+        'both buried end halves paint with the run');
+
+    // The sides of an arm, where it leaves the wall it hangs off. That cell's
+    // post faces are flush against the wall's own masonry and cannot classify
+    // themselves, so they take the arm's surfaces — otherwise the top of a
+    // painted arm keeps a stub of somebody else's finish.
+    const tee = make(['###', '.#.', '.#.']);
+    const teeGrid = {
+        ownerAt: (bx, by) => bx <= 2 && by >= 2 ? 'A' : null,
+        blocksOf: roomId => roomId === 'A' ? [[0, 2], [1, 2], [2, 2]] : []
+    };
+    const teePosts = core.WallFaceResolver.sections(tee, teeGrid, { walls: tee })
+        .filter(section => section.spans.some(span => span.kind.startsWith('post-')));
+    assertEqual(teePosts.map(section => section.atoms), [
+        ['1,0/west/0', '1,1/west/1', '1,2/west/1'],
+        ['1,0/east/0', '1,1/east/0', '1,2/east/0']
+    ], 'an arm carries its own sides through the junction it hangs from');
+
+    // A vertical run passing straight through a junction can have a different
+    // surface above and below it. The sliver at the junction goes with the half
+    // the camera sees, the same call the bands make.
+    const cross = make(['.#.', '###', '.#.']);
+    const crossGrid = {
+        ownerAt: (bx, by) => bx <= 1 && by <= 2 ? 'A' : null,
+        blocksOf: roomId => roomId === 'A' ? [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]] : []
+    };
+    const crossWest = core.WallFaceResolver.sections(cross, crossGrid, { walls: cross })
+        .filter(section => section.spans.some(span => span.kind === 'post-west'));
+    assertEqual(crossWest.map(section => section.atoms), [['1,0/west/1'], ['1,1/west/0', '1,2/west/0']],
+        'a junction post takes the southern half of its run');
+
+    return 14;
 }
 
 function main() {

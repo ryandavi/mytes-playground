@@ -5,6 +5,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectedWallCells = [];
         this.marquee = null;
         this.wallHighlights = [];
+        this.roomHighlight = null;
         this.boundDown = this.onPointerDown.bind(this);
         this.boundMove = this.onPointerMove.bind(this);
         this.boundUp = this.onPointerUp.bind(this);
@@ -163,11 +164,18 @@ class BuildMarqueeSelection extends UIComponent {
         if (this.emptyPress?.pointerId === event.pointerId) {
             const cell = this.emptyPress.cell;
             this.emptyPress = null;
+            // Floors are selectable in their own right. A click on one used to
+            // jump straight to the whole building, which is a strange answer to
+            // "what did I just click" and left no way to reach the room itself.
+            // It reads like the wall scopes now: one click is the thing, two is
+            // what it belongs to.
             const room = cell && this.container?.gameMap?.wallBuilder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.buildingComponentForRoom(room.id);
+            const component = room && event.detail >= 2 ? this.buildingComponentForRoom(room.id) : null;
             if (component) {
                 this.selectBuilding(component);
                 this.preferredScope = 'building';
+            } else if (room) {
+                this.selectRoom(room.id, cell);
             } else {
                 this.parent.selectionManager.setSelection([]);
                 this.clearSelection();
@@ -280,6 +288,7 @@ class BuildMarqueeSelection extends UIComponent {
     renderActionBar() {
         this.actionBar?.remove();
         this.actionBar = null;
+        if (this.selectionKind === 'room') return this.renderRoomActionBar();
         if (this.selectedWallCells.length === 0 || this.wallHighlights.length === 0) return;
         const bar = document.createElement('div');
         bar.className = 'stage-bar build-selection-actions ignore';
@@ -341,6 +350,55 @@ class BuildMarqueeSelection extends UIComponent {
         hint.className = 'build-selection-actions__hint';
         hint.textContent = 'Drag to move';
         controls.append(scopes, actions, hint);
+        bar.append(inspector, controls);
+        this.container?.element?.appendChild(bar);
+        this.actionBar = bar;
+    }
+
+    renderRoomActionBar() {
+        const roomId = this.selectionRoomIds[0];
+        const room = this.container?.gameMap?.regionManager?.get('room', roomId);
+        if (!room) return;
+        const bar = document.createElement('div');
+        bar.className = 'stage-bar build-selection-actions ignore';
+        bar.setAttribute('role', 'toolbar');
+        bar.setAttribute('aria-label', 'Room selection');
+        const inspector = document.createElement('div');
+        inspector.className = 'build-selection-actions__inspector';
+        const title = document.createElement('strong');
+        title.textContent = room.properties?.displayName || room.id;
+        const details = document.createElement('span');
+        const tiles = room.shape?.cells?.size ?? 0;
+        details.textContent = `Room · ${tiles} tile${tiles === 1 ? '' : 's'}`;
+        inspector.append(title, details);
+        const actions = document.createElement('div');
+        actions.className = 'stage-bar__group build-selection-actions__operations';
+        const ui = this.parent;
+        for (const [label, titleText, action] of [
+            ['Paint floor', 'Choose the finish for this floor',
+                () => ui.surfaceCustomizePanel?.openRoomSurface(roomId, 'floor')],
+            ['Paint walls', 'Choose the finish of the walls facing this room',
+                () => ui.surfaceCustomizePanel?.openRoomSurface(roomId, 'wall')],
+            ['Edit area', 'Redraw which tiles belong to this room',
+                () => ui.roomPanel?.select?.(roomId) ?? false],
+            ['Building', 'Select the whole building this room belongs to', () => {
+                const component = this.buildingComponentForRoom(roomId);
+                if (component) return this.selectBuilding(component);
+                ui.showMessage?.('This room is not part of a building yet.', 'info', 'Select');
+                return false;
+            }]
+        ]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'stage-bar__action';
+            button.textContent = label;
+            button.title = titleText;
+            button.addEventListener('click', action);
+            actions.appendChild(button);
+        }
+        const controls = document.createElement('div');
+        controls.className = 'build-selection-actions__controls';
+        controls.append(actions);
         bar.append(inspector, controls);
         this.container?.element?.appendChild(bar);
         this.actionBar = bar;
@@ -601,6 +659,13 @@ class BuildMarqueeSelection extends UIComponent {
                 if (remember) this.preferredScope = scope;
                 return this.selectBuilding(component, additive, cell);
             }
+            // Silently collapsing to one segment reads as a broken scope
+            // button. The wall is real, it just has no building plan to expand
+            // into, and the Inspector is where one is given to it.
+            this.parent.showMessage?.(
+                'These walls are not part of a building yet — assign them under Unassigned walls in the Build Inspector.',
+                'info', 'Select'
+            );
         }
         if (remember) this.preferredScope = scope;
         this.selectedWallCells = additive ? this.mergeWallCells(this.selectedWallCells, cells) : cells;
@@ -650,6 +715,40 @@ class BuildMarqueeSelection extends UIComponent {
         this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
+    }
+
+    /**
+     * A room as a selection in its own right: no wall cells, its floor tinted
+     * through its own mask, and the Inspector's room properties - rename, area,
+     * both paints, which building it belongs to - one tab away.
+     */
+    selectRoom(roomId, anchor = null) {
+        const map = this.container?.gameMap;
+        const room = map?.regionManager?.get('room', roomId);
+        if (!room) return false;
+        this.clearVisuals();
+        this.selectedWallCells = [];
+        this.selectionKind = 'room';
+        this.selectionRoomIds = [roomId];
+        this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : null;
+        this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({ kind: 'room', id: roomId });
+        this.roomHighlight = map.floorBuilder?.createRoomOverlay?.(room, {
+            className: 'build-selection-room',
+            fill: BuildMarqueeSelection.roomFill()
+        }) ?? null;
+        this.renderActionBar();
+        return true;
+    }
+
+    static roomFill() {
+        const accent = getComputedStyle(document.documentElement)
+            .getPropertyValue('--state-info-accent').trim();
+        const parts = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(accent);
+        const [r, g, b] = parts
+            ? [parseInt(parts[1], 16), parseInt(parts[2], 16), parseInt(parts[3], 16)]
+            : [66, 133, 244];
+        return `rgba(${r}, ${g}, ${b}, 0.26)`;
     }
 
     expandSelection(scope, { remember = false } = {}) {
@@ -995,6 +1094,8 @@ class BuildMarqueeSelection extends UIComponent {
     clearVisuals() {
         this.marquee?.remove();
         this.marquee = null;
+        this.roomHighlight?.remove();
+        this.roomHighlight = null;
         this.wallHighlights.forEach(element => element.remove());
         this.wallHighlights = [];
         this.actionBar?.remove();

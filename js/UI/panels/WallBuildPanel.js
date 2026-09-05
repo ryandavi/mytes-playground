@@ -573,6 +573,38 @@ class WallBuildPanel extends CellDragBuildPanel {
 
 
 
+    /**
+     * The corner's paint, spread over every atom a new cell could show.
+     *
+     * Growth is seeded from the corner the run pulled away from, and a corner
+     * is the worst possible sample of one: at a T it carries a single painted
+     * half, on whichever face was left visible once the returning wall buried
+     * the other. Copied literally that produced new cells painted on one half
+     * and bare on the other — 16px stripes — and, where the corner showed its
+     * north face and the new cells show their south, cells painted on a face
+     * nobody looks at, which is the same bug reading as no paint at all.
+     *
+     * Which atom a cell shows cannot be known here: masks and ownership are
+     * derived after this mutation, not before it. So a painted face fills its
+     * whole axis — both halves, both facings — and the one that ends up in
+     * front is right by construction. The hidden atom is a real atom either
+     * way, and a later repaint or room default supersedes it.
+     */
+    static wholeCellAtoms(atoms) {
+        const filled = [];
+        for (const faces of [['north', 'south'], ['west', 'east']]) {
+            const painted = atoms.filter(atom => faces.includes(atom.face));
+            if (painted.length === 0) continue;
+            for (const face of faces) {
+                const own = painted.filter(atom => atom.face === face);
+                for (const half of [0, 1]) {
+                    filled.push({ ...(own.find(atom => atom.half === half) || own[0] || painted[0]), face, half });
+                }
+            }
+        }
+        return filled;
+    }
+
     commitMove(map, plan) {
         const builder = map?.wallBuilder;
         if (!builder || !map.buildTransaction || plan.distance === 0) return false;
@@ -584,10 +616,22 @@ class WallBuildPanel extends CellDragBuildPanel {
             dy: plan.moveY
         };
         const roomChanges = this.roomChangesForMove(map, plan);
-        const atomExtensions = (plan.paintExtensions || []).map(extension => ({
-            targets: extension.cells.map(cell => ({ ...cell })),
-            atoms: map.buildDocument.level().atoms.atomsOfCell(extension.source.x, extension.source.y)
-        }));
+        const atoms = map.buildDocument.level().atoms;
+        const spread = (source, targets) => ({
+            targets: targets.map(cell => ({ ...cell })),
+            atoms: WallBuildPanel.wholeCellAtoms(atoms.atomsOfCell(source.x, source.y))
+        });
+        const ends = [plan.movingCells?.[0], plan.movingCells?.at?.(-1)];
+        const atomExtensions = [
+            ...(plan.paintExtensions || []).map(extension => spread(extension.source, extension.cells)),
+            // The run's own ends move as well as grow, and an end is exactly the
+            // cell whose mask changes when it lands: a T that was showing its
+            // north face arrives as a corner showing its south. Translation is
+            // faithful to the face, which is what left the pulled corner bare
+            // beside the wall it used to match.
+            ...ends.filter(Boolean).map(end =>
+                spread(end, [{ x: end.x + plan.moveX, y: end.y + plan.moveY }]))
+        ];
         let result;
         try {
             result = builder.applyWallCellChanges(Utility.deepClone(changes), {

@@ -186,12 +186,15 @@ Step 2 is what keeps "new walls in a green room come up green" without any inher
 
 **Paint scopes are commands over stores**, resolved at click time and not stored as rules:
 
-| Scope | Writes |
-|---|---|
-| Section | the atoms in the current contiguous visible section |
-| Room (whole interior) | `RoomPlan.wallFinishId`; deletes explicit atoms facing that plan |
-| Space (open-plan) | Room, for every plan in the open space |
-| Exterior (building) | `BuildingPlan.exteriorFinishId`; deletes explicit exterior atoms of that building |
+| Scope | Offered on | Writes |
+|---|---|---|
+| Section | any surface | the atoms in the current contiguous visible section |
+| Whole interior | an interior surface | `RoomPlan.wallFinishId`; deletes explicit atoms facing that plan |
+| Whole space | an interior surface in a multi-room open space | Whole interior, for every plan in the open space |
+| Whole exterior | an exterior surface | the outward atoms of every wall enclosing the room behind this one, visible or not (there is no per-room exterior default to write) |
+| Whole building | an exterior surface | `BuildingPlan.exteriorFinishId`; deletes explicit exterior atoms of that building, room-exterior paint included |
+
+Which scopes appear is not a choice the player makes twice: it follows from the face they clicked (§4.10), so an interior surface never offers an exterior scope and vice versa.
 
 Renderers may batch adjacent atoms with equal resolved finish into one draw. Batches are caches.
 
@@ -298,14 +301,35 @@ Only one face of a horizontal wall is drawn at full height, and one slice per po
 
 | Rendered slice (from `getPaintSpans`) | Candidate atoms | Rule |
 |---|---|---|
-| Horizontal band, west part | `south/0`, `north/0` | the one facing a room if only one does; if both do, the room with the shallower straight depth from this cell (today's `preferredHorizontalRoomSide`, as a pure function over the grid); if neither, `south` |
+| Horizontal band, west part | `south/0`, `north/0` | `south` when it faces outside and `north` faces a room (see below); else the one facing a room if only one does; if both do, the room with the shallower straight depth from this cell (as a pure function over the grid); if neither, `south` |
 | Horizontal band, east part | `south/1`, `north/1` | same |
 | Post west half | `west/1`, `west/0` | the south half if it faces a room, else the north half |
 | Post east half | `east/1`, `east/0` | same |
 
 The hidden atom's paint is never lost; it is stored and will be shown by any future presentation that reveals it (walls-down view, a per-room interior view).
 
-The depth rule is kept deliberately. "South always wins" is what the camera physically sees, but it makes a room's own front wall wear the neighbour's colour, which is the complaint that produced the rule in the first place. As a pure function over the grid (count consecutive owned blocks straight north and south of the cell) it is ten lines, deterministic, and covered by the `hallway-front-wall` fixture.
+**Room on one side only: the south atom wins.** Revised 2026-09-05. The first row of the table said "the one facing a room if only one does", which put a room's own paint on the outside of its front wall and left a building's exterior unreachable — on a simple house every band has a room on one side, so the room atom always won, the exterior atom was never presented, and what is never presented can be neither clicked nor painted. There was no way to paint a house's outside at all.
+
+The camera is south of the wall, so the face you are looking at is the south one. With a room on one side only that side is what is shown: the inside of a room's back wall, the OUTSIDE of its front wall. This is not a mode and there is no interior/exterior toggle — which face you get is which wall you clicked. `fixtures/front-wall-exterior` pins both halves of it.
+
+**A corner belongs to its run.** A band half with masonry behind it — the returning arm of a corner or a T — has one buried face, so its own faces cannot say what it is: the only classification left is whichever side happens to be open, which at a corner is the room even when the run itself fronts the outside. `visibleSurface` therefore takes the identity of the nearest band on either side that can answer (`neighbouringRunSurface`), outside included, and only keeps its own when the two sides disagree. Without it a wall wore two surfaces — interior at both ends, exterior in the middle — and a paint stretch broke off at every junction. A free end has no buried face and keeps its own answer when it has one; it inherits only when it has nothing to say for itself, and outside counts as an answer there too — a wall that runs on past the corner of a room fronts nothing but outside, so reaching over its exterior neighbour for a room further along dressed the last cell of a run in a colour nothing beside it was wearing. The `terminal-half` contract was revised for this on 2026-09-05: the room section stops where the room does.
+
+**An arm's sides carry through its junction.** The same argument holds for posts. Where an arm leaves the wall it hangs off, that cell's post faces sit flush against the wall's own masonry: `lookBlock` reads into the arm's cell, and because floor ownership expands under masonry the block answers with whichever room's floor runs up to it. The junction sliver then wears a neighbouring room's finish while the arm below it carries on in another — the unpainted stub at the top of a painted arm. `postSurface` gives a covered post (mask has an arm on that side) the surface of its own vertical run, read south first and then north past any other junction — a run can pass straight through with a room above and the yard below, and the sliver goes with the half the camera sees, which is the same call the bands make.
+
+For the same reason a **buried band half takes the side it is on**: the arm burying it is a seam, so the west half continues the run west and the east half continues it east, and the two are allowed to differ — that is two surfaces meeting on the post between them. Asking both ways and giving up when they disagree left the half beside an arm wearing the face behind it while the wall it continues went on without it. A free end has no arm and no seam, so it still needs both sides to agree. Pinned by the `an arm carries its own sides through the junction it hangs from` and `a junction post takes the southern half of its run` contracts.
+
+The hidden atom is still stored and still painted by the scopes that own it: a room's interior finish is a room-level default, so the interior face of a front wall takes the room's colour without ever being visible, and the same holds for the outward face of a back wall under a building's exterior finish.
+
+Scopes follow from the face, in `SurfaceCustomizePanel`:
+
+| Selected surface | Offered |
+|---|---|
+| Interior (the face belongs to a room) | Section · Whole interior (that room) · Whole space (when the room is part of a multi-room open space) |
+| Exterior | Section · Whole exterior (every outward atom of the walls enclosing the room behind this one, visible or not) · Whole building (the shell loop, stored as `exteriorFinishId`) |
+
+Room-exterior paint is written as atoms, since there is no per-room exterior default; a later whole-building paint supersedes and clears them, as it does any exterior atom.
+
+**Both sides rooms: the depth rule, kept deliberately.** Here "south always wins" would make a room's own front wall wear the neighbour's colour, which is the complaint that produced the rule in the first place — and unlike the exterior case above, no outside is involved, so there is nothing the camera argument settles. As a pure function over the grid (count consecutive owned blocks straight north and south of the cell) it is ten lines, deterministic, and covered by the `hallway-front-wall` fixture.
 
 ## 5. Edit transaction pipeline
 
@@ -357,6 +381,7 @@ js/Map/Floors/
 js/Map/Walls/
   WallGeometry.js              masks, runs, pieces, thresholds, paint spans      ≤ 400   pure
   WallFaceResolver.js          §4.8 + §4.10 + section grouping                   ≤ 250   pure
+  WallSurfaceRuns.js           run-inheritance walks for §4.10                   ≤ 200   pure
   WallRenderer.js              piece canvases, frames, dirty pieces, flat overlay ≤ 600
   WallCutaway.js               subjects, state machine, hysteresis (unchanged)   ≤ 500
   WallOpenings.js              slots, bridging, placement, binding               ≤ 600
@@ -428,8 +453,11 @@ Site
 
 Reads the plan stores directly. Clicking a building selects its walls, rooms, openings and attached objects; clicking a room selects its seed cells and facing atoms. Inline rename edits the persisted name. Derived states (Open, Disconnected, No entrance, Empty) are badges. The map and the tree select the same `BuildSelection`. Level rows exist in the model and are hidden.
 
+**Buildings are created here, and nowhere else automatically.** A room's *Move to building* select and the *Unassigned walls* row both carry a **New building…** option (`BuildInspector.buildingPicker`), which is the only hand-made building in the product. Everything else adopts: new walls take the building of the structure they touch, then of a room they run alongside, then a fresh one (`WallStructure.resolveBuildingId`), and enclosing an outdoor Area moves that room into the building its new walls made (`adoptRoomIds`). A building left holding neither walls nor rooms is pruned inside the same transaction (`BuildTransaction.pruneEmptyBuildings`), so moving a room out of a building it was alone in does not leave a row behind; undo restores both together.
+
 ### 8.3 Context rules
 
+- **One click is the thing, two is what it belongs to.** On a wall: click a segment, double-click the run. On a floor: click selects the *room* — tinted through its own mask, with Paint floor / Paint walls / Edit area / Building on the stage bar and its properties in the Inspector — and double-click selects the whole building. Selecting Building scope on a wall that has no building plan says so instead of quietly collapsing to one cell.
 - Selecting an atom shows construction, resolved finish and its source (atom / room default / building default / construction), owning building, and the adjacent room label.
 - On the half-tile split case, the two halves are two targets; the hover preview shows exactly the half that will change.
 - Selecting a room exposes Paint floor, Paint interior walls, Edit area, Move to building.
@@ -660,6 +688,7 @@ A fix was written and verified: a single entry point returning the visible atom 
 - **The build grid is bounded to `.canvas`, which is the padded render area.** The map reserves render padding for tall wall art (160px above, one cell all round), so the grid tiles across space nothing can be placed in — 32×36 cells drawn for a 30×30 map. The debug overlay draws only the real grid, which is why it reads better.
 - **Removing a room definition left its empty plan behind. — FIXED.** Room removal now transfers the plan's authored seed cells to its chosen neighbour, deletes the source `RoomPlan` in the same transaction, and remains undoable. A still-enclosed space may immediately receive a fresh detected plan, but the removed zero-tile definition no longer remains as a grey row.
 - **Choose was selectable with no room on the map. — FIXED.** The Room Areas panel disables Choose when no projected room owns tiles and switches the active operation to Add.
+- **A cutaway ended flat where a wall ran out. — FIXED 2026-09-05.** Ryan's rule: *a lowered window is one or more stub cells with a stepped transition either side of it, or there is no window at all.* Three things were wrong. (1) The August spec let a pure end cap join a lowered run with no transition of its own, so wherever a wall simply stopped the cutaway showed a square end — `resolveHorizontalBoundary` now stands a free end like any other boundary and `reserveTransitionBesideFullCap` hands the step to the cell inside it. **This supersedes the end-cap exception in the wall spec's cutaway rules.** (2) The chain rules were skipped entirely for any render piece that was not wholly horizontal, so a run inside a wrapped wall — every room with corners — fell back to raw states and stepped straight from full height to stub; chains are now resolved per cell, so a piece spanning several of them gets each one resolved. (3) `enforceTransitionBoundaries` is the rule itself: a lowered island whose flanking cells cannot draw the straight ramp frame — a corner, a junction, an end cap, an opening, or the end of the run — is raised back. A wall with only one straight cell between its corners therefore never cuts away, and neither does one whose boundary cell is a door. "Walls down" is untouched: every wall is down there, by definition.
 
 ## 13b. Cutover verification, 2026-09-05
 
@@ -672,6 +701,32 @@ A fix was written and verified: a single entry point returning the visible atom 
 - House renders without console or page errors in Up, Cutaway, Down and Hidden presentations at native zoom. Solid wall points resolve atom addresses, opening apertures fall through, and pointer sweeps leave `imageDataReads` at zero.
 - Moving and cancelling both an opening and a fixture keeps the live object, renderer cache and canonical attachment store aligned. One completed drag produces one shared-history command with exact undo/redo. Fixture placement now resolves straight spans inside geometry pieces, so endpoint junctions no longer make every House wall reject a returned painting.
 - Build commits are the persistence and derived-consumer boundary. Paint-only commits skip door topology and lighting; structural revisions invalidate those consumers once. Content, time-source and text-encoding validation pass.
+
+## 13c. Follow-up fixes, 2026-09-05
+
+Playtesting after the cutover. Each entry is the rule, not the diff; the code carries the reasoning.
+
+**Buildings**
+
+1. **Nothing could create a building.** They came only from authored Tiled data, and `BuildDocument.collectBuildings` invents one only for a map that already has wall tiles — so on a wall-less map everything built was unassigned: "Unassigned walls (N)" in the Navigator, only *Site* in a room's building select, and Building-scope selection collapsing to one segment. Adoption, hand-creation and pruning are described in §8.2. The old fallback — *the first building on the map* — is gone; it silently annexed every shed to the house.
+
+**Rooms**
+
+2. **A renamed room reverted in the Rooms panel.** The row's input read `properties.playerName`, which only the pending-room stub ever writes; a rename writes `displayName` on the plan. The field is derived now — `displayName` when it differs from `authoredDisplayName`, else empty with the authored name as placeholder — so the panel and the Inspector agree.
+3. **An enclosed room still offered Finish walls, and built a second ring around the first.** `RoomPanel.perimeterPlan` ringed the room's resolved cells, which include the masonry its floor expands under (§4.7), so the ring landed one cell beyond the walls already there. It rings the room's *open* cells now. `demolitionPlan` runs off the same function and was wrong in the same way.
+
+**Wall surfaces** (§4.10 carries the rules; this is what changed and why)
+
+4. **A room's front wall wore the room's own paint.** The visible-atom table said "the one facing a room if only one does", which made a building's exterior unreachable — never presented, so never clickable or paintable. With a room on one side only the **south** atom wins: the inside of a back wall, the outside of a front wall. Both sides rooms keeps the depth rule. An Interior/Exterior toggle was built first and removed: which face you get is which wall you clicked, not a mode.
+5. **Slivers at junctions belonged to nobody.** Three rules, all the same principle — a face that cannot speak for itself takes the surface of the run it belongs to. A buried half takes **its own side** of the arm burying it (the seam is the point; the two sides may differ). A free end takes what its neighbour has, outside included. A covered post takes its vertical run, **south first**. Before these, one wall could wear three surfaces and a paint stretch broke at every junction.
+6. **The palette showed plaster over a painted wall.** `getCurrentFinishId` looked the override up without the half; atom paint is keyed on the atom.
+7. **Pulling a wall out striped the new cells.** Growth is seeded from the corner the run pulled away from, and a corner carries at most one painted half — on whichever face survived being buried. A painted face now fills its whole axis (both halves, both facings) on the new cells and on the run's moved ends; which atom a cell will show cannot be known at mutation time, since masks and ownership are derived after it.
+
+**Cutaway** — see the entry in §13a.5.
+
+**Module map.** The inheritance walks moved out of `WallFaceResolver` into `WallSurfaceRuns` (§6): with three of them the resolver had grown to 356 lines against a 250 budget. Both are pure, and only the walks moved — `classify`, `visibleAtom`, `visibleSurface`, `classifyPaintAtom` and `sections` stay where callers expect them.
+
+**Suite:** 24 fixtures in 192 orientations, 14 geometry contracts, 100 randomized ownership cases, 40 randomized transaction edits. New: `fixtures/front-wall-exterior`, and contracts for the arm's sides, the junction post, and the run between two returning walls. Revised: `terminal-half`, which asserted that a wall continuing past a room's corner stayed in the room's section — written when exterior faces could be neither seen nor painted. The room's section stops where the room does.
 
 ## 14. Questions closed 2026-09-03
 

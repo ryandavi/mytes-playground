@@ -1,4 +1,6 @@
 class BuildInspector extends ModalWindow {
+    static NEW_BUILDING = '__new_building__';
+
     constructor(parent) {
         super(parent, {
             id: 'build-inspector-panel',
@@ -200,6 +202,17 @@ class BuildInspector extends ModalWindow {
             ]));
             return;
         }
+        if (selection.kind === 'wall' && selection.id === 'unassigned') {
+            const walls = level.walls.values().filter(wall => !wall.buildingId);
+            if (walls.length === 0) return root.append(BuildInspector.message('Every wall belongs to a building.'));
+            root.append(this.propertyHeading(`${walls.length} wall cells`, 'Unassigned walls'));
+            // Walls with no building cannot be selected as one, renamed, merged
+            // or roofed. Authored maps can still carry them, so the Navigator
+            // node is also where they get adopted.
+            root.append(this.buildingPicker('Assign to building', null, buildingId =>
+                this.assignWallsToBuilding(walls, buildingId)));
+            return;
+        }
         if (selection.kind === 'atom') {
             const details = this.atomDetails(selection.id, map);
             if (!details) return root.append(BuildInspector.message('This wall surface no longer exists.'));
@@ -226,10 +239,29 @@ class BuildInspector extends ModalWindow {
     }
 
     roomBuildingEditor(room) {
+        return this.buildingPicker('Move to building', room.buildingId || '', buildingId => {
+            const map = this.parent?.parent?.gameMap;
+            map?.buildTransaction?.run(`Move ${room.displayName}`, (draft, level) => {
+                const current = level.rooms.get(room.id);
+                if (!current) return;
+                const target = buildingId === BuildInspector.NEW_BUILDING
+                    ? WallStructure.createBuilding(draft)
+                    : buildingId || null;
+                level.rooms.set(room.id, { ...current, buildingId: target });
+            });
+        });
+    }
+
+    /**
+     * The one place a building is made by hand. Nothing else in build mode
+     * creates one — walls adopt the building they touch — so without this a
+     * map that was authored without walls has no building to move a room into.
+     */
+    buildingPicker(titleText, value, onChange) {
         const label = document.createElement('label');
         label.className = 'setting-item setting-item--stacked';
         const title = document.createElement('span');
-        title.textContent = 'Move to building';
+        title.textContent = titleText;
         const select = document.createElement('select');
         const site = document.createElement('option');
         site.value = '';
@@ -242,15 +274,31 @@ class BuildInspector extends ModalWindow {
             option.textContent = building.displayName;
             select.append(option);
         }
-        select.value = room.buildingId || '';
+        const created = document.createElement('option');
+        created.value = BuildInspector.NEW_BUILDING;
+        created.textContent = 'New building…';
+        select.append(created);
+        select.value = value ?? '';
         select.addEventListener('change', () => {
-            map?.buildTransaction?.run(`Move ${room.displayName}`, (_draft, level) => {
-                const current = level.rooms.get(room.id);
-                if (current) level.rooms.set(room.id, { ...current, buildingId: select.value || null });
-            });
+            onChange(select.value);
+            this.render();
         });
         label.append(title, select);
         return label;
+    }
+
+    assignWallsToBuilding(walls, buildingId) {
+        const map = this.parent?.parent?.gameMap;
+        const keys = walls.map(wall => BuildKeys.cell(wall.x, wall.y));
+        return map?.buildTransaction?.run('Assign walls to building', (draft, level) => {
+            const target = buildingId === BuildInspector.NEW_BUILDING
+                ? WallStructure.createBuilding(draft)
+                : buildingId || null;
+            for (const key of keys) {
+                const wall = level.walls.get(key);
+                if (wall) level.walls.set(key, { ...wall, buildingId: target });
+            }
+        });
     }
 
     atomDetails(id, map) {

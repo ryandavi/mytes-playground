@@ -32,6 +32,12 @@
     position: absolute;
 }
 
+// The room tint is a canvas masked to the room's own shape, so its colour is
+// painted in rather than declared here.
+canvas.build-selection-room {
+    image-rendering: pixelated;
+}
+
 .build-selection-actions {
     position: absolute;
     left: 50%;

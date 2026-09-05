@@ -4345,6 +4345,10 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   position: absolute;
 }
 
+canvas.build-selection-room {
+  image-rendering: pixelated;
+}
+
 .build-selection-actions {
   position: absolute;
   left: 50%;

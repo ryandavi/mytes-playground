@@ -142,6 +142,12 @@ class WallStructure extends WallFixtures {
                 : null
         }));
         const defaults = this.wallData.defaults || {};
+        // Resolved once for the whole batch: cells laid in one gesture are one
+        // act of building, and none of them is in `baseCells` yet, so asking
+        // per cell would make every cell of a detached run its own building.
+        let batchBuildingId = this.resolveBuildingId(
+            applied.filter(change => (change.data ?? null) !== null && change.data.buildingId == null)
+        );
         const move = options.contentMove;
         const inverseMove = WallBuilder.invertContentMove(move);
         if (move) this.translateWallContents(move);
@@ -171,14 +177,27 @@ class WallStructure extends WallFixtures {
                         continue;
                     }
                     const data = { ...defaults, ...change.data };
+                    if (data.buildingId == null && batchBuildingId === null) {
+                        batchBuildingId = WallStructure.createBuilding(draft);
+                    }
                     level.walls.setCell(change.x, change.y, {
                         constructionId: data.constructionId || defaults.constructionId,
                         heightCells: Number(data.heightCells) || Number(defaults.heightCells) || 1,
                         connectGroup: data.connectGroup || defaults.connectGroup || data.constructionId,
-                        buildingId: data.buildingId ?? this.inheritedBuildingId(change.x, change.y)
+                        buildingId: data.buildingId ?? batchBuildingId
                     });
                     for (const room of level.rooms.values()) {
                         if (room.seedCells?.includes(key)) level.rooms.removeSeed(room.id, key);
+                    }
+                }
+                // A room you wall in belongs to the building those walls make.
+                // Without this an enclosed Area keeps its walls in one building
+                // and itself on the site, which is what the Navigator was
+                // reporting as unassigned.
+                for (const roomId of options.adoptRoomIds || []) {
+                    const room = level.rooms.get(roomId);
+                    if (batchBuildingId && room && !room.buildingId) {
+                        level.rooms.set(roomId, { ...room, buildingId: batchBuildingId });
                     }
                 }
                 for (const change of options.roomChanges || []) {
@@ -200,12 +219,42 @@ class WallStructure extends WallFixtures {
         return { applied, rejected, inverse };
     }
 
-    inheritedBuildingId(x, y) {
-        for (const direction of WallGeometry.DIRECTIONS) {
-            const neighbour = this.baseCells.get(BuildKeys.cell(x + direction.dx, y + direction.dy));
-            if (neighbour?.buildingId) return neighbour.buildingId;
+    /**
+     * The building newly built cells join: the structure they touch, else the
+     * building of a room they run alongside, else null — and null means a new
+     * building, because nothing else in the model says two structures that
+     * touch nothing are the same one. Never the first building on the map:
+     * that silently annexed every shed to the house.
+     */
+    resolveBuildingId(cells) {
+        if (cells.length === 0) return null;
+        const level = this.gameMap?.buildDocument?.level?.();
+        const grid = this.gameMap?.buildTransaction?.cache?.grid;
+        const pending = new Set(cells.map(cell => BuildKeys.cell(cell.x, cell.y)));
+        let roomBuildingId = null;
+        for (const cell of cells) {
+            for (const direction of WallGeometry.DIRECTIONS) {
+                const x = cell.x + direction.dx;
+                const y = cell.y + direction.dy;
+                const key = BuildKeys.cell(x, y);
+                if (pending.has(key)) continue;
+                const neighbour = this.baseCells.get(key);
+                if (neighbour?.buildingId) return neighbour.buildingId;
+                if (roomBuildingId) continue;
+                const roomId = grid?.ownerOfCell?.(x, y) ?? null;
+                roomBuildingId = (roomId && level?.rooms.get(roomId)?.buildingId) || null;
+            }
         }
-        return this.gameMap?.buildDocument?.buildings?.values?.()[0]?.id ?? null;
+        return roomBuildingId;
+    }
+
+    static createBuilding(draft, displayName = null) {
+        let index = draft.buildings.size + 1;
+        while (draft.buildings.has(`building_${index}`)) index++;
+        const id = `building_${index}`;
+        const name = displayName || `Building ${index}`;
+        draft.buildings.set(id, { id, displayName: name, authoredDisplayName: name });
+        return id;
     }
 
     translateWallContents(move) {

@@ -39,6 +39,7 @@ class BuildTransaction {
         try {
             const draft = new BuildDocument(before);
             edit(draft, draft.level(this.levelId));
+            BuildTransaction.pruneEmptyBuildings(draft, this.levelId);
             this.assertValid(draft);
             const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
             const after = draft.captureStores();
@@ -49,6 +50,22 @@ class BuildTransaction {
         } finally {
             this._active = false;
         }
+    }
+
+    /**
+     * A building is its walls and its rooms. One left holding neither is not a
+     * building you can select, name, roof or demolish — it is a row in the
+     * Navigator and nothing else — and moving a room out of a building is
+     * enough to leave one behind. Pruning here makes it a store delta inside
+     * the same transaction, so undo brings it back with the room that emptied
+     * it. Only on the edit path: a replay applies deltas that already agree.
+     */
+    static pruneEmptyBuildings(draft, levelId) {
+        const level = draft.level(levelId);
+        const used = new Set();
+        for (const wall of level.walls.values()) if (wall.buildingId) used.add(String(wall.buildingId));
+        for (const room of level.rooms.values()) if (room.buildingId) used.add(String(room.buildingId));
+        for (const id of [...draft.buildings.keys()]) if (!used.has(String(id))) draft.buildings.delete(id);
     }
 
     preview(edit) {

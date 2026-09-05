@@ -484,8 +484,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         const roomId = this.target.wallSurface.roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
+        // An exterior face still belongs to a room — it is that room's front
+        // wall seen from outside — and saying whose it is beats "Outside" on a
+        // map where every wall is outside something.
+        const fronts = roomId ? null : this.gameMap?.regionManager?.get('room', this.adjacentRoomId());
         return {
-            room: room ? this.roomName(room) : 'Outside',
+            room: room ? this.roomName(room) : fronts ? `Outside · ${this.roomName(fronts)}` : 'Outside',
             surface: SurfaceCustomizePanel.SURFACE_LABELS[this.target.wallSurface.face] || 'Wall',
             locked
         };
@@ -548,9 +552,12 @@ class SurfaceCustomizePanel extends ModalWindow {
                 SiteConfig.floorSystem?.defaultFinishId ||
                 null;
         }
-        const { cell, face, roomId } = this.target.wallSurface;
+        const { cell, face, roomId, half } = this.target.wallSurface;
+        // With the half, or an atom's own paint is invisible here: the override
+        // is keyed on the atom, so asking for a whole face answers from the room
+        // default and the palette goes on showing plaster over a painted wall.
         return cell
-            ? this.gameMap?.wallBuilder?.resolveSurfaceFinishId(cell, face, roomId ?? null)
+            ? this.gameMap?.wallBuilder?.resolveSurfaceFinishId(cell, face, roomId ?? null, half ?? null)
             : null;
     }
 
@@ -581,6 +588,65 @@ class SurfaceCustomizePanel extends ModalWindow {
         );
     }
 
+    /**
+     * The room on the far side of an exterior surface — the room this stretch
+     * of outside wall belongs to. An exterior face has no room of its own, but
+     * it is still one room's front wall, and that is the unit "whole exterior"
+     * paints.
+     */
+    adjacentRoomId(surface = this.target?.wallSurface) {
+        if (!surface || surface.roomId) return null;
+        const opposite = WallBuilder.OPPOSITE_FACES[surface.face];
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!opposite || !cache) return null;
+        const inner = WallFaceResolver.classify(
+            { x: surface.cell.x, y: surface.cell.y, face: opposite, half: surface.half },
+            cache.grid,
+            { ...cache.topology, walls: cache.geometry }
+        );
+        return inner.kind === 'room' ? inner.roomId : null;
+    }
+
+    /**
+     * Every outward atom of the walls that enclose one room, visible or not.
+     *
+     * Addressed as atoms rather than as surfaces because a room's back wall
+     * shows its inside: its exterior atom is real, and stored, but it is not a
+     * span anyone can click. Painting the outside of a room means all of it,
+     * not the half of it this camera happens to face.
+     */
+    roomExteriorAtoms(roomId) {
+        const builder = this.gameMap?.wallBuilder;
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!builder || !cache || !roomId) return [];
+        const topology = { ...cache.topology, walls: cache.geometry };
+        const atoms = [];
+        for (const cell of builder.cells.values()) {
+            for (const face of ['north', 'south']) {
+                for (const half of [0, 1]) {
+                    const outward = { x: cell.x, y: cell.y, face, half };
+                    if (WallFaceResolver.classify(outward, cache.grid, topology).kind !== 'exterior') continue;
+                    const inner = WallFaceResolver.classify(
+                        { ...outward, face: WallBuilder.OPPOSITE_FACES[face] }, cache.grid, topology
+                    );
+                    if (inner.kind === 'room' && inner.roomId === roomId) atoms.push(outward);
+                }
+            }
+        }
+        return atoms;
+    }
+
+    /** The subset of those atoms this camera can actually show, for the outline. */
+    atomSurfaces(atoms) {
+        const builder = this.gameMap?.wallBuilder;
+        return atoms.map(atom => {
+            const cell = builder?.cells.get(BuildKeys.cell(atom.x, atom.y));
+            return builder?.getCellSurfaces(cell).find(entry =>
+                entry.face === atom.face && entry.half === atom.half
+            ) || null;
+        }).filter(Boolean);
+    }
+
     exteriorSurfaces(buildingId, loopId) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !buildingId) return [];
@@ -606,6 +672,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             return [...builder.cells.values()].flatMap(cell =>
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
+        if (scope === 'roomExterior' && !surface.roomId) {
+            return this.atomSurfaces(this.roomExteriorAtoms(this.adjacentRoomId(surface)));
+        }
         if (scope === 'exterior' && !surface.roomId) {
             const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
             const classification = this.classifyWallSurface(surface);
@@ -626,6 +695,17 @@ class SurfaceCustomizePanel extends ModalWindow {
         const surface = this.target.wallSurface;
 
         const scope = scopeOverride || this.getWallScope();
+        if (scope === 'roomExterior') {
+            return this.roomExteriorAtoms(this.adjacentRoomId(surface)).map(atom => ({
+                surface: 'wall',
+                face: atom.face,
+                axis: 'horizontal',
+                cells: { from: [atom.x, atom.y], to: [atom.x, atom.y] },
+                roomId: null,
+                halves: [atom.half],
+                finishId
+            }));
+        }
         if (scope === 'exterior') {
             const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
             return buildingId ? [{ surface: 'wall', buildingId, exterior: true, finishId }] : [];
@@ -750,18 +830,29 @@ class SurfaceCustomizePanel extends ModalWindow {
         const wall = this.target?.surface === 'wall' ? this.target.wallSurface : null;
         const roomButton = this.scopeElement.querySelector('[data-value="room"]');
         const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
+        const roomExteriorButton = this.scopeElement.querySelector('[data-value="roomExterior"]');
         const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
         const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
         const spaceAvailable = openSpaceRooms.length > 1;
         const buildingId = wall
             ? this.gameMap?.wallBuilder?.baseCells.get(BuildKeys.cell(wall.cell.x, wall.cell.y))?.buildingId
             : null;
-        const exteriorAvailable = !!buildingId && this.classifyWallSurface(wall)?.kind === 'exterior';
+        // Inside and outside are not a choice you make, they are which wall you
+        // clicked: a room's back wall shows its inside, its front wall shows the
+        // building's outside. The scopes follow from that — an interior surface
+        // can grow to the room, an exterior one to the room's own outside or to
+        // the whole building.
+        const exterior = !wall?.roomId && this.classifyWallSurface(wall)?.kind === 'exterior';
+        const buildingAvailable = exterior && !!buildingId;
+        const roomExteriorAvailable = exterior && !!this.adjacentRoomId(wall);
         if (roomButton) roomButton.hidden = !wall?.roomId;
         if (spaceButton) spaceButton.hidden = !spaceAvailable;
-        if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
-        const allowed = wall?.roomId ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])] :
-            exteriorAvailable ? ['stretch', 'exterior'] : ['stretch'];
+        if (roomExteriorButton) roomExteriorButton.hidden = !roomExteriorAvailable;
+        if (exteriorButton) exteriorButton.hidden = !buildingAvailable;
+        const allowed = wall?.roomId
+            ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
+            : ['stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
+                ...(buildingAvailable ? ['exterior'] : [])];
         if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }
 

@@ -9,6 +9,20 @@ class WallFaceResolver {
         return Object.freeze({ kind: 'exterior', loopId: WallFaceResolver.loopAt(bx, by, topology) ?? 'outside' });
     }
 
+    /**
+     * Which atom a slice shows.
+     *
+     * With a room on one side only, the visible face is the south one — the
+     * camera is south of the wall, so what you are looking at is the inside of
+     * a room's back wall and the OUTSIDE of its front wall. Showing the room's
+     * atom on a front wall meant a building's outward faces were never
+     * presented, and what is never presented can be neither clicked nor
+     * painted: there was no way to reach a house's own exterior at all.
+     *
+     * With a room on both sides there is no outside involved and the depth rule
+     * below decides, which is what stops a shared wall wearing the neighbour's
+     * colour. A buried face is never shown; `visibleSurface` swaps it out.
+     */
     static visibleAtom(slice, grid, topology = {}) {
         const x = slice.x;
         const y = slice.y;
@@ -18,6 +32,7 @@ class WallFaceResolver {
             const north = { x, y, face: 'north', half };
             const southClass = WallFaceResolver.classify(south, grid, topology);
             const northClass = WallFaceResolver.classify(north, grid, topology);
+            if (southClass.kind === 'exterior' && northClass.kind === 'room') return Object.freeze(south);
             if (northClass.kind === 'room' && southClass.kind !== 'room') return Object.freeze(north);
             if (southClass.kind === 'room' && northClass.kind !== 'room') return Object.freeze(south);
             if (southClass.kind === 'room' && northClass.kind === 'room' && southClass.roomId !== northClass.roomId) {
@@ -48,7 +63,12 @@ class WallFaceResolver {
     static visibleSurface(slice, grid, topology = {}, geometry = null) {
         let atom = WallFaceResolver.visibleAtom(slice, grid, topology);
         let classification = WallFaceResolver.classify(atom, grid, topology);
-        if (slice.kind !== 'horizontal-band') return Object.freeze({ atom, classification });
+        if (slice.kind !== 'horizontal-band') {
+            return Object.freeze({
+                atom,
+                classification: WallSurfaceRuns.postSurface(slice, grid, topology, geometry) || classification
+            });
+        }
 
         const candidates = ['south', 'north'].map(face => {
             const candidate = { x: slice.x, y: slice.y, face, half: slice.half };
@@ -59,12 +79,37 @@ class WallFaceResolver {
             const visible = candidates.find(candidate => candidate.classification.kind !== 'buried');
             if (visible) ({ atom, classification } = visible);
         }
+        // A half with masonry behind it is a stub of a longer run — the returning
+        // arm of a corner or a T — and it belongs to whatever that run belongs
+        // to. Its own faces cannot say: one is buried, so the only classification
+        // left is whichever side happens to be open, which at a corner is the
+        // room even when the run itself faces outside. That is how one wall came
+        // to wear two surfaces, interior at both ends and exterior in the middle,
+        // and why a paint stretch broke off at every junction.
+        //
+        // A free end has no buried face and keeps its own answer when it has one;
+        // it inherits only when it has nothing to say for itself — and outside
+        // counts as an answer there too. A wall that runs on past the corner of
+        // a room fronts nothing but outside, and reaching over its exterior
+        // neighbour for a room further along dressed the last cell of a run in a
+        // colour nothing beside it was wearing.
         const terminalBand = geometry && WallFaceResolver.isTerminalBand(slice, geometry);
-        if (classification.kind === 'room' || (!hasBuriedFace && !terminalBand) || !geometry) {
+        const inheritable = hasBuriedFace || (terminalBand && classification.kind !== 'room');
+        if (!geometry || !inheritable) {
             return Object.freeze({ atom: Object.freeze(atom), classification });
         }
 
-        const inherited = WallFaceResolver.neighbouringRunRoom(slice, grid, topology, geometry);
+        // A buried half is buried by an arm leaving its own cell, and the arm is
+        // the seam: the west half continues the run west, the east half
+        // continues it east, and they are allowed to differ — that is two
+        // surfaces meeting on the post between them. Asking both ways and
+        // giving up when they disagree is what left the half beside an arm
+        // wearing the face behind it while the wall it continues went on
+        // without it. A free end has no arm and no seam, so it still needs both
+        // sides to agree.
+        const inherited = WallSurfaceRuns.neighbouringRunSurface(
+            slice, grid, topology, geometry, { preferSide: hasBuriedFace }
+        );
         return Object.freeze({
             atom: Object.freeze(atom),
             classification: inherited || classification
@@ -97,44 +142,6 @@ class WallFaceResolver {
         const verticalConnections = Number((mask & WallGeometry.MASK_NORTH) !== 0) +
             Number((mask & WallGeometry.MASK_SOUTH) !== 0);
         return horizontalConnections === 1 && verticalConnections === 0;
-    }
-
-    static neighbouringRunRoom(slice, grid, topology, geometry) {
-        const startUnit = (2 * slice.x) + slice.half;
-        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
-        for (let distance = 1; distance <= limit; distance++) {
-            const rooms = new Map();
-            for (const direction of [-1, 1]) {
-                const unit = startUnit + (distance * direction);
-                if (!WallFaceResolver.horizontalUnitsConnected(startUnit, unit, slice.y, geometry)) continue;
-                const x = Math.floor(unit / 2);
-                const half = ((unit % 2) + 2) % 2;
-                const spans = geometry.paintSpans?.get(BuildKeys.cell(x, slice.y)) || [];
-                if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
-                const neighbourSlice = { x, y: slice.y, kind: 'horizontal-band', half };
-                const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
-                const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
-                if (neighbourClass.kind === 'room') rooms.set(neighbourClass.roomId, neighbourClass);
-            }
-            if (rooms.size === 1) return rooms.values().next().value;
-            if (rooms.size > 1) return null;
-        }
-        return null;
-    }
-
-    static horizontalUnitsConnected(fromUnit, toUnit, y, geometry) {
-        const direction = Math.sign(toUnit - fromUnit);
-        for (let unit = fromUnit; unit !== toUnit; unit += direction) {
-            const next = unit + direction;
-            const x = Math.floor(unit / 2);
-            const nextX = Math.floor(next / 2);
-            if (x === nextX) continue;
-            const leftX = Math.min(x, nextX);
-            const leftMask = geometry.masks?.get(BuildKeys.cell(leftX, y)) || 0;
-            const rightMask = geometry.masks?.get(BuildKeys.cell(leftX + 1, y)) || 0;
-            if (!(leftMask & WallGeometry.MASK_EAST) || !(rightMask & WallGeometry.MASK_WEST)) return false;
-        }
-        return true;
     }
 
     static depthFromAtom(atom, roomId, grid) {

@@ -8,7 +8,7 @@ const sources = [
     'js/Map/Build/BuildingPlanStore.js', 'js/Map/Build/RoomPlanStore.js', 'js/Map/Build/WallCellStore.js',
     'js/Map/Build/WallSurfaceAtomStore.js', 'js/Map/Build/AttachmentStore.js', 'js/Map/Build/BuildDocument.js',
     'js/Utility/RectUtils.js', 'js/Map/Regions/SpatialRegion.js', 'js/Map/Regions/RegionManager.js',
-    'js/Map/Walls/WallGeometry.js', 'js/Map/Walls/WallFaceResolver.js', 'js/Map/Floors/FloorOwnershipResolver.js',
+    'js/Map/Walls/WallGeometry.js', 'js/Map/Walls/WallSurfaceRuns.js', 'js/Map/Walls/WallFaceResolver.js', 'js/Map/Floors/FloorOwnershipResolver.js',
     'js/Map/Regions/RoomTopology.js', 'js/Map/Regions/RoomRegionProjection.js', 'js/Map/Build/BuildDirty.js',
     'js/Map/Build/BuildTransaction.js'
 ];

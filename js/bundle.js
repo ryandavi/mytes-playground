@@ -37038,6 +37038,7 @@ class BuildTransaction {
         try {
             const draft = new BuildDocument(before);
             edit(draft, draft.level(this.levelId));
+            BuildTransaction.pruneEmptyBuildings(draft, this.levelId);
             this.assertValid(draft);
             const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
             const after = draft.captureStores();
@@ -37048,6 +37049,22 @@ class BuildTransaction {
         } finally {
             this._active = false;
         }
+    }
+
+    /**
+     * A building is its walls and its rooms. One left holding neither is not a
+     * building you can select, name, roof or demolish — it is a row in the
+     * Navigator and nothing else — and moving a room out of a building is
+     * enough to leave one behind. Pruning here makes it a store delta inside
+     * the same transaction, so undo brings it back with the room that emptied
+     * it. Only on the edit path: a replay applies deltas that already agree.
+     */
+    static pruneEmptyBuildings(draft, levelId) {
+        const level = draft.level(levelId);
+        const used = new Set();
+        for (const wall of level.walls.values()) if (wall.buildingId) used.add(String(wall.buildingId));
+        for (const room of level.rooms.values()) if (room.buildingId) used.add(String(room.buildingId));
+        for (const id of [...draft.buildings.keys()]) if (!used.has(String(id))) draft.buildings.delete(id);
     }
 
     preview(edit) {
@@ -39429,6 +39446,150 @@ class WallGeometry {
     }
 }
 ;
+/* -- js/Map/Walls/WallSurfaceRuns.js -- */
+/**
+ * WallSurfaceRuns — which surface a wall half belongs to when its own faces
+ * cannot say.
+ *
+ * A half with masonry behind it, a free end, the side of an arm where it leaves
+ * the wall it hangs off: each is part of a run, and the run is what it wears.
+ * These walks answer "what is the nearest half along this run that can name a
+ * surface", with the tie-breaks §4.10 sets out — the side of the seam for a
+ * buried band, south first for a post. Pure: geometry, the ownership grid and
+ * topology in, a classification out.
+ */
+class WallSurfaceRuns {
+    /**
+     * A post is the side of a wall running north-south, and where a horizontal
+     * arm leaves the same cell that side is flush against the arm's masonry.
+     * `lookBlock` reads into the arm's own cell, and floor ownership expands
+     * under masonry, so the block answers with the room whose floor runs up to
+     * it — a junction sliver wearing the neighbouring room's finish while the
+     * wall it is plainly part of carries on below it in another. That is the
+     * unpainted stub at the top of a painted arm.
+     *
+     * A covered post takes the surface of the run it belongs to instead, read
+     * north and south past any other junction, which cannot speak either.
+     */
+    static postSurface(slice, grid, topology, geometry) {
+        const side = slice.kind === 'post-west' ? WallGeometry.MASK_WEST
+            : slice.kind === 'post-east' ? WallGeometry.MASK_EAST : 0;
+        const covered = side && (WallSurfaceRuns.maskAt(slice.x, slice.y, geometry) & side) !== 0;
+        if (!geometry || !covered) return null;
+        // South first. A vertical run can pass straight through the junction
+        // with a different surface on each side of it — a room above, the yard
+        // below — and the sliver belongs to the half the camera is looking at,
+        // which is the same call the bands make.
+        return WallSurfaceRuns.postSurfaceTowards(slice, grid, topology, geometry, side, 1) ??
+            WallSurfaceRuns.postSurfaceTowards(slice, grid, topology, geometry, side, -1);
+    }
+
+    static postSurfaceTowards(slice, grid, topology, geometry, side, direction) {
+        const limit = Math.max(1, (geometry.cells?.size || 1));
+        for (let distance = 1; distance <= limit; distance++) {
+            const y = slice.y + (distance * direction);
+            if (!WallSurfaceRuns.verticalCellsConnected(slice.y, y, slice.x, geometry)) return null;
+            // Another junction, covered on the same side: it cannot speak either.
+            if ((WallSurfaceRuns.maskAt(slice.x, y, geometry) & side) !== 0) continue;
+            const spans = geometry.paintSpans?.get(BuildKeys.cell(slice.x, y)) || [];
+            if (!spans.some(span => span.kind === slice.kind)) continue;
+            const neighbourSlice = { x: slice.x, y, kind: slice.kind, half: slice.half };
+            const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
+            const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
+            if (neighbourClass.kind === 'buried') continue;
+            return neighbourClass;
+        }
+        return null;
+    }
+
+    static maskAt(x, y, geometry) {
+        return geometry?.masks?.get(BuildKeys.cell(x, y)) || 0;
+    }
+
+    static verticalCellsConnected(fromY, toY, x, geometry) {
+        const direction = Math.sign(toY - fromY);
+        for (let y = fromY; y !== toY; y += direction) {
+            const mask = WallSurfaceRuns.maskAt(x, y, geometry);
+            const next = WallSurfaceRuns.maskAt(x, y + direction, geometry);
+            const forward = direction > 0 ? WallGeometry.MASK_SOUTH : WallGeometry.MASK_NORTH;
+            const back = direction > 0 ? WallGeometry.MASK_NORTH : WallGeometry.MASK_SOUTH;
+            if (!(mask & forward) || !(next & back)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * What the run through this half is showing, read from the nearest band on
+     * either side that can answer. Outside counts as an answer: a wall that
+     * fronts the outside carries on being that wall through its own corners.
+     * Two different answers means the run genuinely changes surface here, and
+     * the caller keeps what it had.
+     */
+    static neighbouringRunSurface(slice, grid, topology, geometry, { preferSide = false } = {}) {
+        if (preferSide) {
+            const own = slice.half === 0 ? -1 : 1;
+            return WallSurfaceRuns.runSurfaceTowards(slice, grid, topology, geometry, own) ??
+                WallSurfaceRuns.runSurfaceTowards(slice, grid, topology, geometry, -own);
+        }
+        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
+        for (let distance = 1; distance <= limit; distance++) {
+            const surfaces = new Map();
+            for (const direction of [-1, 1]) {
+                const found = WallSurfaceRuns.runSurfaceAt(slice, grid, topology, geometry, direction, distance);
+                if (found) surfaces.set(WallSurfaceRuns.surfaceKey(found), found);
+            }
+            if (surfaces.size === 1) return surfaces.values().next().value;
+            if (surfaces.size > 1) return null;
+        }
+        return null;
+    }
+
+    /** The first band along the run in one direction that can name a surface. */
+    static runSurfaceTowards(slice, grid, topology, geometry, direction) {
+        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
+        for (let distance = 1; distance <= limit; distance++) {
+            const found = WallSurfaceRuns.runSurfaceAt(slice, grid, topology, geometry, direction, distance);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    static runSurfaceAt(slice, grid, topology, geometry, direction, distance) {
+        const startUnit = (2 * slice.x) + slice.half;
+        const unit = startUnit + (distance * direction);
+        if (!WallSurfaceRuns.horizontalUnitsConnected(startUnit, unit, slice.y, geometry)) return null;
+        const x = Math.floor(unit / 2);
+        const half = ((unit % 2) + 2) % 2;
+        const spans = geometry.paintSpans?.get(BuildKeys.cell(x, slice.y)) || [];
+        if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) return null;
+        const neighbourSlice = { x, y: slice.y, kind: 'horizontal-band', half };
+        const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
+        const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
+        return neighbourClass.kind === 'buried' ? null : neighbourClass;
+    }
+
+    static surfaceKey(classification) {
+        return classification.kind === 'room'
+            ? `room:${classification.roomId}`
+            : `${classification.kind}:${classification.loopId ?? 'outside'}`;
+    }
+
+    static horizontalUnitsConnected(fromUnit, toUnit, y, geometry) {
+        const direction = Math.sign(toUnit - fromUnit);
+        for (let unit = fromUnit; unit !== toUnit; unit += direction) {
+            const next = unit + direction;
+            const x = Math.floor(unit / 2);
+            const nextX = Math.floor(next / 2);
+            if (x === nextX) continue;
+            const leftX = Math.min(x, nextX);
+            const leftMask = geometry.masks?.get(BuildKeys.cell(leftX, y)) || 0;
+            const rightMask = geometry.masks?.get(BuildKeys.cell(leftX + 1, y)) || 0;
+            if (!(leftMask & WallGeometry.MASK_EAST) || !(rightMask & WallGeometry.MASK_WEST)) return false;
+        }
+        return true;
+    }
+}
+;
 /* -- js/Map/Walls/WallFaceResolver.js -- */
 class WallFaceResolver {
     static classify(atom, grid, topology = {}) {
@@ -39441,6 +39602,20 @@ class WallFaceResolver {
         return Object.freeze({ kind: 'exterior', loopId: WallFaceResolver.loopAt(bx, by, topology) ?? 'outside' });
     }
 
+    /**
+     * Which atom a slice shows.
+     *
+     * With a room on one side only, the visible face is the south one — the
+     * camera is south of the wall, so what you are looking at is the inside of
+     * a room's back wall and the OUTSIDE of its front wall. Showing the room's
+     * atom on a front wall meant a building's outward faces were never
+     * presented, and what is never presented can be neither clicked nor
+     * painted: there was no way to reach a house's own exterior at all.
+     *
+     * With a room on both sides there is no outside involved and the depth rule
+     * below decides, which is what stops a shared wall wearing the neighbour's
+     * colour. A buried face is never shown; `visibleSurface` swaps it out.
+     */
     static visibleAtom(slice, grid, topology = {}) {
         const x = slice.x;
         const y = slice.y;
@@ -39450,6 +39625,7 @@ class WallFaceResolver {
             const north = { x, y, face: 'north', half };
             const southClass = WallFaceResolver.classify(south, grid, topology);
             const northClass = WallFaceResolver.classify(north, grid, topology);
+            if (southClass.kind === 'exterior' && northClass.kind === 'room') return Object.freeze(south);
             if (northClass.kind === 'room' && southClass.kind !== 'room') return Object.freeze(north);
             if (southClass.kind === 'room' && northClass.kind !== 'room') return Object.freeze(south);
             if (southClass.kind === 'room' && northClass.kind === 'room' && southClass.roomId !== northClass.roomId) {
@@ -39480,7 +39656,12 @@ class WallFaceResolver {
     static visibleSurface(slice, grid, topology = {}, geometry = null) {
         let atom = WallFaceResolver.visibleAtom(slice, grid, topology);
         let classification = WallFaceResolver.classify(atom, grid, topology);
-        if (slice.kind !== 'horizontal-band') return Object.freeze({ atom, classification });
+        if (slice.kind !== 'horizontal-band') {
+            return Object.freeze({
+                atom,
+                classification: WallSurfaceRuns.postSurface(slice, grid, topology, geometry) || classification
+            });
+        }
 
         const candidates = ['south', 'north'].map(face => {
             const candidate = { x: slice.x, y: slice.y, face, half: slice.half };
@@ -39491,12 +39672,37 @@ class WallFaceResolver {
             const visible = candidates.find(candidate => candidate.classification.kind !== 'buried');
             if (visible) ({ atom, classification } = visible);
         }
+        // A half with masonry behind it is a stub of a longer run — the returning
+        // arm of a corner or a T — and it belongs to whatever that run belongs
+        // to. Its own faces cannot say: one is buried, so the only classification
+        // left is whichever side happens to be open, which at a corner is the
+        // room even when the run itself faces outside. That is how one wall came
+        // to wear two surfaces, interior at both ends and exterior in the middle,
+        // and why a paint stretch broke off at every junction.
+        //
+        // A free end has no buried face and keeps its own answer when it has one;
+        // it inherits only when it has nothing to say for itself — and outside
+        // counts as an answer there too. A wall that runs on past the corner of
+        // a room fronts nothing but outside, and reaching over its exterior
+        // neighbour for a room further along dressed the last cell of a run in a
+        // colour nothing beside it was wearing.
         const terminalBand = geometry && WallFaceResolver.isTerminalBand(slice, geometry);
-        if (classification.kind === 'room' || (!hasBuriedFace && !terminalBand) || !geometry) {
+        const inheritable = hasBuriedFace || (terminalBand && classification.kind !== 'room');
+        if (!geometry || !inheritable) {
             return Object.freeze({ atom: Object.freeze(atom), classification });
         }
 
-        const inherited = WallFaceResolver.neighbouringRunRoom(slice, grid, topology, geometry);
+        // A buried half is buried by an arm leaving its own cell, and the arm is
+        // the seam: the west half continues the run west, the east half
+        // continues it east, and they are allowed to differ — that is two
+        // surfaces meeting on the post between them. Asking both ways and
+        // giving up when they disagree is what left the half beside an arm
+        // wearing the face behind it while the wall it continues went on
+        // without it. A free end has no arm and no seam, so it still needs both
+        // sides to agree.
+        const inherited = WallSurfaceRuns.neighbouringRunSurface(
+            slice, grid, topology, geometry, { preferSide: hasBuriedFace }
+        );
         return Object.freeze({
             atom: Object.freeze(atom),
             classification: inherited || classification
@@ -39529,44 +39735,6 @@ class WallFaceResolver {
         const verticalConnections = Number((mask & WallGeometry.MASK_NORTH) !== 0) +
             Number((mask & WallGeometry.MASK_SOUTH) !== 0);
         return horizontalConnections === 1 && verticalConnections === 0;
-    }
-
-    static neighbouringRunRoom(slice, grid, topology, geometry) {
-        const startUnit = (2 * slice.x) + slice.half;
-        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
-        for (let distance = 1; distance <= limit; distance++) {
-            const rooms = new Map();
-            for (const direction of [-1, 1]) {
-                const unit = startUnit + (distance * direction);
-                if (!WallFaceResolver.horizontalUnitsConnected(startUnit, unit, slice.y, geometry)) continue;
-                const x = Math.floor(unit / 2);
-                const half = ((unit % 2) + 2) % 2;
-                const spans = geometry.paintSpans?.get(BuildKeys.cell(x, slice.y)) || [];
-                if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
-                const neighbourSlice = { x, y: slice.y, kind: 'horizontal-band', half };
-                const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
-                const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
-                if (neighbourClass.kind === 'room') rooms.set(neighbourClass.roomId, neighbourClass);
-            }
-            if (rooms.size === 1) return rooms.values().next().value;
-            if (rooms.size > 1) return null;
-        }
-        return null;
-    }
-
-    static horizontalUnitsConnected(fromUnit, toUnit, y, geometry) {
-        const direction = Math.sign(toUnit - fromUnit);
-        for (let unit = fromUnit; unit !== toUnit; unit += direction) {
-            const next = unit + direction;
-            const x = Math.floor(unit / 2);
-            const nextX = Math.floor(next / 2);
-            if (x === nextX) continue;
-            const leftX = Math.min(x, nextX);
-            const leftMask = geometry.masks?.get(BuildKeys.cell(leftX, y)) || 0;
-            const rightMask = geometry.masks?.get(BuildKeys.cell(leftX + 1, y)) || 0;
-            if (!(leftMask & WallGeometry.MASK_EAST) || !(rightMask & WallGeometry.MASK_WEST)) return false;
-        }
-        return true;
     }
 
     static depthFromAtom(atom, roomId, grid) {
@@ -40453,13 +40621,34 @@ class WallCutawayPlan extends WallRenderer {
         }
 
         const raw = this.getRawCutStates(piece, count);
-        if (!raw || !piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) return raw;
+        if (!raw) return raw;
 
         // Cutaway height belongs to the structural run, not to its render
-        // pieces. Resolve the whole horizontal chain at once so a paint/room
-        // seam cannot independently create a second transition beside the
-        // first one.
-        const chain = this.getHorizontalCellChain(piece.cells[0]);
+        // pieces, so every horizontal cell is answered by resolving the whole
+        // chain it belongs to. Per cell rather than per piece: a piece that
+        // contains a corner or a junction spans more than one chain, and it
+        // used to fall back to the raw states for all of them — which is how a
+        // lowered run inside a wrapped wall reached its end with no transition
+        // at all. Structural cells keep the raw answer; they are already
+        // standing, and they are the boundaries the chains resolve against.
+        //
+        // "Walls down" has no such need: its one standing island is the span
+        // under the moving object, and anchoring the run's ends on top of that
+        // just raises wall the player did not ask for.
+        const anchorRun = this.presentation !== 'down';
+        const chains = new Map();
+        return piece.cells.map((cell, index) => {
+            if (!this.isHorizontalOnlyCell(cell)) return raw[index];
+            const chain = this.getHorizontalCellChain(cell);
+            if (chain.length === 0) return raw[index];
+            const key = BuildKeys.cell(chain[0].x, chain[0].y);
+            if (!chains.has(key)) chains.set(key, this.resolveChain(chain, anchorRun));
+            return chains.get(key).get(BuildKeys.cell(cell.x, cell.y)) === true;
+        });
+    }
+
+    /** One horizontal run, resolved end to end, keyed by cell. */
+    resolveChain(chain, anchorRun) {
         const rawByPiece = new Map();
         const cut = chain.map(cell => {
             const host = this.findPieceForCell(cell.x, cell.y);
@@ -40470,20 +40659,17 @@ class WallCutawayPlan extends WallRenderer {
             const index = host.cells.findIndex(candidate => candidate.x === cell.x && candidate.y === cell.y);
             return rawByPiece.get(host)?.[index] === true;
         });
+        const resolved = this.resolveChainHeights(chain, cut, anchorRun);
+        return new Map(chain.map((cell, index) => [BuildKeys.cell(cell.x, cell.y), resolved[index]]));
+    }
 
-        // Everything from here to the transition tidy-up exists to give a
-        // cutaway somewhere sensible to return to full height. "Walls down" has
-        // no such need: its one standing island is the span under the moving
-        // object, and anchoring the run's ends on top of that just raises wall
-        // the player did not ask for.
-        const anchorRun = this.presentation !== 'down';
-
-        // Straight endpoints abutting vertical structure remain standing. Pure
-        // end caps keep their requested state: a cap can belong to a long stub
-        // run as long as that run eventually reaches one valid transition.
+    resolveChainHeights(chain, cut, anchorRun, standEndCaps = true) {
+        // Straight endpoints abutting vertical structure remain standing, and so
+        // does a free end: every lowered run climbs back to full height at both
+        // of its ends.
         if (anchorRun) {
-            this.resolveHorizontalBoundary(chain, cut, 0);
-            this.resolveHorizontalBoundary(chain, cut, cut.length - 1);
+            this.resolveHorizontalBoundary(chain, cut, 0, standEndCaps);
+            this.resolveHorizontalBoundary(chain, cut, cut.length - 1, standEndCaps);
         }
 
         // Opposing transitions may not touch. This most often happens when a
@@ -40520,10 +40706,43 @@ class WallCutawayPlan extends WallRenderer {
             // whenever the run beyond it is lowered.
             this.reserveTransitionBesideFullCap(chain, cut, 0, 1);
             this.reserveTransitionBesideFullCap(chain, cut, cut.length - 1, -1);
+            this.enforceTransitionBoundaries(chain, cut);
         }
+        return cut;
+    }
 
-        const resolvedByCell = new Map(chain.map((cell, index) => [`${cell.x},${cell.y}`, cut[index]]));
-        return piece.cells.map(cell => resolvedByCell.get(`${cell.x},${cell.y}`) === true);
+    /**
+     * A lowered window is a stub with a stepped transition either side of it,
+     * or it is nothing.
+     *
+     * Standing the cells at a run's ends is not enough on its own: the ramp art
+     * is a straight horizontal frame, so a cell that stands but is a corner, a
+     * junction or an end cap draws no step, and the wall drops from full height
+     * to stub in one hard edge. Rather than leave that, the window closes and
+     * the wall stays up — Ryan's call, 2026-09-05: if there is not at least one
+     * lowered cell between two transition columns, do not cut away at all.
+     */
+    enforceTransitionBoundaries(chain, cut) {
+        const carriesRamp = index => {
+            const cell = chain[index];
+            return !!cell && !cell.opening && cut[index] === false &&
+                WallBuilder.isStraightHorizontal(this.computeMask(cell));
+        };
+        for (let changed = true; changed;) {
+            changed = false;
+            for (let index = 0; index < cut.length;) {
+                if (!cut[index]) {
+                    index++;
+                    continue;
+                }
+                const from = index;
+                while (index < cut.length && cut[index]) index++;
+                if (carriesRamp(from - 1) && carriesRamp(index)) continue;
+                for (let inner = from; inner < index; inner++) cut[inner] = false;
+                changed = true;
+            }
+        }
+        return cut;
     }
 
     getRawCutStates(piece, count = piece.cells.length) {
@@ -40570,15 +40789,25 @@ class WallCutawayPlan extends WallRenderer {
         return WallBuilder.isHorizontalMask(mask) && !WallBuilder.isVerticalMask(mask);
     }
 
-    resolveHorizontalBoundary(chain, cut, boundaryIndex) {
+    /**
+     * A lowered run always climbs back to full height, at both of its ends.
+     *
+     * Where it meets a corner or a junction that is obvious: the structure
+     * stands and the straight cell beside it steps down. A free end used to be
+     * the exception — a cap could stay a stub as long as the run reached one
+     * valid transition somewhere — and that is the flat, unfinished end the
+     * cutaway showed wherever a wall simply stopped. The end stands too now.
+     * It cannot carry the straight ramp art itself, so `reserveTransitionBeside‑
+     * FullCap` hands the step to the cell inside it.
+     *
+     * An opening is never raised: a door standing full height in the middle of
+     * a cutaway is worse than an unfinished end.
+     */
+    resolveHorizontalBoundary(chain, cut, boundaryIndex, standEndCaps = true) {
         const boundary = chain[boundaryIndex];
-        if (!boundary) return;
-        if (!WallBuilder.isEndCapMask(this.computeMask(boundary))) {
-            // This horizontal sequence terminates at a corner, junction, or
-            // other structural boundary outside the sequence. Its boundary
-            // straight cell must stand so it can transition into the stub run.
-            if (!boundary.opening) cut[boundaryIndex] = false;
-        }
+        if (!boundary || boundary.opening) return;
+        if (!standEndCaps && WallBuilder.isEndCapMask(this.computeMask(boundary))) return;
+        cut[boundaryIndex] = false;
     }
 
     ensureHorizontalChainAnchor(chain, cut) {
@@ -42232,6 +42461,12 @@ class WallStructure extends WallFixtures {
                 : null
         }));
         const defaults = this.wallData.defaults || {};
+        // Resolved once for the whole batch: cells laid in one gesture are one
+        // act of building, and none of them is in `baseCells` yet, so asking
+        // per cell would make every cell of a detached run its own building.
+        let batchBuildingId = this.resolveBuildingId(
+            applied.filter(change => (change.data ?? null) !== null && change.data.buildingId == null)
+        );
         const move = options.contentMove;
         const inverseMove = WallBuilder.invertContentMove(move);
         if (move) this.translateWallContents(move);
@@ -42261,14 +42496,27 @@ class WallStructure extends WallFixtures {
                         continue;
                     }
                     const data = { ...defaults, ...change.data };
+                    if (data.buildingId == null && batchBuildingId === null) {
+                        batchBuildingId = WallStructure.createBuilding(draft);
+                    }
                     level.walls.setCell(change.x, change.y, {
                         constructionId: data.constructionId || defaults.constructionId,
                         heightCells: Number(data.heightCells) || Number(defaults.heightCells) || 1,
                         connectGroup: data.connectGroup || defaults.connectGroup || data.constructionId,
-                        buildingId: data.buildingId ?? this.inheritedBuildingId(change.x, change.y)
+                        buildingId: data.buildingId ?? batchBuildingId
                     });
                     for (const room of level.rooms.values()) {
                         if (room.seedCells?.includes(key)) level.rooms.removeSeed(room.id, key);
+                    }
+                }
+                // A room you wall in belongs to the building those walls make.
+                // Without this an enclosed Area keeps its walls in one building
+                // and itself on the site, which is what the Navigator was
+                // reporting as unassigned.
+                for (const roomId of options.adoptRoomIds || []) {
+                    const room = level.rooms.get(roomId);
+                    if (batchBuildingId && room && !room.buildingId) {
+                        level.rooms.set(roomId, { ...room, buildingId: batchBuildingId });
                     }
                 }
                 for (const change of options.roomChanges || []) {
@@ -42290,12 +42538,42 @@ class WallStructure extends WallFixtures {
         return { applied, rejected, inverse };
     }
 
-    inheritedBuildingId(x, y) {
-        for (const direction of WallGeometry.DIRECTIONS) {
-            const neighbour = this.baseCells.get(BuildKeys.cell(x + direction.dx, y + direction.dy));
-            if (neighbour?.buildingId) return neighbour.buildingId;
+    /**
+     * The building newly built cells join: the structure they touch, else the
+     * building of a room they run alongside, else null — and null means a new
+     * building, because nothing else in the model says two structures that
+     * touch nothing are the same one. Never the first building on the map:
+     * that silently annexed every shed to the house.
+     */
+    resolveBuildingId(cells) {
+        if (cells.length === 0) return null;
+        const level = this.gameMap?.buildDocument?.level?.();
+        const grid = this.gameMap?.buildTransaction?.cache?.grid;
+        const pending = new Set(cells.map(cell => BuildKeys.cell(cell.x, cell.y)));
+        let roomBuildingId = null;
+        for (const cell of cells) {
+            for (const direction of WallGeometry.DIRECTIONS) {
+                const x = cell.x + direction.dx;
+                const y = cell.y + direction.dy;
+                const key = BuildKeys.cell(x, y);
+                if (pending.has(key)) continue;
+                const neighbour = this.baseCells.get(key);
+                if (neighbour?.buildingId) return neighbour.buildingId;
+                if (roomBuildingId) continue;
+                const roomId = grid?.ownerOfCell?.(x, y) ?? null;
+                roomBuildingId = (roomId && level?.rooms.get(roomId)?.buildingId) || null;
+            }
         }
-        return this.gameMap?.buildDocument?.buildings?.values?.()[0]?.id ?? null;
+        return roomBuildingId;
+    }
+
+    static createBuilding(draft, displayName = null) {
+        let index = draft.buildings.size + 1;
+        while (draft.buildings.has(`building_${index}`)) index++;
+        const id = `building_${index}`;
+        const name = displayName || `Building ${index}`;
+        draft.buildings.set(id, { id, displayName: name, authoredDisplayName: name });
+        return id;
     }
 
     translateWallContents(move) {
@@ -43193,6 +43471,275 @@ class WallTiledExporter {
         return TiledDocument.takeNextId(mapEl, attribute);
     }
 
+}
+;
+/* -- js/Map/Roofs/RoofGeometry.js -- */
+class RoofGeometry {
+    static DIRECTIONS = Object.freeze([
+        Object.freeze({ name: 'north', dx: 0, dy: -1 }),
+        Object.freeze({ name: 'east', dx: 1, dy: 0 }),
+        Object.freeze({ name: 'south', dx: 0, dy: 1 }),
+        Object.freeze({ name: 'west', dx: -1, dy: 0 })
+    ]);
+
+    static compute(input = {}) {
+        const plan = input.roofPlan || {};
+        const buildingId = String(plan.buildingId || input.buildingId || '');
+        const width = RoofGeometry.dimension(input.width ?? input.config?.width);
+        const height = RoofGeometry.dimension(input.height ?? input.config?.height);
+        const base = RoofGeometry.coverFor(input.topology, buildingId);
+        for (const key of plan.excludedCells || []) base.delete(key);
+        const cover = RoofGeometry.dilate(
+            base,
+            Number(plan.overhangCells) || 0,
+            width,
+            height,
+            RoofGeometry.otherBuildingCells(input.topology, buildingId)
+        );
+        const style = ['flat', 'hip', 'gable'].includes(plan.style) ? plan.style : 'flat';
+        const sections = RoofGeometry.components(cover).map(cells =>
+            RoofGeometry.section(cells, style, plan, input.walls, input.config || {})
+        );
+        return Object.freeze({ buildingId, sections: Object.freeze(sections), revision: Number(input.revision) || 0 });
+    }
+
+    static dimension(value) {
+        const number = Number(value);
+        return Number.isInteger(number) && number > 0 ? number : Infinity;
+    }
+
+    static coverFor(topology, buildingId) {
+        const source = topology?.roofableFootprint?.(buildingId) ??
+            topology?.roofableByBuilding?.get?.(buildingId) ?? [];
+        return new Set([...source].map(String));
+    }
+
+    static otherBuildingCells(topology, buildingId) {
+        const result = new Set();
+        for (const [id, cells] of topology?.roofableByBuilding || []) {
+            if (String(id) === buildingId) continue;
+            for (const key of cells) result.add(String(key));
+        }
+        return result;
+    }
+
+    static dilate(source, rounds, width, height, forbidden = new Set()) {
+        let cover = new Set(source);
+        for (let round = 0; round < Math.max(0, Math.min(1, rounds)); round++) {
+            const next = new Set(cover);
+            for (const key of cover) {
+                const { x, y } = BuildKeys.parseCell(key);
+                for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    const candidate = BuildKeys.cell(nx, ny);
+                    if (nx >= 0 && ny >= 0 && nx < width && ny < height && !forbidden.has(candidate)) {
+                        next.add(candidate);
+                    }
+                }
+            }
+            cover = next;
+        }
+        return cover;
+    }
+
+    static components(cover) {
+        const remaining = new Set(cover);
+        const sections = [];
+        while (remaining.size) {
+            const first = RoofGeometry.sorted(remaining)[0];
+            remaining.delete(first);
+            const cells = [first];
+            for (let index = 0; index < cells.length; index++) {
+                const { x, y } = BuildKeys.parseCell(cells[index]);
+                for (const direction of RoofGeometry.DIRECTIONS) {
+                    const key = BuildKeys.cell(x + direction.dx, y + direction.dy);
+                    if (!remaining.delete(key)) continue;
+                    cells.push(key);
+                }
+            }
+            sections.push(new Set(RoofGeometry.sorted(cells)));
+        }
+        return sections.sort((a, b) => RoofGeometry.compareKeys(a.values().next().value, b.values().next().value));
+    }
+
+    static section(cells, style, plan, walls, config) {
+        const bounds = RoofGeometry.bounds(cells);
+        const ridgeAxis = style === 'gable' ? RoofGeometry.ridgeAxis(plan.ridgeAxis, bounds) : null;
+        const heights = style === 'flat'
+            ? new Map([...cells].map(key => [key, 1]))
+            : style === 'gable'
+                ? RoofGeometry.gableHeights(cells, ridgeAxis)
+                : RoofGeometry.hipHeights(cells);
+        const parts = new Map(RoofGeometry.sorted(cells).map(key => [key,
+            RoofGeometry.classify(key, cells, heights, style, ridgeAxis)
+        ]));
+        const wallHeights = RoofGeometry.wallHeights(cells, walls, config);
+        return Object.freeze({
+            key: cells.values().next().value,
+            cells,
+            heightPx: wallHeights.length ? Math.max(...wallHeights) : Number(config.defaultHeightPx) || 0,
+            mixedHeights: new Set(wallHeights).size > 1,
+            parts,
+            bounds: Object.freeze(bounds),
+            ridgeAxis
+        });
+    }
+
+    static hipHeights(cells) {
+        const heights = new Map();
+        let frontier = [];
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            if (RoofGeometry.DIRECTIONS.some(d => !cells.has(BuildKeys.cell(x + d.dx, y + d.dy))) ||
+                [-1, 1].some(dx => [-1, 1].some(dy => !cells.has(BuildKeys.cell(x + dx, y + dy))))) {
+                heights.set(key, 1);
+                frontier.push(key);
+            }
+        }
+        let distance = 1;
+        while (frontier.length) {
+            const next = [];
+            for (const key of frontier) {
+                const { x, y } = BuildKeys.parseCell(key);
+                for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                    const neighbour = BuildKeys.cell(x + dx, y + dy);
+                    if (!cells.has(neighbour) || heights.has(neighbour)) continue;
+                    heights.set(neighbour, distance + 1);
+                    next.push(neighbour);
+                }
+            }
+            frontier = next;
+            distance++;
+        }
+        return heights;
+    }
+
+    static gableHeights(cells, ridgeAxis) {
+        const heights = new Map();
+        const cross = ridgeAxis === 'x'
+            ? [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }]
+            : [{ dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            let distance = 1;
+            for (;; distance++) {
+                if (cross.some(d => !cells.has(BuildKeys.cell(x + d.dx * distance, y + d.dy * distance)))) break;
+            }
+            heights.set(key, distance);
+        }
+        return heights;
+    }
+
+    static classify(key, cells, heights, style, ridgeAxis) {
+        const { x, y } = BuildKeys.parseCell(key);
+        if (style === 'flat') {
+            const edgeMask = RoofGeometry.DIRECTIONS.reduce((mask, direction, index) =>
+                cells.has(BuildKeys.cell(x + direction.dx, y + direction.dy)) ? mask : mask | (1 << index), 0);
+            return Object.freeze({ part: 'flat', facing: null, shade: 'neutral', height: 1, edgeMask });
+        }
+        if (style === 'gable') {
+            const ends = ridgeAxis === 'x'
+                ? RoofGeometry.DIRECTIONS.filter(d => d.name === 'east' || d.name === 'west')
+                : RoofGeometry.DIRECTIONS.filter(d => d.name === 'north' || d.name === 'south');
+            const end = ends.find(d => !cells.has(BuildKeys.cell(x + d.dx, y + d.dy)));
+            if (end) return RoofGeometry.part('gable-end', end.name, heights.get(key));
+        }
+        const own = heights.get(key) || 1;
+        const neighbours = RoofGeometry.DIRECTIONS.map(direction => ({
+            ...direction,
+            value: heights.get(BuildKeys.cell(x + direction.dx, y + direction.dy)) || 0
+        }));
+        const lower = neighbours.filter(neighbour => neighbour.value < own);
+        const higher = neighbours.filter(neighbour => neighbour.value > own);
+        if (lower.length === 1) return RoofGeometry.part('slope', lower[0].name, own);
+        if (lower.length === 2 && RoofGeometry.adjacent(lower)) {
+            return RoofGeometry.part('hip', RoofGeometry.corner(lower), own);
+        }
+        if (lower.length === 2) {
+            return RoofGeometry.part('ridge', lower.some(d => d.name === 'north') ? 'x' : 'y', own);
+        }
+        if (lower.length === 3) {
+            const continuation = neighbours.find(neighbour => !lower.includes(neighbour));
+            return RoofGeometry.part('ridge-end', continuation?.name || null, own);
+        }
+        if (lower.length === 4) return RoofGeometry.part('peak', null, own);
+        if (lower.length === 0 && higher.length >= 2) {
+            for (let left = 0; left < higher.length; left++) for (let right = left + 1; right < higher.length; right++) {
+                const pair = [higher[left], higher[right]];
+                if (RoofGeometry.adjacent(pair)) return RoofGeometry.part('valley', RoofGeometry.corner(pair), own);
+            }
+        }
+        const nearest = RoofGeometry.nearestEdge(x, y, cells);
+        return RoofGeometry.part('slope', nearest, own);
+    }
+
+    static part(part, facing, height) {
+        return Object.freeze({ part, facing, shade: RoofGeometry.shade(facing), height });
+    }
+
+    static adjacent(directions) {
+        if (directions.length !== 2 || !directions[0] || !directions[1]) return false;
+        return directions[0].dx !== -directions[1].dx || directions[0].dy !== -directions[1].dy;
+    }
+
+    static corner(directions) {
+        return ['north', 'south'].find(name => directions.some(d => d.name === name)) + '-' +
+            ['east', 'west'].find(name => directions.some(d => d.name === name));
+    }
+
+    static nearestEdge(x, y, cells) {
+        return RoofGeometry.DIRECTIONS.map((direction, order) => {
+            let distance = 1;
+            while (cells.has(BuildKeys.cell(x + direction.dx * distance, y + direction.dy * distance))) distance++;
+            return { name: direction.name, distance, order };
+        }).sort((a, b) => a.distance - b.distance || a.order - b.order)[0].name;
+    }
+
+    static shade(facing) {
+        if (String(facing).includes('south')) return 'light';
+        if (String(facing).includes('north')) return 'dark';
+        if (String(facing).includes('east')) return 'mid-light';
+        if (String(facing).includes('west')) return 'mid-dark';
+        return 'neutral';
+    }
+
+    static ridgeAxis(value, bounds) {
+        if (value === 'x' || value === 'y') return value;
+        return bounds.width >= bounds.height ? 'x' : 'y';
+    }
+
+    static wallHeights(cells, walls, config) {
+        const source = walls instanceof Map ? walls : new Map(Object.entries(walls || {}));
+        const cellSize = Number(config.cellSize) || 32;
+        const constructions = config.constructions instanceof Map
+            ? config.constructions : new Map(Object.entries(config.constructions || {}));
+        return [...cells].map(key => source.get(key)).filter(Boolean).map(wall => {
+            const construction = constructions.get(wall.constructionId);
+            return Number(construction?.height) || (Number(wall.heightCells) || 1) * cellSize;
+        });
+    }
+
+    static bounds(cells) {
+        const points = [...cells].map(BuildKeys.parseCell);
+        const xs = points.map(point => point.x);
+        const ys = points.map(point => point.y);
+        const left = Math.min(...xs);
+        const top = Math.min(...ys);
+        const right = Math.max(...xs) + 1;
+        const bottom = Math.max(...ys) + 1;
+        return { left, top, right, bottom, width: right - left, height: bottom - top };
+    }
+
+    static sorted(cells) {
+        return [...cells].sort(RoofGeometry.compareKeys);
+    }
+
+    static compareKeys(left, right) {
+        const a = BuildKeys.parseCell(left);
+        const b = BuildKeys.parseCell(right);
+        return a.y - b.y || a.x - b.x;
+    }
 }
 ;
 /* -- js/Map/Terrain/TerrainAtlas.js -- */
@@ -71562,6 +72109,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectedWallCells = [];
         this.marquee = null;
         this.wallHighlights = [];
+        this.roomHighlight = null;
         this.boundDown = this.onPointerDown.bind(this);
         this.boundMove = this.onPointerMove.bind(this);
         this.boundUp = this.onPointerUp.bind(this);
@@ -71720,11 +72268,18 @@ class BuildMarqueeSelection extends UIComponent {
         if (this.emptyPress?.pointerId === event.pointerId) {
             const cell = this.emptyPress.cell;
             this.emptyPress = null;
+            // Floors are selectable in their own right. A click on one used to
+            // jump straight to the whole building, which is a strange answer to
+            // "what did I just click" and left no way to reach the room itself.
+            // It reads like the wall scopes now: one click is the thing, two is
+            // what it belongs to.
             const room = cell && this.container?.gameMap?.wallBuilder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.buildingComponentForRoom(room.id);
+            const component = room && event.detail >= 2 ? this.buildingComponentForRoom(room.id) : null;
             if (component) {
                 this.selectBuilding(component);
                 this.preferredScope = 'building';
+            } else if (room) {
+                this.selectRoom(room.id, cell);
             } else {
                 this.parent.selectionManager.setSelection([]);
                 this.clearSelection();
@@ -71837,6 +72392,7 @@ class BuildMarqueeSelection extends UIComponent {
     renderActionBar() {
         this.actionBar?.remove();
         this.actionBar = null;
+        if (this.selectionKind === 'room') return this.renderRoomActionBar();
         if (this.selectedWallCells.length === 0 || this.wallHighlights.length === 0) return;
         const bar = document.createElement('div');
         bar.className = 'stage-bar build-selection-actions ignore';
@@ -71903,6 +72459,55 @@ class BuildMarqueeSelection extends UIComponent {
         this.actionBar = bar;
     }
 
+    renderRoomActionBar() {
+        const roomId = this.selectionRoomIds[0];
+        const room = this.container?.gameMap?.regionManager?.get('room', roomId);
+        if (!room) return;
+        const bar = document.createElement('div');
+        bar.className = 'stage-bar build-selection-actions ignore';
+        bar.setAttribute('role', 'toolbar');
+        bar.setAttribute('aria-label', 'Room selection');
+        const inspector = document.createElement('div');
+        inspector.className = 'build-selection-actions__inspector';
+        const title = document.createElement('strong');
+        title.textContent = room.properties?.displayName || room.id;
+        const details = document.createElement('span');
+        const tiles = room.shape?.cells?.size ?? 0;
+        details.textContent = `Room · ${tiles} tile${tiles === 1 ? '' : 's'}`;
+        inspector.append(title, details);
+        const actions = document.createElement('div');
+        actions.className = 'stage-bar__group build-selection-actions__operations';
+        const ui = this.parent;
+        for (const [label, titleText, action] of [
+            ['Paint floor', 'Choose the finish for this floor',
+                () => ui.surfaceCustomizePanel?.openRoomSurface(roomId, 'floor')],
+            ['Paint walls', 'Choose the finish of the walls facing this room',
+                () => ui.surfaceCustomizePanel?.openRoomSurface(roomId, 'wall')],
+            ['Edit area', 'Redraw which tiles belong to this room',
+                () => ui.roomPanel?.select?.(roomId) ?? false],
+            ['Building', 'Select the whole building this room belongs to', () => {
+                const component = this.buildingComponentForRoom(roomId);
+                if (component) return this.selectBuilding(component);
+                ui.showMessage?.('This room is not part of a building yet.', 'info', 'Select');
+                return false;
+            }]
+        ]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'stage-bar__action';
+            button.textContent = label;
+            button.title = titleText;
+            button.addEventListener('click', action);
+            actions.appendChild(button);
+        }
+        const controls = document.createElement('div');
+        controls.className = 'build-selection-actions__controls';
+        controls.append(actions);
+        bar.append(inspector, controls);
+        this.container?.element?.appendChild(bar);
+        this.actionBar = bar;
+    }
+
     selectionSummary() {
         const count = this.selectedWallCells.length;
         if (!count) return { title: 'Nothing selected', details: '' };
@@ -71946,7 +72551,7 @@ class BuildMarqueeSelection extends UIComponent {
 
     buildingName() {
         const map = this.container?.gameMap;
-        const buildingId = this.selectedRooms()
+        const buildingId = this.selectedBuildingIds()[0] || this.selectedRooms()
             .map(room => map?.buildDocument?.level?.().rooms.get(room.id)?.buildingId)
             .find(Boolean);
         const planName = buildingId ? map?.buildDocument?.buildings.get(buildingId)?.displayName : null;
@@ -72065,7 +72670,7 @@ class BuildMarqueeSelection extends UIComponent {
     renameBuilding(name) {
         const map = this.container?.gameMap;
         const build = map?.buildTransaction;
-        const buildingId = this.selectedRooms()
+        const buildingId = this.selectedBuildingIds()[0] || this.selectedRooms()
             .map(room => build?.document?.level(build.levelId).rooms.get(room.id)?.buildingId)
             .find(Boolean);
         const building = buildingId ? build?.document?.buildings.get(buildingId) : null;
@@ -72158,6 +72763,13 @@ class BuildMarqueeSelection extends UIComponent {
                 if (remember) this.preferredScope = scope;
                 return this.selectBuilding(component, additive, cell);
             }
+            // Silently collapsing to one segment reads as a broken scope
+            // button. The wall is real, it just has no building plan to expand
+            // into, and the Inspector is where one is given to it.
+            this.parent.showMessage?.(
+                'These walls are not part of a building yet — assign them under Unassigned walls in the Build Inspector.',
+                'info', 'Select'
+            );
         }
         if (remember) this.preferredScope = scope;
         this.selectedWallCells = additive ? this.mergeWallCells(this.selectedWallCells, cells) : cells;
@@ -72201,10 +72813,46 @@ class BuildMarqueeSelection extends UIComponent {
         const objects = [...(component.objectIds || [])]
             .map(id => this.container?.gameMap?.getObjectById?.(id))
             .filter(Boolean);
-        this.parent.selectionManager.setSelection(objects);
+        this.parent.selectionManager.setSelection(additive
+            ? [...this.parent.selectionManager.getSelectedObjects(), ...objects]
+            : objects);
         this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
+    }
+
+    /**
+     * A room as a selection in its own right: no wall cells, its floor tinted
+     * through its own mask, and the Inspector's room properties - rename, area,
+     * both paints, which building it belongs to - one tab away.
+     */
+    selectRoom(roomId, anchor = null) {
+        const map = this.container?.gameMap;
+        const room = map?.regionManager?.get('room', roomId);
+        if (!room) return false;
+        this.clearVisuals();
+        this.selectedWallCells = [];
+        this.selectionKind = 'room';
+        this.selectionRoomIds = [roomId];
+        this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : null;
+        this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({ kind: 'room', id: roomId });
+        this.roomHighlight = map.floorBuilder?.createRoomOverlay?.(room, {
+            className: 'build-selection-room',
+            fill: BuildMarqueeSelection.roomFill()
+        }) ?? null;
+        this.renderActionBar();
+        return true;
+    }
+
+    static roomFill() {
+        const accent = getComputedStyle(document.documentElement)
+            .getPropertyValue('--state-info-accent').trim();
+        const parts = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(accent);
+        const [r, g, b] = parts
+            ? [parseInt(parts[1], 16), parseInt(parts[2], 16), parseInt(parts[3], 16)]
+            : [66, 133, 244];
+        return `rgba(${r}, ${g}, ${b}, 0.26)`;
     }
 
     expandSelection(scope, { remember = false } = {}) {
@@ -72550,6 +73198,8 @@ class BuildMarqueeSelection extends UIComponent {
     clearVisuals() {
         this.marquee?.remove();
         this.marquee = null;
+        this.roomHighlight?.remove();
+        this.roomHighlight = null;
         this.wallHighlights.forEach(element => element.remove());
         this.wallHighlights = [];
         this.actionBar?.remove();
@@ -76563,6 +77213,8 @@ constructor(parent, options = {}) {
 ;
 /* -- js/UI/Build/BuildInspector.js -- */
 class BuildInspector extends ModalWindow {
+    static NEW_BUILDING = '__new_building__';
+
     constructor(parent) {
         super(parent, {
             id: 'build-inspector-panel',
@@ -76583,13 +77235,17 @@ class BuildInspector extends ModalWindow {
         this.tabs = [...this.modalElement.querySelectorAll('[data-build-inspector-tab]')];
         this.views = [...this.modalElement.querySelectorAll('[data-build-inspector-view]')];
         for (const tab of this.tabs) tab.addEventListener('click', () => this.showTab(tab.dataset.buildInspectorTab));
-        this.unsubscribeSelection = this.parent.buildSelection.subscribe(() => this.render());
+        this.unsubscribeSelection = this.parent.buildSelection.subscribe(selection => {
+            this.activeTab = selection ? 'properties' : 'navigator';
+            this.render();
+        });
         this.unsubscribeBuild = this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, () => this.render());
         this.render();
     }
 
     handleToolModeChanged(mode) {
         if (mode === UIToolModes.MOVE) {
+            this.activeTab = this.parent.buildSelection.current ? 'properties' : 'navigator';
             this.open();
             this.render();
         } else {
@@ -76760,6 +77416,17 @@ class BuildInspector extends ModalWindow {
             ]));
             return;
         }
+        if (selection.kind === 'wall' && selection.id === 'unassigned') {
+            const walls = level.walls.values().filter(wall => !wall.buildingId);
+            if (walls.length === 0) return root.append(BuildInspector.message('Every wall belongs to a building.'));
+            root.append(this.propertyHeading(`${walls.length} wall cells`, 'Unassigned walls'));
+            // Walls with no building cannot be selected as one, renamed, merged
+            // or roofed. Authored maps can still carry them, so the Navigator
+            // node is also where they get adopted.
+            root.append(this.buildingPicker('Assign to building', null, buildingId =>
+                this.assignWallsToBuilding(walls, buildingId)));
+            return;
+        }
         if (selection.kind === 'atom') {
             const details = this.atomDetails(selection.id, map);
             if (!details) return root.append(BuildInspector.message('This wall surface no longer exists.'));
@@ -76786,10 +77453,29 @@ class BuildInspector extends ModalWindow {
     }
 
     roomBuildingEditor(room) {
+        return this.buildingPicker('Move to building', room.buildingId || '', buildingId => {
+            const map = this.parent?.parent?.gameMap;
+            map?.buildTransaction?.run(`Move ${room.displayName}`, (draft, level) => {
+                const current = level.rooms.get(room.id);
+                if (!current) return;
+                const target = buildingId === BuildInspector.NEW_BUILDING
+                    ? WallStructure.createBuilding(draft)
+                    : buildingId || null;
+                level.rooms.set(room.id, { ...current, buildingId: target });
+            });
+        });
+    }
+
+    /**
+     * The one place a building is made by hand. Nothing else in build mode
+     * creates one — walls adopt the building they touch — so without this a
+     * map that was authored without walls has no building to move a room into.
+     */
+    buildingPicker(titleText, value, onChange) {
         const label = document.createElement('label');
         label.className = 'setting-item setting-item--stacked';
         const title = document.createElement('span');
-        title.textContent = 'Move to building';
+        title.textContent = titleText;
         const select = document.createElement('select');
         const site = document.createElement('option');
         site.value = '';
@@ -76802,15 +77488,31 @@ class BuildInspector extends ModalWindow {
             option.textContent = building.displayName;
             select.append(option);
         }
-        select.value = room.buildingId || '';
+        const created = document.createElement('option');
+        created.value = BuildInspector.NEW_BUILDING;
+        created.textContent = 'New building…';
+        select.append(created);
+        select.value = value ?? '';
         select.addEventListener('change', () => {
-            map?.buildTransaction?.run(`Move ${room.displayName}`, (_draft, level) => {
-                const current = level.rooms.get(room.id);
-                if (current) level.rooms.set(room.id, { ...current, buildingId: select.value || null });
-            });
+            onChange(select.value);
+            this.render();
         });
         label.append(title, select);
         return label;
+    }
+
+    assignWallsToBuilding(walls, buildingId) {
+        const map = this.parent?.parent?.gameMap;
+        const keys = walls.map(wall => BuildKeys.cell(wall.x, wall.y));
+        return map?.buildTransaction?.run('Assign walls to building', (draft, level) => {
+            const target = buildingId === BuildInspector.NEW_BUILDING
+                ? WallStructure.createBuilding(draft)
+                : buildingId || null;
+            for (const key of keys) {
+                const wall = level.walls.get(key);
+                if (wall) level.walls.set(key, { ...wall, buildingId: target });
+            }
+        });
     }
 
     atomDetails(id, map) {
@@ -82047,8 +82749,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         const roomId = this.target.wallSurface.roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
+        // An exterior face still belongs to a room — it is that room's front
+        // wall seen from outside — and saying whose it is beats "Outside" on a
+        // map where every wall is outside something.
+        const fronts = roomId ? null : this.gameMap?.regionManager?.get('room', this.adjacentRoomId());
         return {
-            room: room ? this.roomName(room) : 'Outside',
+            room: room ? this.roomName(room) : fronts ? `Outside · ${this.roomName(fronts)}` : 'Outside',
             surface: SurfaceCustomizePanel.SURFACE_LABELS[this.target.wallSurface.face] || 'Wall',
             locked
         };
@@ -82111,9 +82817,12 @@ class SurfaceCustomizePanel extends ModalWindow {
                 SiteConfig.floorSystem?.defaultFinishId ||
                 null;
         }
-        const { cell, face, roomId } = this.target.wallSurface;
+        const { cell, face, roomId, half } = this.target.wallSurface;
+        // With the half, or an atom's own paint is invisible here: the override
+        // is keyed on the atom, so asking for a whole face answers from the room
+        // default and the palette goes on showing plaster over a painted wall.
         return cell
-            ? this.gameMap?.wallBuilder?.resolveSurfaceFinishId(cell, face, roomId ?? null)
+            ? this.gameMap?.wallBuilder?.resolveSurfaceFinishId(cell, face, roomId ?? null, half ?? null)
             : null;
     }
 
@@ -82144,6 +82853,65 @@ class SurfaceCustomizePanel extends ModalWindow {
         );
     }
 
+    /**
+     * The room on the far side of an exterior surface — the room this stretch
+     * of outside wall belongs to. An exterior face has no room of its own, but
+     * it is still one room's front wall, and that is the unit "whole exterior"
+     * paints.
+     */
+    adjacentRoomId(surface = this.target?.wallSurface) {
+        if (!surface || surface.roomId) return null;
+        const opposite = WallBuilder.OPPOSITE_FACES[surface.face];
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!opposite || !cache) return null;
+        const inner = WallFaceResolver.classify(
+            { x: surface.cell.x, y: surface.cell.y, face: opposite, half: surface.half },
+            cache.grid,
+            { ...cache.topology, walls: cache.geometry }
+        );
+        return inner.kind === 'room' ? inner.roomId : null;
+    }
+
+    /**
+     * Every outward atom of the walls that enclose one room, visible or not.
+     *
+     * Addressed as atoms rather than as surfaces because a room's back wall
+     * shows its inside: its exterior atom is real, and stored, but it is not a
+     * span anyone can click. Painting the outside of a room means all of it,
+     * not the half of it this camera happens to face.
+     */
+    roomExteriorAtoms(roomId) {
+        const builder = this.gameMap?.wallBuilder;
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!builder || !cache || !roomId) return [];
+        const topology = { ...cache.topology, walls: cache.geometry };
+        const atoms = [];
+        for (const cell of builder.cells.values()) {
+            for (const face of ['north', 'south']) {
+                for (const half of [0, 1]) {
+                    const outward = { x: cell.x, y: cell.y, face, half };
+                    if (WallFaceResolver.classify(outward, cache.grid, topology).kind !== 'exterior') continue;
+                    const inner = WallFaceResolver.classify(
+                        { ...outward, face: WallBuilder.OPPOSITE_FACES[face] }, cache.grid, topology
+                    );
+                    if (inner.kind === 'room' && inner.roomId === roomId) atoms.push(outward);
+                }
+            }
+        }
+        return atoms;
+    }
+
+    /** The subset of those atoms this camera can actually show, for the outline. */
+    atomSurfaces(atoms) {
+        const builder = this.gameMap?.wallBuilder;
+        return atoms.map(atom => {
+            const cell = builder?.cells.get(BuildKeys.cell(atom.x, atom.y));
+            return builder?.getCellSurfaces(cell).find(entry =>
+                entry.face === atom.face && entry.half === atom.half
+            ) || null;
+        }).filter(Boolean);
+    }
+
     exteriorSurfaces(buildingId, loopId) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !buildingId) return [];
@@ -82169,6 +82937,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             return [...builder.cells.values()].flatMap(cell =>
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
+        if (scope === 'roomExterior' && !surface.roomId) {
+            return this.atomSurfaces(this.roomExteriorAtoms(this.adjacentRoomId(surface)));
+        }
         if (scope === 'exterior' && !surface.roomId) {
             const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
             const classification = this.classifyWallSurface(surface);
@@ -82189,6 +82960,17 @@ class SurfaceCustomizePanel extends ModalWindow {
         const surface = this.target.wallSurface;
 
         const scope = scopeOverride || this.getWallScope();
+        if (scope === 'roomExterior') {
+            return this.roomExteriorAtoms(this.adjacentRoomId(surface)).map(atom => ({
+                surface: 'wall',
+                face: atom.face,
+                axis: 'horizontal',
+                cells: { from: [atom.x, atom.y], to: [atom.x, atom.y] },
+                roomId: null,
+                halves: [atom.half],
+                finishId
+            }));
+        }
         if (scope === 'exterior') {
             const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
             return buildingId ? [{ surface: 'wall', buildingId, exterior: true, finishId }] : [];
@@ -82313,18 +83095,29 @@ class SurfaceCustomizePanel extends ModalWindow {
         const wall = this.target?.surface === 'wall' ? this.target.wallSurface : null;
         const roomButton = this.scopeElement.querySelector('[data-value="room"]');
         const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
+        const roomExteriorButton = this.scopeElement.querySelector('[data-value="roomExterior"]');
         const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
         const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
         const spaceAvailable = openSpaceRooms.length > 1;
         const buildingId = wall
             ? this.gameMap?.wallBuilder?.baseCells.get(BuildKeys.cell(wall.cell.x, wall.cell.y))?.buildingId
             : null;
-        const exteriorAvailable = !!buildingId && this.classifyWallSurface(wall)?.kind === 'exterior';
+        // Inside and outside are not a choice you make, they are which wall you
+        // clicked: a room's back wall shows its inside, its front wall shows the
+        // building's outside. The scopes follow from that — an interior surface
+        // can grow to the room, an exterior one to the room's own outside or to
+        // the whole building.
+        const exterior = !wall?.roomId && this.classifyWallSurface(wall)?.kind === 'exterior';
+        const buildingAvailable = exterior && !!buildingId;
+        const roomExteriorAvailable = exterior && !!this.adjacentRoomId(wall);
         if (roomButton) roomButton.hidden = !wall?.roomId;
         if (spaceButton) spaceButton.hidden = !spaceAvailable;
-        if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
-        const allowed = wall?.roomId ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])] :
-            exteriorAvailable ? ['stretch', 'exterior'] : ['stretch'];
+        if (roomExteriorButton) roomExteriorButton.hidden = !roomExteriorAvailable;
+        if (exteriorButton) exteriorButton.hidden = !buildingAvailable;
+        const allowed = wall?.roomId
+            ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
+            : ['stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
+                ...(buildingAvailable ? ['exterior'] : [])];
         if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }
 
@@ -84306,6 +85099,38 @@ class WallBuildPanel extends CellDragBuildPanel {
 
 
 
+    /**
+     * The corner's paint, spread over every atom a new cell could show.
+     *
+     * Growth is seeded from the corner the run pulled away from, and a corner
+     * is the worst possible sample of one: at a T it carries a single painted
+     * half, on whichever face was left visible once the returning wall buried
+     * the other. Copied literally that produced new cells painted on one half
+     * and bare on the other — 16px stripes — and, where the corner showed its
+     * north face and the new cells show their south, cells painted on a face
+     * nobody looks at, which is the same bug reading as no paint at all.
+     *
+     * Which atom a cell shows cannot be known here: masks and ownership are
+     * derived after this mutation, not before it. So a painted face fills its
+     * whole axis — both halves, both facings — and the one that ends up in
+     * front is right by construction. The hidden atom is a real atom either
+     * way, and a later repaint or room default supersedes it.
+     */
+    static wholeCellAtoms(atoms) {
+        const filled = [];
+        for (const faces of [['north', 'south'], ['west', 'east']]) {
+            const painted = atoms.filter(atom => faces.includes(atom.face));
+            if (painted.length === 0) continue;
+            for (const face of faces) {
+                const own = painted.filter(atom => atom.face === face);
+                for (const half of [0, 1]) {
+                    filled.push({ ...(own.find(atom => atom.half === half) || own[0] || painted[0]), face, half });
+                }
+            }
+        }
+        return filled;
+    }
+
     commitMove(map, plan) {
         const builder = map?.wallBuilder;
         if (!builder || !map.buildTransaction || plan.distance === 0) return false;
@@ -84317,10 +85142,22 @@ class WallBuildPanel extends CellDragBuildPanel {
             dy: plan.moveY
         };
         const roomChanges = this.roomChangesForMove(map, plan);
-        const atomExtensions = (plan.paintExtensions || []).map(extension => ({
-            targets: extension.cells.map(cell => ({ ...cell })),
-            atoms: map.buildDocument.level().atoms.atomsOfCell(extension.source.x, extension.source.y)
-        }));
+        const atoms = map.buildDocument.level().atoms;
+        const spread = (source, targets) => ({
+            targets: targets.map(cell => ({ ...cell })),
+            atoms: WallBuildPanel.wholeCellAtoms(atoms.atomsOfCell(source.x, source.y))
+        });
+        const ends = [plan.movingCells?.[0], plan.movingCells?.at?.(-1)];
+        const atomExtensions = [
+            ...(plan.paintExtensions || []).map(extension => spread(extension.source, extension.cells)),
+            // The run's own ends move as well as grow, and an end is exactly the
+            // cell whose mask changes when it lands: a T that was showing its
+            // north face arrives as a corner showing its south. Translation is
+            // faithful to the face, which is what left the pulled corner bare
+            // beside the wall it used to match.
+            ...ends.filter(Boolean).map(end =>
+                spread(end, [{ x: end.x + plan.moveX, y: end.y + plan.moveY }]))
+        ];
         let result;
         try {
             result = builder.applyWallCellChanges(Utility.deepClone(changes), {
@@ -84995,7 +85832,7 @@ class RoomPanel extends ModalWindow {
         if (name) {
             // Not while they are still in it: writing the stored value back
             // under the cursor is how a rename undoes itself as you type.
-            if (document.activeElement !== name) name.value = room.properties?.playerName ?? '';
+            if (document.activeElement !== name) name.value = RoomPanel.playerName(room);
             name.placeholder = room.properties?.authoredDisplayName ??
                 room.properties?.displayName ?? room.id;
         }
@@ -85021,7 +85858,7 @@ class RoomPanel extends ModalWindow {
         const name = document.createElement('input');
         name.type = 'text';
         name.className = 'room-row__name';
-        name.value = room.properties?.playerName ?? '';
+        name.value = RoomPanel.playerName(room);
         name.placeholder = room.properties?.authoredDisplayName ?? room.properties?.displayName ?? room.id;
         name.maxLength = 24;
         name.autocomplete = 'off';
@@ -85242,6 +86079,20 @@ class RoomPanel extends ModalWindow {
         return this.parent?.surfaceCustomizePanel?.openRoomSurface?.(roomId, surface) ?? false;
     }
 
+    /**
+     * The name the player gave this room, as opposed to the one the map was
+     * authored with — the field's own value, with the authored name standing
+     * behind it as the placeholder. It is derived rather than stored: a rename
+     * writes `displayName` on the room plan (see `commitRoom`), and reading
+     * back a `playerName` that nothing ever writes is why a typed name
+     * reappeared blank the moment the row was redrawn.
+     */
+    static playerName(room) {
+        const authored = room?.properties?.authoredDisplayName ?? null;
+        const display = room?.properties?.displayName ?? null;
+        return display && display !== authored ? display : '';
+    }
+
     /** The wall-cell ring immediately outside the room's floor mask. */
     perimeterPlan(room) {
         const empty = { missing: [], present: 0, presentCells: [], state: 'open', label: 'Open', action: 'Enclose room', actionTitle: 'Build walls around this room' };
@@ -85249,14 +86100,22 @@ class RoomPanel extends ModalWindow {
         const width = this.gameMap?.gridSystem?.gridWidth ?? 0;
         const height = this.gameMap?.gridSystem?.gridHeight ?? 0;
         const walls = this.gameMap?.wallBuilder?.baseCells;
+        // A room owns the masonry that encloses it: ownership expands under the
+        // walls so a floor runs beneath them rather than stopping a half-tile
+        // short. Ringing those cells puts the perimeter one cell out beyond the
+        // walls that are already there, which is how an enclosed room came to
+        // offer Finish walls and then build a second ring around the first. The
+        // ring belongs outside the room's OPEN cells.
+        const interior = new Set([...room.shape.cells].filter(key => !walls?.has(key)));
+        if (interior.size === 0) return empty;
         const boundary = new Map();
-        for (const key of room.shape.cells) {
+        for (const key of interior) {
             const [x, y] = key.split(',').map(Number);
             for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
                 const nx = x + dx;
                 const ny = y + dy;
                 const next = `${nx},${ny}`;
-                if (room.shape.cells.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                if (interior.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
                 boundary.set(next, { x: nx, y: ny });
             }
             // Wall corners occupy their own diagonal cell. Add a diagonal only
@@ -85264,8 +86123,7 @@ class RoomPanel extends ModalWindow {
             // are outside the room. This closes rectangular and stepped outer
             // corners without filling the inside notch of an L-shaped room.
             for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-                if (room.shape.cells.has(`${x + dx},${y}`) ||
-                    room.shape.cells.has(`${x},${y + dy}`)) continue;
+                if (interior.has(`${x + dx},${y}`) || interior.has(`${x},${y + dy}`)) continue;
                 const nx = x + dx;
                 const ny = y + dy;
                 if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
@@ -85382,7 +86240,7 @@ class RoomPanel extends ModalWindow {
         if (!room || !builder || !this.gameMap?.buildTransaction || plan.missing.length === 0) return false;
         const result = builder.applyWallCellChanges(
             plan.missing.map(cell => ({ ...cell, data: {} })),
-            { label: `Enclose ${this.label(room)}` }
+            { label: `Enclose ${this.label(room)}`, adoptRoomIds: [room.id] }
         );
         if (!result?.applied.length) {
             const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';
@@ -85575,6 +86433,9 @@ class RoomPanel extends ModalWindow {
         }
         this.markSelection();
         this.renderHighlight();
+        if (this.gameMap?.buildDocument?.level?.().rooms.has(value)) {
+            this.parent.buildSelection?.set({ kind: 'room', id: value });
+        }
     }
 
     /**
@@ -85854,7 +86715,7 @@ class RoomPanel extends ModalWindow {
             // this, painting with New Room left the brush on "New Room" and the
             // next stroke made a second one — which is exactly the "why did that
             // make another room?" that made this tool confusing.
-            this.selected = roomId;
+            this.select(roomId);
         }
     }
 

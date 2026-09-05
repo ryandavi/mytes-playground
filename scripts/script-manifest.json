@@ -374,6 +374,9 @@
     "src": "js/Map/Walls/WallGeometry.js"
   },
   {
+    "src": "js/Map/Walls/WallSurfaceRuns.js"
+  },
+  {
     "src": "js/Map/Walls/WallFaceResolver.js"
   },
   {
@@ -405,6 +408,9 @@
   },
   {
     "src": "js/Map/Walls/WallTiledExporter.js"
+  },
+  {
+    "src": "js/Map/Roofs/RoofGeometry.js"
   },
   {
     "src": "js/Map/Terrain/TerrainAtlas.js"
