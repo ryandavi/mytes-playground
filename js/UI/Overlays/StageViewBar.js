@@ -31,6 +31,7 @@ class StageViewBar extends UIComponent {
         this.snapToggle = null;
         this.speed = null;
         this.exportButton = null;
+        this.roofToggle = null;
     }
 
     get gameMode() {
@@ -54,6 +55,13 @@ class StageViewBar extends UIComponent {
         this.gridToggle = this.track(new BuildGridToggle(this, root));
         this.snapToggle = this.track(new BuildSnapToggle(this, root));
         this.footprintToggle = this.track(new BuildFootprintToggle(this, root));
+        this.roofToggle = root.querySelector('.build-roof-toggle');
+        if (this.roofToggle) {
+            const onRoofToggle = () => this.container?.gameMap?.roofRenderer
+                ?.setBuildVisible(this.roofToggle.checked);
+            this.roofToggle.addEventListener('change', onRoofToggle);
+            this.track(() => this.roofToggle?.removeEventListener('change', onRoofToggle));
+        }
         this.speed = this.track(new SegmentControl(
             root.querySelector('.stage-speed-control'),
             { onChange: (value) => this.applySpeed(value) }
@@ -100,6 +108,11 @@ class StageViewBar extends UIComponent {
         this.gridToggle?.sync();
         this.snapToggle?.sync();
         this.syncSpeed();
+        if (this.roofToggle) {
+            const renderer = this.container?.gameMap?.roofRenderer;
+            this.roofToggle.disabled = !renderer;
+            this.roofToggle.checked = renderer?.buildVisible === true;
+        }
         if (this.exportButton) {
             this.exportButton.disabled =
                 typeof WallTiledExporter === 'undefined' ||
@@ -120,5 +133,6 @@ class StageViewBar extends UIComponent {
         this.snapToggle = null;
         this.speed = null;
         this.exportButton = null;
+        this.roofToggle = null;
     }
 }

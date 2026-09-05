@@ -35,6 +35,8 @@ class GameMap {
         this.floorBuilder = null;
         this.footprintOverlay = null;
         this.floorMaterialRegistry = null;
+        this.roofMaterialRegistry = null;
+        this.roofRenderer = null;
         this.terrainBuilder = null;
         this.surfaceCustomizer = null;
         this.renderer = new MapRenderer();
@@ -324,6 +326,26 @@ class GameMap {
         return this.objectsById.get(String(id)) || null;
     }
 
+    roofPlanForBuilding(buildingId) {
+        return this.buildDocument?.level?.().roofs.forBuilding(String(buildingId)) || null;
+    }
+
+    isRoofedCell(x, y) {
+        const key = BuildKeys.cell(Number(x), Number(y));
+        const topology = this.buildTransaction?.cache?.topology;
+        const roofs = this.buildDocument?.level?.().roofs.values() || [];
+        for (const plan of roofs) {
+            if (plan.excludedCells.includes(key)) continue;
+            if (topology?.roofableFootprint(plan.buildingId).has(key)) return true;
+        }
+        return false;
+    }
+
+    isRoofedAt(worldX, worldY) {
+        const cellSize = this.gridSystem?.config?.cellSize || 32;
+        return this.isRoofedCell(Math.floor(worldX / cellSize), Math.floor(worldY / cellSize));
+    }
+
     getMyteById(id) {
         if (id === undefined || id === null) return null;
         return this.mytes.find(myte => String(myte.id) === String(id)) || null;
@@ -582,7 +604,9 @@ class GameMap {
 		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
 			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
 			await this.wallMaterialRegistry.load();
-			this.buildDocument = BuildDocument.fromMapData(mapData);
+			this.buildDocument = BuildDocument.fromMapData(mapData, {
+				roofDefaults: SiteConfig.roofSystem?.enabled ? SiteConfig.roofSystem.defaults : null
+			});
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
 			this.wallBuilder.baseCells = this.buildDocument.level().walls.records;
 			this.wallBuilder.openings = this.buildDocument.level().openings.values();
@@ -601,11 +625,22 @@ class GameMap {
 					this.floorBuilder = null;
 				}
 			}
+			if (SiteConfig.roofSystem?.enabled === true) {
+				try {
+					this.roofMaterialRegistry = new RoofMaterialRegistry(this.parent?.resourceManager ?? null);
+					await this.roofMaterialRegistry.load();
+					this.roofRenderer = new RoofRenderer(this, this.roofMaterialRegistry);
+				} catch (error) {
+					Utility.logDebug('Roof system unavailable:', error);
+					this.roofRenderer = null;
+				}
+			}
 			this.buildTransaction = new BuildTransaction({
 				document: this.buildDocument,
 				width: this.gridSystem.gridWidth,
 				height: this.gridSystem.gridHeight,
 				reachBlocks: this.floorBuilder?.bleedBlocks?.() ?? 1,
+				roofDefaults: SiteConfig.roofSystem?.enabled ? SiteConfig.roofSystem.defaults : null,
 				cellSize: this.gridSystem.config.cellSize,
 				geometryOptions: {
 					cellSize: this.gridSystem.config.cellSize,
@@ -614,12 +649,13 @@ class GameMap {
 				regionManager: this.regionManager,
 				eventManager: this.eventManager,
 				history: this.buildHistory,
-				renderers: { walls: this.wallBuilder, floors: this.floorBuilder },
+				renderers: { walls: this.wallBuilder, floors: this.floorBuilder, roofs: this.roofRenderer },
 				onCommit: event => this.handleBuildCommit(event)
 			});
 			this.footprintOverlay = new BuildFootprintOverlay(this);
 			this.buildTransaction.initialize();
 			await this.wallBuilder.initialize();
+			this.roofRenderer?.initialize(this.buildTransaction.cache.roofs);
 			// The reserve is fixed, not remeasured here — a value that changed
 			// after the camera and input had sampled it was the old coordinate
 			// drift. Just flag it in debug if real wall art won't fit.
@@ -1326,6 +1362,8 @@ class GameMap {
             this.environmentManager.update(deltaTime);
         }
 
+		this.roofRenderer?.update();
+
     }
 
     dispose() {
@@ -1363,6 +1401,11 @@ class GameMap {
 			this.floorBuilder.dispose();
 			this.floorBuilder = null;
 			this.floorMaterialRegistry = null;
+		}
+		if (this.roofRenderer) {
+			this.roofRenderer.dispose();
+			this.roofRenderer = null;
+			this.roofMaterialRegistry = null;
 		}
 		if (this.terrainBuilder) {
 			this.terrainBuilder.dispose();

@@ -1,5 +1,5 @@
 class BuildSelection {
-    static KINDS = Object.freeze(['building', 'room', 'wall', 'atom', 'object']);
+    static KINDS = Object.freeze(['building', 'room', 'wall', 'atom', 'roof', 'object']);
 
     constructor() {
         this.value = null;

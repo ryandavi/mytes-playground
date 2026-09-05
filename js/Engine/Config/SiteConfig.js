@@ -98,6 +98,20 @@ const SiteConfig = Object.freeze({
 		edgeBleedCells: 0.5
 	}),
 
+	roofSystem: Object.freeze({
+		enabled: true,
+		materialsPath: 'data/map-objects/roof-materials.json',
+		hideInBuildMode: true,
+		defaults: Object.freeze({
+			style: 'flat',
+			ridgeAxis: 'auto',
+			finishId: 'shingle_asphalt',
+			colorId: 'slate',
+			overhangCells: 0,
+			visibility: 'auto'
+		})
+	}),
+
 	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same
 	// thing Tiled's terrain brush paints, driven from inside build mode.
 	terrainSystem: Object.freeze({

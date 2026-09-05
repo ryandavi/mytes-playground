@@ -189,6 +189,20 @@ const SiteConfig = Object.freeze({
 		edgeBleedCells: 0.5
 	}),
 
+	roofSystem: Object.freeze({
+		enabled: true,
+		materialsPath: 'data/map-objects/roof-materials.json',
+		hideInBuildMode: true,
+		defaults: Object.freeze({
+			style: 'flat',
+			ridgeAxis: 'auto',
+			finishId: 'shingle_asphalt',
+			colorId: 'slate',
+			overhangCells: 0,
+			visibility: 'auto'
+		})
+	}),
+
 	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same
 	// thing Tiled's terrain brush paints, driven from inside build mode.
 	terrainSystem: Object.freeze({
@@ -36660,6 +36674,63 @@ class WallSurfaceAtomStore extends BuildRecordStore {
     }
 }
 ;
+/* -- js/Map/Build/RoofPlanStore.js -- */
+class RoofPlanStore extends BuildRecordStore {
+    static STYLES = Object.freeze(['flat', 'hip', 'gable']);
+    static RIDGE_AXES = Object.freeze(['auto', 'x', 'y']);
+    static VISIBILITIES = Object.freeze(['auto', 'shown', 'hidden']);
+
+    static id(buildingId, levelId = 'level_ground') {
+        return `${String(buildingId)}@${String(levelId)}`;
+    }
+
+    static create(buildingId, defaults = {}, levelId = 'level_ground') {
+        return {
+            id: RoofPlanStore.id(buildingId, levelId),
+            buildingId,
+            levelId,
+            style: defaults.style || 'flat',
+            ridgeAxis: defaults.ridgeAxis || 'auto',
+            finishId: defaults.finishId || null,
+            colorId: defaults.colorId || null,
+            overhangCells: Number(defaults.overhangCells) === 1 ? 1 : 0,
+            visibility: defaults.visibility || 'auto',
+            excludedCells: [],
+            properties: {}
+        };
+    }
+
+    keyOf(record) {
+        return String(record?.id || RoofPlanStore.id(record?.buildingId, record?.levelId || 'level_ground'));
+    }
+
+    normalize(record, key) {
+        if (!record?.buildingId) throw new Error(`Roof plan ${key} requires buildingId`);
+        const levelId = String(record.levelId || 'level_ground');
+        const style = RoofPlanStore.STYLES.includes(record.style) ? record.style : 'flat';
+        const ridgeAxis = RoofPlanStore.RIDGE_AXES.includes(record.ridgeAxis) ? record.ridgeAxis : 'auto';
+        const visibility = RoofPlanStore.VISIBILITIES.includes(record.visibility) ? record.visibility : 'auto';
+        return {
+            id: String(record.id || RoofPlanStore.id(record.buildingId, levelId)),
+            buildingId: String(record.buildingId),
+            levelId,
+            style,
+            ridgeAxis,
+            finishId: record.finishId == null ? null : String(record.finishId),
+            colorId: record.colorId == null ? null : String(record.colorId),
+            overhangCells: Number(record.overhangCells) === 1 ? 1 : 0,
+            visibility,
+            excludedCells: RoomPlanStore.normalizeSeeds(Array.isArray(record.excludedCells)
+                ? record.excludedCells : String(record.excludedCells || '').split(/\s+/).filter(Boolean)),
+            properties: StoreDelta.clone(record.properties || {})
+        };
+    }
+
+    forBuilding(buildingId, levelId = 'level_ground') {
+        return this.get(RoofPlanStore.id(buildingId, levelId));
+    }
+}
+;
 /* -- js/Map/Build/AttachmentStore.js -- */
 class AttachmentStore extends BuildRecordStore {
     keyOf(record) {
@@ -36699,7 +36770,7 @@ class AttachmentStore extends BuildRecordStore {
 class BuildDocument {
     static VERSION = 8;
     static DEFAULT_LEVEL_ID = 'level_ground';
-    static LEVEL_STORES = Object.freeze(['walls', 'atoms', 'rooms', 'openings', 'fixtures', 'attachments']);
+    static LEVEL_STORES = Object.freeze(['walls', 'atoms', 'rooms', 'roofs', 'openings', 'fixtures', 'attachments']);
 
     constructor(authored = {}) {
         this.buildings = new BuildingPlanStore(authored.buildings || []);
@@ -36710,7 +36781,7 @@ class BuildDocument {
         this.authored = this.captureStores();
     }
 
-    static fromMapData(mapData = {}) {
+    static fromMapData(mapData = {}, options = {}) {
         const walls = BuildDocument.collectWallCells(mapData.walls || {});
         const wallGeometry = WallGeometry.compute(new Map(walls.map(cell => [BuildKeys.cell(cell.x, cell.y), cell])));
         const buildingData = BuildDocument.collectBuildings(mapData, walls);
@@ -36721,6 +36792,7 @@ class BuildDocument {
         BuildDocument.applyAuthoredAssignments(
             rooms, mapData.walls?.roomAssignments || {}, fallbackBuildingId, wallGeometry
         );
+        const roofs = BuildDocument.collectRoofs(mapData, buildingData, rooms, options.roofDefaults);
         return new BuildDocument({
             buildings: buildingData,
             levels: {
@@ -36736,6 +36808,7 @@ class BuildDocument {
                     })),
                     atoms: BuildDocument.collectAtoms(mapData.walls?.faceOverrides || []),
                     rooms,
+                    roofs,
                     openings: mapData.walls?.openings || [],
                     fixtures: mapData.walls?.fixtures || [],
                     attachments: mapData.walls?.attachments || []
@@ -36761,6 +36834,7 @@ class BuildDocument {
             walls: new WallCellStore(level.walls || []),
             atoms: new WallSurfaceAtomStore(level.atoms || []),
             rooms: new RoomPlanStore(level.rooms || []),
+            roofs: new RoofPlanStore(level.roofs || []),
             openings: new AttachmentStore(level.openings || []),
             fixtures: new AttachmentStore(level.fixtures || []),
             attachments: new AttachmentStore(level.attachments || [])
@@ -36885,6 +36959,28 @@ class BuildDocument {
         });
     }
 
+    static collectRoofs(mapData, buildings, rooms, defaults = null) {
+        const authored = mapData.walls?.roofPlans || [];
+        return buildings.flatMap(building => {
+            const source = authored.find(plan => BuildDocument.slug(plan.buildingId) === building.id);
+            const room = rooms.find(candidate => candidate.buildingId === building.id &&
+                ['roofStyle', 'roofFinishId', 'roofColorId', 'roofOverhang', 'roofVisibility']
+                    .some(name => candidate.properties?.[name] != null));
+            const props = source || room?.properties || null;
+            if (!props && !defaults) return [];
+            return [{
+                ...RoofPlanStore.create(building.id, defaults || {}),
+                style: props?.roofStyle || props?.style || defaults?.style,
+                ridgeAxis: props?.roofRidgeAxis || props?.ridgeAxis || defaults?.ridgeAxis,
+                finishId: props?.roofFinishId || props?.finishId || defaults?.finishId,
+                colorId: props?.roofColorId || props?.colorId || defaults?.colorId,
+                overhangCells: Number(props?.roofOverhang ?? props?.overhangCells ?? defaults?.overhangCells) || 0,
+                visibility: props?.roofVisibility || props?.visibility || defaults?.visibility,
+                excludedCells: props?.roofExcludedCells || props?.excludedCells || []
+            }];
+        });
+    }
+
     static seedCellsForRoom(room, cellSize) {
         if (Array.isArray(room.tilemask?.cells)) return RoomPlanStore.normalizeSeeds(room.tilemask.cells);
         const bounds = room.bounds || {};
@@ -36996,6 +37092,9 @@ class BuildDirty {
             return !previous || previous.roomType !== room.roomType ||
                 JSON.stringify(previous.properties || {}) !== JSON.stringify(room.properties || {});
         });
+        const roofBuildingIds = BuildDirty.roofBuildings(
+            before, after, levelId, structuralCells, roomDelta, previousRoom
+        );
         BuildDirty.addFinishChanges(cells, blocks, roomDelta, previousRoom, nextGrid, geometry, topology);
         return Object.freeze({
             cells: Object.freeze([...cells].sort()),
@@ -37004,8 +37103,37 @@ class BuildDirty {
             ownershipChanged,
             roomTopologyChanged,
             roomEnvironmentChanged,
+            roofBuildingIds: Object.freeze([...roofBuildingIds].sort()),
             recordsChanged: Object.freeze(recordsChanged)
         });
+    }
+
+    static roofBuildings(before, after, levelId, structuralCells, roomDelta, previousRoom) {
+        const ids = new Set();
+        const previousWalls = before.levels?.[levelId]?.walls;
+        const nextWalls = after.levels?.[levelId]?.walls;
+        const record = (store, key) => store instanceof Map ? store.get(key) : store?.[key];
+        for (const key of structuralCells) {
+            const beforeId = record(previousWalls, key)?.buildingId;
+            const afterId = record(nextWalls, key)?.buildingId;
+            if (beforeId) ids.add(beforeId);
+            if (afterId) ids.add(afterId);
+        }
+        const roofDelta = StoreDelta.diff(before.levels?.[levelId]?.roofs, after.levels?.[levelId]?.roofs);
+        const previousRoofs = before.levels?.[levelId]?.roofs;
+        for (const roof of Object.values(roofDelta.set || {})) if (roof.buildingId) ids.add(roof.buildingId);
+        for (const key of roofDelta.removed || []) {
+            const buildingId = record(previousRoofs, key)?.buildingId;
+            if (buildingId) ids.add(buildingId);
+        }
+        for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
+            if (room.buildingId) ids.add(room.buildingId);
+            if (previousRoom(roomId)?.buildingId) ids.add(previousRoom(roomId).buildingId);
+        }
+        for (const roomId of roomDelta.removed || []) if (previousRoom(roomId)?.buildingId) {
+            ids.add(previousRoom(roomId).buildingId);
+        }
+        return ids;
     }
 
     static addBuildingFinishCells(cells, before, after, levelId) {
@@ -37077,6 +37205,7 @@ class BuildTransaction {
         this.width = Number(options.width);
         this.height = Number(options.height);
         this.reachBlocks = Number(options.reachBlocks) || 1;
+        this.roofDefaults = options.roofDefaults || null;
         this.geometryOptions = options.geometryOptions || {};
         this.cellSize = Number(options.cellSize) || 32;
         this.validate = options.validate || null;
@@ -37110,6 +37239,7 @@ class BuildTransaction {
         try {
             const draft = new BuildDocument(before);
             edit(draft, draft.level(this.levelId));
+            this.syncBuildingRoofs(before, draft);
             BuildTransaction.pruneEmptyBuildings(draft, this.levelId);
             this.assertValid(draft);
             const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
@@ -37147,6 +37277,7 @@ class BuildTransaction {
         const before = this.document.captureStores();
         const draft = new BuildDocument(before);
         edit(draft, draft.level(this.levelId));
+        this.syncBuildingRoofs(before, draft);
         this.assertValid(draft);
         return Object.freeze({
             ...this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid, count: false }),
@@ -37166,6 +37297,7 @@ class BuildTransaction {
             this.cellSize
         );
         this.renderers.floors?.setOwnershipGrid?.(this.cache.grid);
+        this.renderers.roofs?.setGeometries?.(this.cache.roofs);
         return this.cache;
     }
 
@@ -37243,7 +37375,23 @@ class BuildTransaction {
             plans: level.rooms, openings: level.openings.values(), revision
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
-        return Object.freeze({ geometry, grid, topology, revision });
+        const roofs = new Map(level.roofs.values().map(plan => [plan.id, RoofGeometry.compute({
+            width: this.width, height: this.height, walls: geometry.cells, topology, roofPlan: plan,
+            revision, config: { ...this.geometryOptions, cellSize: this.cellSize }
+        })]));
+        return Object.freeze({ geometry, grid, topology, roofs, revision });
+    }
+
+    syncBuildingRoofs(before, draft) {
+        const roofs = draft.level(this.levelId).roofs;
+        for (const roof of roofs.values()) if (!draft.buildings.has(roof.buildingId)) roofs.delete(roof.id);
+        if (!this.roofDefaults) return;
+        const previous = before.buildings instanceof Map ? before.buildings : new Map(Object.entries(before.buildings || {}));
+        for (const building of draft.buildings.values()) {
+            if (previous.has(building.id) || roofs.forBuilding(building.id, this.levelId)) continue;
+            const roof = RoofPlanStore.create(building.id, this.roofDefaults, this.levelId);
+            roofs.set(roof.id, roof);
+        }
     }
 
     // Thresholds belong to both sides of an opening. Filter them only from the
@@ -37286,6 +37434,8 @@ class BuildTransaction {
         }
         this.renderers.floors?.setOwnershipGrid?.(data.derived.grid);
         this._stats.floorChunksRedrawn += Number(this.renderers.floors?.invalidate?.(dirty.blocks)) || 0;
+        this.renderers.roofs?.setGeometries?.(data.derived.roofs);
+        this.renderers.roofs?.invalidate?.(dirty.roofBuildingIds);
         const event = Object.freeze({
             label: data.label,
             deltas: data.forward,
@@ -37294,6 +37444,7 @@ class BuildTransaction {
             geometry: data.derived.geometry,
             grid: data.derived.grid,
             topology: data.derived.topology,
+            roofs: data.derived.roofs,
             regions
         });
         this._stats.transactions++;
@@ -37772,7 +37923,7 @@ class RoomTopology {
         const loopByBlock = RoomTopology.loopBlocks(enrichedComponents);
         const adjacency = RoomTopology.openingAdjacency(input.openings || [], grid);
         const served = RoomTopology.openingsByRoom(input.openings || [], grid);
-        const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, grid);
+        const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, components);
         const shellEdgesByBuilding = new Map([...roofableByBuilding].map(([buildingId, cells]) => [
             buildingId, Object.freeze(RoomTopology.boundaryEdges(cells))
         ]));
@@ -37927,16 +38078,22 @@ class RoomTopology {
         });
     }
 
-    static roofableFootprints(plans, states, walls, grid) {
+    static roofableFootprints(plans, states, walls, components) {
         const result = new Map();
         const take = (buildingId, key) => {
             if (!buildingId) return;
             if (!result.has(buildingId)) result.set(buildingId, new Set());
             result.get(buildingId).add(key);
         };
+        const componentsById = new Map((components || []).map(component => [component.id, component]));
         for (const plan of plans) {
-            if (!states.get(plan.id)?.indoor || !grid) continue;
-            for (const key of grid.cellsOf(plan.id)) take(plan.buildingId, key);
+            const state = states.get(plan.id);
+            if (!state?.indoor) continue;
+            for (const componentId of state.componentIds) {
+                const component = componentsById.get(componentId);
+                if (!component?.enclosed) continue;
+                for (const key of component.cells) take(plan.buildingId, key);
+            }
         }
         for (const [key, wall] of walls) take(wall.buildingId, key);
         return result;
@@ -39458,7 +39615,16 @@ class WallGeometry {
             if (mask === 0) return [band(0, middle, 0), band(middle, cellSize, 1)];
             return [post(inset, middle, 'post-west'), post(middle, cellSize - inset, 'post-east')];
         }
-        if (!vertical || (east !== west && WallGeometry.inheritsVerticalFace(mask))) {
+        // An arm that ends here shows no sides: its west and east faces are
+        // inside the masonry of the wall it hangs off, and what you are looking
+        // at across the whole cell is that wall's own face. This held for a
+        // corner (one horizontal neighbour) but not for a T (two), so an arm
+        // meeting the middle of a run cut a 14px post out of it — a sliver
+        // wearing the arm's rooms in the middle of an exterior wall, and a run
+        // that could never be painted in one stretch. The test is only whether
+        // the vertical passes through: through means real sides, terminating
+        // means none, however many ways the horizontal goes.
+        if (!vertical || WallGeometry.inheritsVerticalFace(mask)) {
             return [band(0, middle, 0), band(middle, cellSize, 1)];
         }
         const spans = [];
@@ -43529,12 +43695,16 @@ class WallTiledExporter {
         }
 
         const level = this.gameMap.buildDocument?.level?.();
+        const exportedRoofs = new Set();
         for (const room of (level?.rooms.values() ?? []).sort((a, b) => a.id.localeCompare(b.id))) {
             const roomId = room.id;
             const cells = [...room.seedCells].sort();
             if (cells.length === 0) continue;
             const columns = cells.map(key => Number(key.split(',')[0]));
             const rows = cells.map(key => Number(key.split(',')[1]));
+            const roof = room.buildingId && !exportedRoofs.has(room.buildingId)
+                ? level.roofs.forBuilding(room.buildingId) : null;
+            if (roof) exportedRoofs.add(room.buildingId);
             records.push({
                 // Named by the room, so re-exporting an unchanged room rewrites
                 // the same object rather than stacking a second one beside it.
@@ -43550,7 +43720,17 @@ class WallTiledExporter {
                     roomId: { value: roomId },
                     // The rectangle above is only where to find it in Tiled. A
                     // room need not be rectangular, so the cells are the truth.
-                    cells: { value: cells.join(' ') }
+                    cells: { value: cells.join(' ') },
+                    ...(roof ? {
+                        buildingId: { value: room.buildingId },
+                        roofStyle: { value: roof.style },
+                        roofRidgeAxis: { value: roof.ridgeAxis },
+                        roofFinishId: { value: roof.finishId },
+                        roofColorId: { value: roof.colorId },
+                        roofOverhang: { value: roof.overhangCells, type: 'int' },
+                        roofVisibility: { value: roof.visibility },
+                        roofExcludedCells: { value: roof.excludedCells.join(' ') }
+                    } : {})
                 }
             });
         }
@@ -43688,6 +43868,7 @@ class RoofGeometry {
             height,
             RoofGeometry.otherBuildingCells(input.topology, buildingId)
         );
+        for (const key of plan.excludedCells || []) cover.delete(key);
         const style = ['flat', 'hip', 'gable'].includes(plan.style) ? plan.style : 'flat';
         const sections = RoofGeometry.components(cover).map(cells =>
             RoofGeometry.section(cells, style, plan, input.walls, input.config || {})
@@ -43931,6 +44112,332 @@ class RoofGeometry {
         const a = BuildKeys.parseCell(left);
         const b = BuildKeys.parseCell(right);
         return a.y - b.y || a.x - b.x;
+    }
+}
+;
+/* -- js/Map/Roofs/RoofMaterialRegistry.js -- */
+class RoofMaterialRegistry extends SurfaceMaterialRegistry {
+    static PALETTE_OVERRIDES = Object.freeze({
+        body: 'color', line: 'line', shade: 'shade', light: 'light', edge: 'edge'
+    });
+
+    constructor(resourceManager = null) {
+        super(resourceManager);
+        this.tileSize = 32;
+        this.colors = new Map();
+        this.atlases = new Map();
+    }
+
+    async load(path = SiteConfig.roofSystem.materialsPath) {
+        const data = await this.fetchDefinition(path, 'roof materials');
+        this.validate(data);
+        this.setCommonDefinition(data);
+        this.tileSize = Number(data.tileSize) || 32;
+        this.colors = new Map(Object.entries(data.colors || {}));
+        this.atlases.clear();
+        await this.loadImageRecords([...this.finishes].filter(([, finish]) => finish.sheet)
+            .map(([id, finish]) => [`roof-${id}`, finish.sheet]));
+        return this;
+    }
+
+    validate(data) {
+        if (!data || data.schemaVersion !== 1 || !data.finishes) {
+            throw new Error('roof-materials.json must use schemaVersion 1 and declare finishes');
+        }
+        for (const [id, finish] of Object.entries(data.finishes)) {
+            if (!!finish.sheet === (typeof finish.template === 'string')) {
+                throw new Error(`Roof finish "${id}" needs exactly one of "sheet" or "template"`);
+            }
+            if (!finish.sheet) {
+                const problem = FinishPalette.describeTemplateProblem(id, finish, data.finishes);
+                if (problem) throw new Error(`Roof finish "${id}" ${problem}`);
+            } else if (!finish.palette?.body) {
+                throw new Error(`Roof finish "${id}" needs a palette with a body slot`);
+            }
+        }
+    }
+
+    resolveColor(colorId, finish) {
+        if (FinishPalette.isColor(colorId)) return colorId;
+        return this.colors.get(colorId) || finish?.color || finish?.palette?.body || '#808080';
+    }
+
+    getAtlas(finishId, colorId = null) {
+        const key = `${finishId}|${colorId || ''}`;
+        if (this.atlases.has(key)) return this.atlases.get(key);
+        const finish = this.getFinish(finishId);
+        if (!finish) return null;
+        const templateId = finish.template || finishId;
+        const template = this.getFinish(templateId);
+        const source = this.images.get(`roof-${templateId}`);
+        if (!source || !template?.palette) return null;
+        const tint = { ...finish, color: this.resolveColor(colorId, finish) };
+        const atlas = FinishPalette.recolor(source,
+            FinishPalette.resolve(template.palette, tint, RoofMaterialRegistry.PALETTE_OVERRIDES));
+        this.atlases.set(key, atlas);
+        return atlas;
+    }
+
+    getColor(id) { return FinishPalette.isColor(id) ? id : this.colors.get(id) || null; }
+
+    getSample(finishId, colorId = null) {
+        const atlas = this.getAtlas(finishId, colorId);
+        if (!atlas) return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = this.tileSize;
+        canvas.height = this.tileSize;
+        canvas.getContext('2d').drawImage(atlas, 0, this.tileSize, this.tileSize, this.tileSize,
+            0, 0, this.tileSize, this.tileSize);
+        return canvas;
+    }
+}
+;
+/* -- js/Map/Roofs/RoofHitTest.js -- */
+class RoofHitTest {
+    constructor(renderer) {
+        this.renderer = renderer;
+    }
+
+    atMapPoint(x, y) {
+        if (!this.renderer?.isPresentationVisible()) return null;
+        const cellSize = this.renderer.cellSize;
+        const records = [...this.renderer.sections.values()].sort((a, b) => b.zIndex - a.zIndex);
+        for (const record of records) {
+            if (record.canvas.hidden) continue;
+            const localX = x - record.left;
+            const localY = y - record.top;
+            if (localX < 0 || localY < 0 || localX >= record.width || localY >= record.height) continue;
+            const cellX = Math.floor(localX / cellSize) + record.geometry.bounds.left;
+            const cellY = Math.floor(localY / cellSize) + record.geometry.bounds.top;
+            const key = BuildKeys.cell(cellX, cellY);
+            if (!record.geometry.cells.has(key)) continue;
+            return Object.freeze({
+                kind: 'roof', buildingId: record.plan.buildingId,
+                roofPlanId: record.plan.id, sectionKey: record.geometry.key, cellKey: key
+            });
+        }
+        return null;
+    }
+}
+;
+/* -- js/Map/Roofs/RoofRenderer.js -- */
+class RoofRenderer {
+    static SHADE_ROWS = Object.freeze({ dark: 0, neutral: 1, light: 2, 'mid-dark': 3, 'mid-light': 4 });
+    static PART_ROWS = Object.freeze({
+        flat: 5, slope: 6, hip: 7, ridge: 8, 'ridge-end': 9,
+        peak: 10, valley: 11, 'gable-end': 12
+    });
+    static FACING_COLUMNS = Object.freeze({
+        north: 0, east: 1, south: 2, west: 3,
+        'north-east': 0, 'south-east': 1, 'south-west': 2, 'north-west': 3,
+        x: 0, y: 1
+    });
+
+    constructor(gameMap, registry) {
+        this.gameMap = gameMap;
+        this.registry = registry;
+        this.cellSize = gameMap.gridSystem?.config?.cellSize || 32;
+        this.geometries = new Map();
+        this.sections = new Map();
+        this.container = null;
+        this.buildVisible = SiteConfig.roofSystem?.hideInBuildMode !== true;
+        this.hitTest = new RoofHitTest(this);
+        this.sectionsRedrawn = 0;
+        this._visibilityKey = '';
+        this._visibilityStates = new Map();
+        this._unsubscribers = [];
+    }
+
+    initialize(geometries) {
+        this.geometries = geometries || new Map();
+        this.invalidate([...this.geometries.values()].map(roof => roof.buildingId));
+        const events = this.gameMap.eventManager;
+        if (events) this._unsubscribers.push(
+            events.on(EVENTS.WALL_PRESENTATION_CHANGED, () => this.syncVisibility(true)),
+            events.on(EVENTS.GAME_MODE_CHANGED, ({ mode }) => {
+                if (mode === GAME_MODES.BUILD) {
+                    this.buildVisible = SiteConfig.roofSystem?.hideInBuildMode !== true;
+                }
+                this.syncVisibility(true);
+            }),
+            events.on(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, () => this.syncVisibility(true))
+        );
+        return this;
+    }
+
+    ensureContainer() {
+        if (this.container?.isConnected) return this.container;
+        const layer = this.gameMap.layers.objects;
+        if (!layer) return null;
+        this.container = document.createElement('div');
+        this.container.className = 'roof-surfaces';
+        Object.assign(this.container.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
+        layer.appendChild(this.container);
+        return this.container;
+    }
+
+    setGeometries(geometries) { this.geometries = geometries || new Map(); }
+
+    invalidate(buildingIds) {
+        const dirty = new Set((buildingIds || []).map(String));
+        for (const [key, record] of [...this.sections]) {
+            const roof = this.geometries.get(record.plan.id);
+            const plan = this.currentPlan(record.plan.buildingId);
+            const section = roof?.sections.find(candidate => candidate.key === record.geometry.key);
+            if (!roof || !plan || (dirty.has(record.plan.buildingId) &&
+                (!section || record.signature !== this.signature(plan, section)))) {
+                record.canvas.remove();
+                this.sections.delete(key);
+            }
+        }
+        let redrawn = 0;
+        for (const roof of this.geometries.values()) {
+            if (!dirty.has(roof.buildingId)) continue;
+            const plan = this.currentPlan(roof.buildingId);
+            if (!plan) continue;
+            for (const section of roof.sections) {
+                if (this.sections.has(`${plan.id}/${section.key}`)) continue;
+                redrawn += Number(this.drawSection(plan, section));
+            }
+        }
+        this.sectionsRedrawn += redrawn;
+        this.syncVisibility(true);
+        return redrawn;
+    }
+
+    currentPlan(buildingId) {
+        const sourceDocument = this.previewDocument || this.gameMap.buildDocument;
+        return sourceDocument?.level?.().roofs.forBuilding(buildingId) || null;
+    }
+
+    signature(plan, geometry) {
+        return JSON.stringify([
+            plan.style, plan.finishId, plan.colorId, geometry.heightPx,
+            [...geometry.parts].map(([key, part]) => [key, part.part, part.facing, part.shade, part.edgeMask])
+        ]);
+    }
+
+    drawSection(plan, geometry) {
+        const root = this.ensureContainer();
+        const atlas = this.registry.getAtlas(plan.finishId, plan.colorId);
+        if (!root || !atlas || geometry.cells.size === 0) return false;
+        const fascia = 3;
+        const width = geometry.bounds.width * this.cellSize;
+        const height = geometry.bounds.height * this.cellSize + fascia;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'roof-surface';
+        canvas.dataset.roofBuildingId = plan.buildingId;
+        canvas.dataset.roofSection = geometry.key;
+        canvas.width = width;
+        canvas.height = height;
+        const left = geometry.bounds.left * this.cellSize;
+        const top = geometry.bounds.top * this.cellSize - geometry.heightPx;
+        const zIndex = this.gameMap.getDepthZIndex(geometry.bounds.bottom * this.cellSize, 1);
+        Object.assign(canvas.style, { position: 'absolute', left: `${left}px`, top: `${top}px`, zIndex: String(zIndex) });
+        const context = canvas.getContext('2d');
+        context.imageSmoothingEnabled = false;
+        for (const key of geometry.cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            const part = geometry.parts.get(key);
+            const dx = (x - geometry.bounds.left) * this.cellSize;
+            const dy = (y - geometry.bounds.top) * this.cellSize;
+            this.blit(context, atlas, RoofRenderer.SHADE_ROWS[part.shade] ?? 1, 0, dx, dy);
+            const row = RoofRenderer.PART_ROWS[part.part];
+            const column = part.part === 'flat' ? part.edgeMask : RoofRenderer.FACING_COLUMNS[part.facing] ?? 0;
+            this.blit(context, atlas, row, column, dx, dy);
+            if ((part.edgeMask & 4) !== 0) context.drawImage(atlas,
+                column * this.cellSize, row * this.cellSize + this.cellSize - 3, this.cellSize, 3,
+                dx, dy + this.cellSize, this.cellSize, 3);
+        }
+        root.appendChild(canvas);
+        this.sections.set(`${plan.id}/${geometry.key}`, {
+            canvas, plan, geometry, left, top, width, height, zIndex,
+            signature: this.signature(plan, geometry)
+        });
+        return true;
+    }
+
+    blit(context, atlas, row, column, x, y) {
+        context.drawImage(atlas, column * this.cellSize, row * this.cellSize,
+            this.cellSize, this.cellSize, x, y, this.cellSize, this.cellSize);
+    }
+
+    isPresentationVisible() {
+        const mode = this.gameMap.wallBuilder?.presentation || SiteConfig.wallSystem.defaultPresentation;
+        if (mode === 'down' || mode === 'hidden') return false;
+        return !this.gameMap.gameMode?.isBuild?.() || this.buildVisible;
+    }
+
+    cutawayBuildingIds() {
+        const rooms = this.gameMap.wallBuilder?._cutawayRoomIds || new Set();
+        const plans = this.gameMap.buildDocument?.level?.().rooms;
+        return new Set([...rooms].map(id => plans?.get(id)?.buildingId).filter(Boolean));
+    }
+
+    syncVisibility(force = false) {
+        const presentation = this.gameMap.wallBuilder?.presentation || SiteConfig.wallSystem.defaultPresentation;
+        const cutaways = presentation === 'cutaway' ? this.cutawayBuildingIds() : new Set();
+        const key = `${presentation}|${this.gameMap.gameMode?.mode}|${this.buildVisible}|${[...cutaways].sort()}`;
+        const pending = [...this._visibilityStates.values()].some(state => state.hidden !== state.desired);
+        if (!force && key === this._visibilityKey && !pending) return false;
+        this._visibilityKey = key;
+        const presentationVisible = this.isPresentationVisible();
+        const now = WallBuilder.presentationNow();
+        for (const record of this.sections.values()) {
+            const autoDesired = presentation === 'cutaway' && record.plan.visibility === 'auto' &&
+                cutaways.has(record.plan.buildingId);
+            let state = this._visibilityStates.get(record.plan.buildingId);
+            if (!state) state = { hidden: false, desired: false, since: now };
+            if (state.desired !== autoDesired) state = { ...state, desired: autoDesired, since: now };
+            const delay = autoDesired
+                ? Number(SiteConfig.wallSystem.cutawayLowerDelayMs) || 0
+                : Number(SiteConfig.wallSystem.cutawayRaiseDelayMs) || 0;
+            if (presentation !== 'cutaway') state = { hidden: false, desired: false, since: now };
+            else if (state.hidden !== state.desired && now - state.since >= delay) state.hidden = state.desired;
+            this._visibilityStates.set(record.plan.buildingId, state);
+            record.canvas.hidden = !presentationVisible || record.plan.visibility === 'hidden' ||
+                (record.plan.visibility === 'auto' && state.hidden);
+        }
+        return true;
+    }
+
+    setBuildVisible(flag) { this.buildVisible = flag === true; this.syncVisibility(true); }
+    update() { this.syncVisibility(); }
+
+    createBuildingOverlay(buildingId, className, fill) {
+        const overlays = [];
+        for (const record of this.sections.values()) {
+            if (record.plan.buildingId !== buildingId || record.canvas.hidden) continue;
+            const canvas = document.createElement('canvas');
+            canvas.className = `surface-paint-overlay ${className}`;
+            canvas.width = record.width;
+            canvas.height = record.height;
+            Object.assign(canvas.style, {
+                position: 'absolute', left: `${record.left}px`, top: `${record.top}px`,
+                zIndex: String(record.zIndex + 1), pointerEvents: 'none'
+            });
+            const context = canvas.getContext('2d');
+            context.fillStyle = fill;
+            for (const key of record.geometry.cells) {
+                const { x, y } = BuildKeys.parseCell(key);
+                context.fillRect((x - record.geometry.bounds.left) * this.cellSize,
+                    (y - record.geometry.bounds.top) * this.cellSize, this.cellSize, this.cellSize);
+            }
+            this.ensureContainer()?.appendChild(canvas);
+            overlays.push(canvas);
+        }
+        return overlays;
+    }
+
+    dispose() {
+        for (const unsubscribe of this._unsubscribers) unsubscribe();
+        this._unsubscribers = [];
+        for (const { canvas } of this.sections.values()) canvas.remove();
+        this.sections.clear();
+        this._visibilityStates.clear();
+        this.container?.remove();
+        this.container = null;
+        this.geometries.clear();
     }
 }
 ;
@@ -45702,7 +46209,7 @@ class SurfaceCustomizer {
             ? this.gameMap?.wallMaterialRegistry
             : surface === 'floor'
                 ? this.gameMap?.floorMaterialRegistry
-                : null;
+                : surface === 'roof' ? this.gameMap?.roofMaterialRegistry : null;
         return [...(registry?.finishes || [])].map(([id, finish]) => ({ id, ...finish }));
     }
 
@@ -45717,6 +46224,9 @@ class SurfaceCustomizer {
             .filter(Boolean)
             .filter(entry => {
                 if (!rules) return true;
+                if (entry.surface === 'roof') {
+                    return !!this.gameMap?.buildDocument?.level?.().roofs.forBuilding(entry.buildingId);
+                }
                 if (entry.surface === 'floor') {
                     return rules.canPaintRoomFloor(this.gameMap?.regionManager?.get('room', entry.roomId)).allowed;
                 }
@@ -45746,6 +46256,11 @@ class SurfaceCustomizer {
         this.gameMap.wallBuilder.previewDocument = preview.document;
         this.gameMap.wallBuilder.previewCache = preview;
         this.gameMap.floorBuilder.previewDocument = preview.document;
+        if (this.gameMap.roofRenderer) {
+            this.gameMap.roofRenderer.previewDocument = preview.document;
+            this.gameMap.roofRenderer.setGeometries(preview.roofs);
+            this.gameMap.roofRenderer.invalidate(dirty.roofBuildingIds);
+        }
         this.gameMap.wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
         return true;
@@ -45758,6 +46273,11 @@ class SurfaceCustomizer {
         wallBuilder.previewDocument = null;
         wallBuilder.previewCache = null;
         this.gameMap.floorBuilder.previewDocument = null;
+        if (this.gameMap.roofRenderer) {
+            this.gameMap.roofRenderer.previewDocument = null;
+            this.gameMap.roofRenderer.setGeometries(this.gameMap.buildTransaction.cache.roofs);
+            this.gameMap.roofRenderer.invalidate(dirty.roofBuildingIds);
+        }
         wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
         this.previewSession = null;
@@ -45791,6 +46311,15 @@ class SurfaceCustomizer {
             .filter(request => request.surface === 'wall' && request.exterior && request.buildingId)
             .map(request => request.buildingId));
         for (const request of requests) {
+                if (request.surface === 'roof') {
+                    const roof = level.roofs.forBuilding(request.buildingId);
+                    if (roof) level.roofs.set(roof.id, {
+                        ...roof,
+                        finishId: request.finishId || roof.finishId,
+                        colorId: request.colorId ?? roof.colorId
+                    });
+                    continue;
+                }
                 if (request.surface === 'floor') {
                     const room = level.rooms.get(request.roomId);
                     if (room) level.rooms.set(room.id, { ...room, floorFinishId: request.finishId || null });
@@ -45890,6 +46419,8 @@ class GameMap {
         this.floorBuilder = null;
         this.footprintOverlay = null;
         this.floorMaterialRegistry = null;
+        this.roofMaterialRegistry = null;
+        this.roofRenderer = null;
         this.terrainBuilder = null;
         this.surfaceCustomizer = null;
         this.renderer = new MapRenderer();
@@ -46179,6 +46710,26 @@ class GameMap {
         return this.objectsById.get(String(id)) || null;
     }
 
+    roofPlanForBuilding(buildingId) {
+        return this.buildDocument?.level?.().roofs.forBuilding(String(buildingId)) || null;
+    }
+
+    isRoofedCell(x, y) {
+        const key = BuildKeys.cell(Number(x), Number(y));
+        const topology = this.buildTransaction?.cache?.topology;
+        const roofs = this.buildDocument?.level?.().roofs.values() || [];
+        for (const plan of roofs) {
+            if (plan.excludedCells.includes(key)) continue;
+            if (topology?.roofableFootprint(plan.buildingId).has(key)) return true;
+        }
+        return false;
+    }
+
+    isRoofedAt(worldX, worldY) {
+        const cellSize = this.gridSystem?.config?.cellSize || 32;
+        return this.isRoofedCell(Math.floor(worldX / cellSize), Math.floor(worldY / cellSize));
+    }
+
     getMyteById(id) {
         if (id === undefined || id === null) return null;
         return this.mytes.find(myte => String(myte.id) === String(id)) || null;
@@ -46437,7 +46988,9 @@ class GameMap {
 		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
 			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
 			await this.wallMaterialRegistry.load();
-			this.buildDocument = BuildDocument.fromMapData(mapData);
+			this.buildDocument = BuildDocument.fromMapData(mapData, {
+				roofDefaults: SiteConfig.roofSystem?.enabled ? SiteConfig.roofSystem.defaults : null
+			});
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
 			this.wallBuilder.baseCells = this.buildDocument.level().walls.records;
 			this.wallBuilder.openings = this.buildDocument.level().openings.values();
@@ -46456,11 +47009,22 @@ class GameMap {
 					this.floorBuilder = null;
 				}
 			}
+			if (SiteConfig.roofSystem?.enabled === true) {
+				try {
+					this.roofMaterialRegistry = new RoofMaterialRegistry(this.parent?.resourceManager ?? null);
+					await this.roofMaterialRegistry.load();
+					this.roofRenderer = new RoofRenderer(this, this.roofMaterialRegistry);
+				} catch (error) {
+					Utility.logDebug('Roof system unavailable:', error);
+					this.roofRenderer = null;
+				}
+			}
 			this.buildTransaction = new BuildTransaction({
 				document: this.buildDocument,
 				width: this.gridSystem.gridWidth,
 				height: this.gridSystem.gridHeight,
 				reachBlocks: this.floorBuilder?.bleedBlocks?.() ?? 1,
+				roofDefaults: SiteConfig.roofSystem?.enabled ? SiteConfig.roofSystem.defaults : null,
 				cellSize: this.gridSystem.config.cellSize,
 				geometryOptions: {
 					cellSize: this.gridSystem.config.cellSize,
@@ -46469,12 +47033,13 @@ class GameMap {
 				regionManager: this.regionManager,
 				eventManager: this.eventManager,
 				history: this.buildHistory,
-				renderers: { walls: this.wallBuilder, floors: this.floorBuilder },
+				renderers: { walls: this.wallBuilder, floors: this.floorBuilder, roofs: this.roofRenderer },
 				onCommit: event => this.handleBuildCommit(event)
 			});
 			this.footprintOverlay = new BuildFootprintOverlay(this);
 			this.buildTransaction.initialize();
 			await this.wallBuilder.initialize();
+			this.roofRenderer?.initialize(this.buildTransaction.cache.roofs);
 			// The reserve is fixed, not remeasured here — a value that changed
 			// after the camera and input had sampled it was the old coordinate
 			// drift. Just flag it in debug if real wall art won't fit.
@@ -47181,6 +47746,8 @@ class GameMap {
             this.environmentManager.update(deltaTime);
         }
 
+		this.roofRenderer?.update();
+
     }
 
     dispose() {
@@ -47218,6 +47785,11 @@ class GameMap {
 			this.floorBuilder.dispose();
 			this.floorBuilder = null;
 			this.floorMaterialRegistry = null;
+		}
+		if (this.roofRenderer) {
+			this.roofRenderer.dispose();
+			this.roofRenderer = null;
+			this.roofMaterialRegistry = null;
 		}
 		if (this.terrainBuilder) {
 			this.terrainBuilder.dispose();
@@ -48353,6 +48925,7 @@ class MapEnvironmentManager {
                 gloomFloor: Number(entry.gloomFloor.toFixed(3)),
                 colorAlpha: Number(entry.colorAlpha.toFixed(3)),
                 windowDaylight: Number(entry.windowDaylight.toFixed(3)),
+                roofCoverage: Number(entry.roofCoverage.toFixed(3)),
                 daylightGloom: entry.room.lighting.daylightGloom,
                 mode: entry.room.lighting.mode,
                 interiorCells: geometry.interiorByRoom.get(entry.room.id)?.size ?? 0,
@@ -49233,6 +49806,7 @@ class MapEnvironmentManager {
             const gloomFloor = room.lighting.daylightGloom * daylight * gloomFloorShare;
             roomState.set(room.id, {
                 room,
+                roofCoverage: this.roofCoverageForRoom(room),
                 lift: Utility.clamp(baseFloor, 0, room.lighting.ambientCeiling),
                 colorAlpha: Utility.clamp(baseFloor * 0.42, 0, 0.42),
                 windowDaylight,
@@ -49313,6 +49887,17 @@ class MapEnvironmentManager {
         });
 
         return roomState;
+    }
+
+    roofCoverageForRoom(room) {
+        const cells = room?.shape?.cells;
+        if (!cells?.size) return 0;
+        let roofed = 0;
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            if (this.gameMap?.isRoofedCell?.(x, y)) roofed++;
+        }
+        return roofed / cells.size;
     }
 
     // -- Room light geometry (F-P1) -------------------------------------------
@@ -51210,6 +51795,11 @@ class GameMapParticleSystem extends ParticleSystem {
         const source = emitter.sourceObject;
         const options = emitter.options;
 
+        if (this.isWeatherEmitter(emitter) && source &&
+            this.map?.isRoofedAt?.(source.posX ?? emitter.x, source.posY ?? emitter.y)) {
+            return false;
+        }
+
         if (options.emitWhileAlive && !WorldParticleUtilities.isSourceActive(source)) {
             return false;
         }
@@ -51699,6 +52289,7 @@ class TileMapLoader {
 		const fixtures = [];
 		const faceOverrides = [];
 		const roomAssignments = {};
+		const roofPlans = [];
 		mapData.objects = mapData.objects.filter(object => {
 			const type = String(object.properties?.type || object.name || object.type || '').toUpperCase();
 			if (type === 'WALLFINISHOVERRIDE') {
@@ -51735,6 +52326,18 @@ class TileMapLoader {
 				const roomId = String(object.properties?.roomId || object.id);
 				for (const key of String(object.properties?.cells || '').split(' ')) {
 					if (/^-?\d+,-?\d+$/.test(key)) roomAssignments[key] = roomId;
+				}
+				if (object.properties?.roofStyle && object.properties?.buildingId) {
+					roofPlans.push({
+						buildingId: object.properties.buildingId,
+						roofStyle: object.properties.roofStyle,
+						roofRidgeAxis: object.properties.roofRidgeAxis,
+						roofFinishId: object.properties.roofFinishId,
+						roofColorId: object.properties.roofColorId,
+						roofOverhang: Number(object.properties.roofOverhang) || 0,
+						roofVisibility: object.properties.roofVisibility,
+						roofExcludedCells: String(object.properties.roofExcludedCells || '').split(/\s+/).filter(Boolean)
+					});
 				}
 				return false;
 			}
@@ -51801,7 +52404,7 @@ class TileMapLoader {
 		});
 
 		mapData.walls = {
-			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, wangAtlas
+			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, roofPlans, wangAtlas
 		};
 	}
 
@@ -72135,7 +72738,7 @@ class SelectionManager extends UIComponent {
 ;
 /* -- js/UI/Build/BuildSelection.js -- */
 class BuildSelection {
-    static KINDS = Object.freeze(['building', 'room', 'wall', 'atom', 'object']);
+    static KINDS = Object.freeze(['building', 'room', 'wall', 'atom', 'roof', 'object']);
 
     constructor() {
         this.value = null;
@@ -75399,6 +76002,7 @@ class StageViewBar extends UIComponent {
         this.snapToggle = null;
         this.speed = null;
         this.exportButton = null;
+        this.roofToggle = null;
     }
 
     get gameMode() {
@@ -75422,6 +76026,13 @@ class StageViewBar extends UIComponent {
         this.gridToggle = this.track(new BuildGridToggle(this, root));
         this.snapToggle = this.track(new BuildSnapToggle(this, root));
         this.footprintToggle = this.track(new BuildFootprintToggle(this, root));
+        this.roofToggle = root.querySelector('.build-roof-toggle');
+        if (this.roofToggle) {
+            const onRoofToggle = () => this.container?.gameMap?.roofRenderer
+                ?.setBuildVisible(this.roofToggle.checked);
+            this.roofToggle.addEventListener('change', onRoofToggle);
+            this.track(() => this.roofToggle?.removeEventListener('change', onRoofToggle));
+        }
         this.speed = this.track(new SegmentControl(
             root.querySelector('.stage-speed-control'),
             { onChange: (value) => this.applySpeed(value) }
@@ -75468,6 +76079,11 @@ class StageViewBar extends UIComponent {
         this.gridToggle?.sync();
         this.snapToggle?.sync();
         this.syncSpeed();
+        if (this.roofToggle) {
+            const renderer = this.container?.gameMap?.roofRenderer;
+            this.roofToggle.disabled = !renderer;
+            this.roofToggle.checked = renderer?.buildVisible === true;
+        }
         if (this.exportButton) {
             this.exportButton.disabled =
                 typeof WallTiledExporter === 'undefined' ||
@@ -75488,6 +76104,7 @@ class StageViewBar extends UIComponent {
         this.snapToggle = null;
         this.speed = null;
         this.exportButton = null;
+        this.roofToggle = null;
     }
 }
 ;
@@ -77965,6 +78582,7 @@ class BuildInspector extends ModalWindow {
             root.append(this.propertyHeading(plan.displayName, 'Building'));
             root.append(this.nameEditor(plan.displayName, value => marquee.renameBuilding(value)));
             root.append(this.buildingTypeEditor(plan));
+            root.append(this.roofEditor(plan.id));
             // An action you cannot take reads better greyed out than as a
             // button that answers with a message when you press it.
             const parts = marquee.buildingComponents(selection.id).length;
@@ -77978,6 +78596,14 @@ class BuildInspector extends ModalWindow {
                     selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
                 ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
             ]));
+            return;
+        }
+        if (selection.kind === 'roof') {
+            const roof = level.roofs.get(selection.id);
+            if (!roof) return root.append(BuildInspector.message('This roof no longer exists.'));
+            const building = map.buildDocument.buildings.get(roof.buildingId);
+            root.append(this.propertyHeading(building?.displayName || roof.buildingId, 'Roof'));
+            root.append(this.roofEditor(roof.buildingId));
             return;
         }
         if (selection.kind === 'room') {
@@ -78100,6 +78726,108 @@ class BuildInspector extends ModalWindow {
         });
         label.append(title, select);
         return label;
+    }
+
+    roofEditor(buildingId) {
+        const map = this.parent?.parent?.gameMap;
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(buildingId);
+        const group = document.createElement('div');
+        group.className = 'settings-group build-inspector-roof';
+        const title = document.createElement('h3');
+        title.className = 'settings-group-title';
+        title.textContent = 'Roof';
+        group.append(title);
+        if (!roof) {
+            group.append(this.actionRow([['Add roof', () => this.addRoof(buildingId)]]));
+            return group;
+        }
+        const registry = map.roofMaterialRegistry;
+        group.append(
+            this.roofSelect('Style', roof.style, RoofPlanStore.STYLES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { style: value }, 'Change roof style')),
+            this.roofSelect('Material', roof.finishId, [...(registry?.finishes || [])].map(([id, finish]) =>
+                [id, finish.name || id.replaceAll('_', ' ')]),
+                value => this.editRoof(buildingId, { finishId: value }, 'Change roof material')),
+            this.roofColorEditor(roof),
+            this.roofSelect('Overhang', String(roof.overhangCells), [['0', 'Built-in eave'], ['1', 'One tile']],
+                value => this.editRoof(buildingId, { overhangCells: Number(value) }, 'Change roof overhang')),
+            this.roofSelect('Visibility', roof.visibility,
+                RoofPlanStore.VISIBILITIES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { visibility: value }, 'Change roof visibility'))
+        );
+        if (roof.style === 'gable') group.insertBefore(
+            this.roofSelect('Ridge axis', roof.ridgeAxis, RoofPlanStore.RIDGE_AXES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { ridgeAxis: value }, 'Change roof ridge axis')),
+            group.children[2]
+        );
+        const geometry = map.buildTransaction?.cache?.roofs.get(roof.id);
+        const indoor = map.buildDocument.level().rooms.values().some(room => room.buildingId === buildingId &&
+            map.buildTransaction.cache.topology.planStates.get(room.id)?.indoor);
+        if (!indoor) group.append(BuildInspector.message('No indoor rooms: there is nothing to cover.'));
+        if (geometry?.sections.some(section => section.mixedHeights)) {
+            group.append(BuildInspector.message('Mixed wall heights: this roof uses the tallest wall.'));
+        }
+        group.append(this.actionRow([
+            ['Paint roof', () => this.parent.surfaceCustomizePanel.openRoofSurface(buildingId)],
+            ['Un-roof cells', () => this.parent.surfaceCustomizePanel.beginUnroof(buildingId)],
+            ['Remove roof', () => this.removeRoof(buildingId), 'is-danger']
+        ]));
+        return group;
+    }
+
+    roofSelect(titleText, value, options, commit) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = titleText;
+        const select = document.createElement('select');
+        for (const [id, text] of options) {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = text;
+            select.append(option);
+        }
+        BuildInspector.selectValue(select, value);
+        select.addEventListener('change', () => commit(select.value));
+        label.append(title, select);
+        return label;
+    }
+
+    roofColorEditor(roof) {
+        const registry = this.parent?.parent?.gameMap?.roofMaterialRegistry;
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Colour';
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = registry?.getColor(roof.colorId) || '#5d5650';
+        input.addEventListener('change', () => this.editRoof(roof.buildingId,
+            { colorId: input.value }, 'Change roof colour'));
+        label.append(title, input);
+        return label;
+    }
+
+    editRoof(buildingId, changes, label) {
+        return this.parent?.parent?.gameMap?.buildTransaction?.run(label, (_draft, level) => {
+            const roof = level.roofs.forBuilding(buildingId);
+            if (roof) level.roofs.set(roof.id, { ...roof, ...changes });
+        });
+    }
+
+    addRoof(buildingId) {
+        const defaults = SiteConfig.roofSystem.defaults;
+        return this.parent?.parent?.gameMap?.buildTransaction?.run('Add roof', (_draft, level) => {
+            const roof = RoofPlanStore.create(buildingId, defaults);
+            level.roofs.set(roof.id, roof);
+        });
+    }
+
+    removeRoof(buildingId) {
+        return this.parent?.parent?.gameMap?.buildTransaction?.run('Remove roof', (_draft, level) => {
+            const roof = level.roofs.forBuilding(buildingId);
+            if (roof) level.roofs.delete(roof.id);
+        });
     }
 
     roomTypeEditor(room) {
@@ -83121,6 +83849,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
         this.target = null;
+        this.unroofBuildingId = null;
+        this.lastUnroofCell = null;
+        this.unroofExclude = null;
         this.hoverTimer = null;
         // Two independent outlines over the same geometry: what the pointer is
         // on, and what a click already chose. See `setOverlay`.
@@ -83128,6 +83859,15 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.selection = { elements: [], key: null, className: 'paint-selection' };
         this.boundStagePointerDown = this.handleStagePointerDown.bind(this);
         this.boundStagePointerMove = this.handleStagePointerMove.bind(this);
+        this.boundStagePointerUp = () => {
+            this.lastUnroofCell = null;
+            this.unroofExclude = null;
+        };
+        this.boundStageClick = event => {
+            if (!this.parent.isTool(UIToolModes.SURFACE) || !this.target) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        };
         this.init();
         this.paletteElement = this.modalElement?.querySelector('.surface-palette');
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
@@ -83165,6 +83905,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         };
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.addEventListener('pointerup', this.boundStagePointerUp, true);
+        this.parent?.parent?.canvas?.addEventListener('click', this.boundStageClick, true);
         this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundStagePointerLeave);
         // Both outlines are absolutely positioned over wall pieces the builder
         // throws away and rebuilds — when a wall is painted, when it changes
@@ -83191,6 +83933,9 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.revertPreview();
         this.setOverlay(this.hover, null);
         this.setTarget(null);
+        this.unroofBuildingId = null;
+        this.lastUnroofCell = null;
+        this.unroofExclude = null;
         this.renderPalette();
         // The panel opens with the mode, not with the first click: entering a
         // mode that says nothing and shows nothing reads as "nothing happened".
@@ -83225,6 +83970,9 @@ class SurfaceCustomizePanel extends ModalWindow {
     handleStagePointerMove(event) {
         if (!this.parent.isTool(UIToolModes.SURFACE)) return;
         const target = this.resolveTarget(event);
+        if (this.unroofBuildingId && (event.buttons & 1) !== 0 && target?.surface === 'roof') {
+            this.toggleRoofCell(target);
+        }
         this.setOverlay(this.hover, target);
         // Surface is the one build tool where "is there anything here" is a real
         // question — most of a wall is air, and a vertical run is not a paint
@@ -83251,7 +83999,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (!target) return;
         slot.elements = target.surface === 'wall'
             ? this.createWallOverlay(target.wallSurface, slot.className)
-            : [this.createFloorOverlay(target.room, slot.className)].filter(Boolean);
+            : target.surface === 'roof'
+                ? this.gameMap?.roofRenderer?.createBuildingOverlay(target.buildingId,
+                    slot.className, SurfaceCustomizePanel.overlayFill(slot.className)) || []
+                : [this.createFloorOverlay(target.room, slot.className)].filter(Boolean);
         slot.key = slot.elements.length > 0 ? key : null;
     }
 
@@ -83260,7 +84011,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         return target.surface === 'wall'
             ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},` +
                 `${target.wallSurface.from}-${target.wallSurface.to}`
-            : `floor:${target.room.id}`;
+            : target.surface === 'roof' ? `roof:${target.buildingId}` : `floor:${target.room.id}`;
     }
 
     /**
@@ -83323,10 +84074,33 @@ class SurfaceCustomizePanel extends ModalWindow {
      * hit-testing it would claim ground belonging to the room next door.
      */
     resolveTarget(event) {
+        const world = this.gameMap?.container?.inputHandler?.screenToWorldCoordinates?.(
+            event.clientX, event.clientY
+        );
+        const roof = world && this.gameMap?.roofRenderer?.hitTest?.atMapPoint(world.x, world.y);
+        if (roof) return { surface: 'roof', ...roof };
+        if (world && this.unroofBuildingId) {
+            const target = this.resolveExcludedRoofCell(world);
+            if (target) return target;
+        }
         const hit = this.resolveWallHit(event);
         if (hit) return { surface: 'wall', wallSurface: hit.surface, piece: hit.piece };
         const room = this.resolveRoomAt(event);
         return room ? { surface: 'floor', room } : null;
+    }
+
+    resolveExcludedRoofCell(world) {
+        const map = this.gameMap;
+        const plan = map?.buildDocument?.level?.().roofs.forBuilding(this.unroofBuildingId);
+        const roof = plan && map?.buildTransaction?.cache?.roofs.get(plan.id);
+        if (!roof) return null;
+        const height = Math.max(0, ...roof.sections.map(section => section.heightPx));
+        const cellSize = map.gridSystem?.config?.cellSize || 32;
+        const key = BuildKeys.cell(Math.floor(world.x / cellSize), Math.floor((world.y + height) / cellSize));
+        const base = map.buildTransaction.cache.topology.roofableFootprint(plan.buildingId);
+        if (!base.has(key) && !plan.excludedCells.includes(key)) return null;
+        return { surface: 'roof', kind: 'roof', buildingId: plan.buildingId,
+            roofPlanId: plan.id, roofPlan: plan, cellKey: key };
     }
 
     /**
@@ -83391,6 +84165,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.target = target;
         if (target?.surface === 'floor') {
             this.parent.buildSelection?.set({ kind: 'room', id: target.room.id });
+        } else if (target?.surface === 'roof') {
+            this.parent.buildSelection?.set({ kind: 'roof', id: target.roofPlanId, buildingId: target.buildingId });
         } else if (target?.wallSurface) {
             const surface = target.wallSurface;
             this.parent.buildSelection?.set({
@@ -83457,6 +84233,28 @@ class SurfaceCustomizePanel extends ModalWindow {
         return true;
     }
 
+    openRoofSurface(buildingId) {
+        const map = this.gameMap;
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(buildingId);
+        if (!roof || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        map.roofRenderer?.setBuildVisible(true);
+        this.parent.stageViewBar?.sync?.();
+        this.setTarget({
+            surface: 'roof', buildingId, roofPlanId: roof.id, roofPlan: roof
+        });
+        this.renderPalette();
+        this.redrawOverlays();
+        this.open();
+        return true;
+    }
+
+    beginUnroof(buildingId) {
+        if (!this.openRoofSurface(buildingId)) return false;
+        this.unroofBuildingId = buildingId;
+        this.parent.showMessage('Click or drag roof tiles to add or remove them.', 'info', 'Un-roof cells');
+        return true;
+    }
+
     // The elements were parented to art that has since been rebuilt, so both
     // slots are drawn again from scratch rather than moved.
     redrawOverlays() {
@@ -83471,6 +84269,13 @@ class SurfaceCustomizePanel extends ModalWindow {
         // target, so clicking one has to fall through to whatever is under it
         // rather than being swallowed into a no-op.
         const target = this.resolveTarget(event);
+        if (this.unroofBuildingId && target?.surface === 'roof') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            this.toggleRoofCell(target, true);
+            return;
+        }
         if (!target) {
             // "Not that one" — the same answer clicking bare map gives a
             // selected object (see ContainerInputManager.setupClickHandling).
@@ -83480,6 +84285,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         this.setTarget(target);
         // Alt-click takes the finish that is already here, to put on something
         // else. It used to say "Picked up wallpaper blue flower" and then hold
@@ -83499,6 +84305,30 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         this.renderPalette();
         this.open();
+    }
+
+    toggleRoofCell(target, force = false) {
+        if (target?.buildingId !== this.unroofBuildingId || !target.cellKey) return false;
+        if (!force && this.lastUnroofCell === target.cellKey) return false;
+        this.lastUnroofCell = target.cellKey;
+        const map = this.gameMap;
+        const current = map?.buildDocument?.level?.().roofs.forBuilding(target.buildingId);
+        if (force || this.unroofExclude === null) {
+            this.unroofExclude = !current?.excludedCells.includes(target.cellKey);
+        }
+        const committed = map?.buildTransaction?.run('Un-roof cells', (_draft, level) => {
+            const roof = level.roofs.forBuilding(target.buildingId);
+            if (!roof) return;
+            const excluded = new Set(roof.excludedCells);
+            if (this.unroofExclude) excluded.add(target.cellKey);
+            else excluded.delete(target.cellKey);
+            level.roofs.set(roof.id, { ...roof, excludedCells: [...excluded] });
+        });
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(target.buildingId);
+        if (roof) this.target = { ...this.target, roofPlan: roof };
+        this.redrawOverlays();
+        this.renderPalette();
+        return committed?.committed === true;
     }
 
     /**
@@ -83534,10 +84364,13 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     holdFinish(finishId, surface) {
         if (!finishId || !surface) return false;
-        this.held = { finishId, surface };
+        this.held = {
+            finishId, surface,
+            colorId: surface === 'roof' ? this.target?.roofPlan?.colorId : null
+        };
         this.renderHeld();
         this.parent.showMessage(
-            `Holding ${this.finishLabel(finishId, surface)}. Click a ${surface === 'floor' ? 'floor' : 'wall'} to paint it.`,
+            `Holding ${this.finishLabel(finishId, surface)}. Click a ${surface} to paint it.`,
             'info', 'Eyedropper'
         );
         return true;
@@ -83565,7 +84398,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             );
             return false;
         }
-        return this.applyFinish(this.held.finishId);
+        return this.applyFinish(this.held.finishId, null, this.held.colorId);
     }
 
     finishLabel(finishId, surface) {
@@ -83592,6 +84425,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     // shown on the target line and disables the palette.
     checkTarget(target = this.target) {
         if (!target) return BuildRules.deny('Nothing selected.');
+        if (target.surface === 'roof') return BuildRules.ALLOWED;
         return target.surface === 'floor'
             ? this.rules?.canPaintRoomFloor(target.room) ?? BuildRules.ALLOWED
             : this.rules?.canPaintWallFace(target.wallSurface.cell) ?? BuildRules.ALLOWED;
@@ -83607,6 +84441,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         const locked = !this.checkTarget().allowed;
         if (this.target.surface === 'floor') {
             return { room: this.roomName(this.target.room), surface: 'Floor', locked };
+        }
+        if (this.target.surface === 'roof') {
+            const building = this.gameMap?.buildDocument?.buildings.get(this.target.buildingId);
+            return { room: building?.displayName || 'Building', surface: 'Roof', locked };
         }
         const roomId = this.target.wallSurface.roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
@@ -83629,6 +84467,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     // wall that belongs to nothing.
     targetRoom() {
         if (!this.target) return null;
+        if (this.target.surface === 'roof') return null;
         if (this.target.surface === 'floor') return this.target.room;
         const roomId = this.target.wallSurface.roomId;
         return roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
@@ -83673,6 +84512,10 @@ class SurfaceCustomizePanel extends ModalWindow {
     // What this surface is already painted with, so the palette can say so.
     getCurrentFinishId() {
         if (!this.target) return null;
+        if (this.target.surface === 'roof') {
+            this.target.roofPlan = this.gameMap?.buildDocument?.level?.().roofs.forBuilding(this.target.buildingId);
+            return this.target.roofPlan?.finishId || null;
+        }
         if (this.target.surface === 'floor') {
             return this.target.room.properties?.floorFinishId ||
                 SiteConfig.floorSystem?.defaultFinishId ||
@@ -83813,6 +84656,12 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     buildRequests(finishId, scopeOverride = null) {
         if (!this.target) return [];
+        if (this.target.surface === 'roof') {
+            return [{
+                surface: 'roof', buildingId: this.target.buildingId, finishId,
+                colorId: this.target.roofPlan?.colorId
+            }];
+        }
         if (this.target.surface === 'floor') {
             return [{ surface: 'floor', roomId: this.target.room.id, finishId }];
         }
@@ -83885,7 +84734,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         // the whole group stands down and the panel is just its prompt.
         if (this.finishGroup) this.finishGroup.hidden = !this.target;
         if (this.finishTitle && this.target) {
-            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish' : 'Wall finish';
+            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish'
+                : this.target.surface === 'roof' ? 'Roof material' : 'Wall finish';
         }
         if (!this.target) return;
 
@@ -83949,6 +84799,35 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
+        if (this.target.surface === 'roof') this.renderRoofColors();
+    }
+
+    renderRoofColors() {
+        const registry = this.gameMap?.roofMaterialRegistry;
+        const plan = this.gameMap?.buildDocument?.level?.().roofs.forBuilding(this.target.buildingId);
+        if (!registry || !plan) return;
+        const group = document.createElement('div');
+        group.className = 'surface-roof-colors';
+        const swatches = registry.getFinish(plan.finishId)?.swatches || [...registry.colors.keys()];
+        for (const id of swatches) {
+            const color = registry.getColor(id);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'surface-color-swatch';
+            button.title = id.replaceAll('_', ' ');
+            button.setAttribute('aria-label', button.title);
+            button.setAttribute('aria-pressed', String(plan.colorId === id));
+            button.style.backgroundColor = color;
+            button.addEventListener('click', () => this.applyFinish(plan.finishId, null, id));
+            group.append(button);
+        }
+        const custom = document.createElement('input');
+        custom.type = 'color';
+        custom.title = 'Custom roof colour';
+        custom.value = registry.getColor(plan.colorId) || '#5d5650';
+        custom.addEventListener('change', () => this.applyFinish(plan.finishId, null, custom.value));
+        group.append(custom);
+        this.paletteElement.append(group);
     }
 
     renderScopeChoices() {
@@ -83987,7 +84866,7 @@ class SurfaceCustomizePanel extends ModalWindow {
      * ids the targets carried a moment ago, replayed through the same
      * customizer so persistence and the room lighting rebuild both happen.
      */
-    applyFinish(finishId, scopeOverride = null) {
+    applyFinish(finishId, scopeOverride = null, colorId = undefined) {
         clearTimeout(this.hoverTimer);
         const customizer = this.gameMap?.surfaceCustomizer;
         if (!customizer) return false;
@@ -83997,6 +84876,9 @@ class SurfaceCustomizePanel extends ModalWindow {
         // identical to the paint being applied and undo appears to skip paint.
         customizer.revertPreview();
         const requests = this.buildRequests(finishId, scopeOverride);
+        if (this.target?.surface === 'roof' && colorId !== undefined) {
+            for (const request of requests) request.colorId = colorId;
+        }
         if (requests.length === 0) return false;
 
         const usesBuildTransaction = !!this.gameMap?.buildTransaction;
@@ -84065,6 +84947,11 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     getFinishSample(finishId, surface = this.target?.surface) {
         if (surface === 'floor') return this.gameMap.floorMaterialRegistry?.getTile(finishId);
+        if (surface === 'roof') {
+            const colorId = this.held?.surface === 'roof' && this.held.finishId === finishId
+                ? this.held.colorId : this.target?.roofPlan?.colorId;
+            return this.gameMap.roofMaterialRegistry?.getSample(finishId, colorId);
+        }
         return this.gameMap.wallMaterialRegistry
             ?.getSwatchColumns(finishId, this.gameMap.wallMaterialRegistry.getConstruction(this.target.piece.constructionId))
             ?.body || null;
@@ -84088,6 +84975,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.scope = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.removeEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.removeEventListener('pointerup', this.boundStagePointerUp, true);
+        this.parent?.parent?.canvas?.removeEventListener('click', this.boundStageClick, true);
         this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundStagePointerLeave);
         document.body.classList.remove('customize-mode');
         super.dispose();

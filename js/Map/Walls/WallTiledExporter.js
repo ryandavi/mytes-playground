@@ -537,12 +537,16 @@ class WallTiledExporter {
         }
 
         const level = this.gameMap.buildDocument?.level?.();
+        const exportedRoofs = new Set();
         for (const room of (level?.rooms.values() ?? []).sort((a, b) => a.id.localeCompare(b.id))) {
             const roomId = room.id;
             const cells = [...room.seedCells].sort();
             if (cells.length === 0) continue;
             const columns = cells.map(key => Number(key.split(',')[0]));
             const rows = cells.map(key => Number(key.split(',')[1]));
+            const roof = room.buildingId && !exportedRoofs.has(room.buildingId)
+                ? level.roofs.forBuilding(room.buildingId) : null;
+            if (roof) exportedRoofs.add(room.buildingId);
             records.push({
                 // Named by the room, so re-exporting an unchanged room rewrites
                 // the same object rather than stacking a second one beside it.
@@ -558,7 +562,17 @@ class WallTiledExporter {
                     roomId: { value: roomId },
                     // The rectangle above is only where to find it in Tiled. A
                     // room need not be rectangular, so the cells are the truth.
-                    cells: { value: cells.join(' ') }
+                    cells: { value: cells.join(' ') },
+                    ...(roof ? {
+                        buildingId: { value: room.buildingId },
+                        roofStyle: { value: roof.style },
+                        roofRidgeAxis: { value: roof.ridgeAxis },
+                        roofFinishId: { value: roof.finishId },
+                        roofColorId: { value: roof.colorId },
+                        roofOverhang: { value: roof.overhangCells, type: 'int' },
+                        roofVisibility: { value: roof.visibility },
+                        roofExcludedCells: { value: roof.excludedCells.join(' ') }
+                    } : {})
                 }
             });
         }

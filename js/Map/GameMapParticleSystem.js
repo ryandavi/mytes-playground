@@ -863,6 +863,11 @@ class GameMapParticleSystem extends ParticleSystem {
         const source = emitter.sourceObject;
         const options = emitter.options;
 
+        if (this.isWeatherEmitter(emitter) && source &&
+            this.map?.isRoofedAt?.(source.posX ?? emitter.x, source.posY ?? emitter.y)) {
+            return false;
+        }
+
         if (options.emitWhileAlive && !WorldParticleUtilities.isSourceActive(source)) {
             return false;
         }

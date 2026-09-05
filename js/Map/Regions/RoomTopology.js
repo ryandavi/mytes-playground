@@ -26,7 +26,7 @@ class RoomTopology {
         const loopByBlock = RoomTopology.loopBlocks(enrichedComponents);
         const adjacency = RoomTopology.openingAdjacency(input.openings || [], grid);
         const served = RoomTopology.openingsByRoom(input.openings || [], grid);
-        const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, grid);
+        const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, components);
         const shellEdgesByBuilding = new Map([...roofableByBuilding].map(([buildingId, cells]) => [
             buildingId, Object.freeze(RoomTopology.boundaryEdges(cells))
         ]));
@@ -181,16 +181,22 @@ class RoomTopology {
         });
     }
 
-    static roofableFootprints(plans, states, walls, grid) {
+    static roofableFootprints(plans, states, walls, components) {
         const result = new Map();
         const take = (buildingId, key) => {
             if (!buildingId) return;
             if (!result.has(buildingId)) result.set(buildingId, new Set());
             result.get(buildingId).add(key);
         };
+        const componentsById = new Map((components || []).map(component => [component.id, component]));
         for (const plan of plans) {
-            if (!states.get(plan.id)?.indoor || !grid) continue;
-            for (const key of grid.cellsOf(plan.id)) take(plan.buildingId, key);
+            const state = states.get(plan.id);
+            if (!state?.indoor) continue;
+            for (const componentId of state.componentIds) {
+                const component = componentsById.get(componentId);
+                if (!component?.enclosed) continue;
+                for (const key of component.cells) take(plan.buildingId, key);
+            }
         }
         for (const [key, wall] of walls) take(wall.buildingId, key);
         return result;

@@ -15,6 +15,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
         this.target = null;
+        this.unroofBuildingId = null;
+        this.lastUnroofCell = null;
+        this.unroofExclude = null;
         this.hoverTimer = null;
         // Two independent outlines over the same geometry: what the pointer is
         // on, and what a click already chose. See `setOverlay`.
@@ -22,6 +25,15 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.selection = { elements: [], key: null, className: 'paint-selection' };
         this.boundStagePointerDown = this.handleStagePointerDown.bind(this);
         this.boundStagePointerMove = this.handleStagePointerMove.bind(this);
+        this.boundStagePointerUp = () => {
+            this.lastUnroofCell = null;
+            this.unroofExclude = null;
+        };
+        this.boundStageClick = event => {
+            if (!this.parent.isTool(UIToolModes.SURFACE) || !this.target) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        };
         this.init();
         this.paletteElement = this.modalElement?.querySelector('.surface-palette');
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
@@ -59,6 +71,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         };
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.addEventListener('pointerup', this.boundStagePointerUp, true);
+        this.parent?.parent?.canvas?.addEventListener('click', this.boundStageClick, true);
         this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundStagePointerLeave);
         // Both outlines are absolutely positioned over wall pieces the builder
         // throws away and rebuilds — when a wall is painted, when it changes
@@ -85,6 +99,9 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.revertPreview();
         this.setOverlay(this.hover, null);
         this.setTarget(null);
+        this.unroofBuildingId = null;
+        this.lastUnroofCell = null;
+        this.unroofExclude = null;
         this.renderPalette();
         // The panel opens with the mode, not with the first click: entering a
         // mode that says nothing and shows nothing reads as "nothing happened".
@@ -119,6 +136,9 @@ class SurfaceCustomizePanel extends ModalWindow {
     handleStagePointerMove(event) {
         if (!this.parent.isTool(UIToolModes.SURFACE)) return;
         const target = this.resolveTarget(event);
+        if (this.unroofBuildingId && (event.buttons & 1) !== 0 && target?.surface === 'roof') {
+            this.toggleRoofCell(target);
+        }
         this.setOverlay(this.hover, target);
         // Surface is the one build tool where "is there anything here" is a real
         // question — most of a wall is air, and a vertical run is not a paint
@@ -145,7 +165,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (!target) return;
         slot.elements = target.surface === 'wall'
             ? this.createWallOverlay(target.wallSurface, slot.className)
-            : [this.createFloorOverlay(target.room, slot.className)].filter(Boolean);
+            : target.surface === 'roof'
+                ? this.gameMap?.roofRenderer?.createBuildingOverlay(target.buildingId,
+                    slot.className, SurfaceCustomizePanel.overlayFill(slot.className)) || []
+                : [this.createFloorOverlay(target.room, slot.className)].filter(Boolean);
         slot.key = slot.elements.length > 0 ? key : null;
     }
 
@@ -154,7 +177,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         return target.surface === 'wall'
             ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},` +
                 `${target.wallSurface.from}-${target.wallSurface.to}`
-            : `floor:${target.room.id}`;
+            : target.surface === 'roof' ? `roof:${target.buildingId}` : `floor:${target.room.id}`;
     }
 
     /**
@@ -217,10 +240,33 @@ class SurfaceCustomizePanel extends ModalWindow {
      * hit-testing it would claim ground belonging to the room next door.
      */
     resolveTarget(event) {
+        const world = this.gameMap?.container?.inputHandler?.screenToWorldCoordinates?.(
+            event.clientX, event.clientY
+        );
+        const roof = world && this.gameMap?.roofRenderer?.hitTest?.atMapPoint(world.x, world.y);
+        if (roof) return { surface: 'roof', ...roof };
+        if (world && this.unroofBuildingId) {
+            const target = this.resolveExcludedRoofCell(world);
+            if (target) return target;
+        }
         const hit = this.resolveWallHit(event);
         if (hit) return { surface: 'wall', wallSurface: hit.surface, piece: hit.piece };
         const room = this.resolveRoomAt(event);
         return room ? { surface: 'floor', room } : null;
+    }
+
+    resolveExcludedRoofCell(world) {
+        const map = this.gameMap;
+        const plan = map?.buildDocument?.level?.().roofs.forBuilding(this.unroofBuildingId);
+        const roof = plan && map?.buildTransaction?.cache?.roofs.get(plan.id);
+        if (!roof) return null;
+        const height = Math.max(0, ...roof.sections.map(section => section.heightPx));
+        const cellSize = map.gridSystem?.config?.cellSize || 32;
+        const key = BuildKeys.cell(Math.floor(world.x / cellSize), Math.floor((world.y + height) / cellSize));
+        const base = map.buildTransaction.cache.topology.roofableFootprint(plan.buildingId);
+        if (!base.has(key) && !plan.excludedCells.includes(key)) return null;
+        return { surface: 'roof', kind: 'roof', buildingId: plan.buildingId,
+            roofPlanId: plan.id, roofPlan: plan, cellKey: key };
     }
 
     /**
@@ -285,6 +331,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.target = target;
         if (target?.surface === 'floor') {
             this.parent.buildSelection?.set({ kind: 'room', id: target.room.id });
+        } else if (target?.surface === 'roof') {
+            this.parent.buildSelection?.set({ kind: 'roof', id: target.roofPlanId, buildingId: target.buildingId });
         } else if (target?.wallSurface) {
             const surface = target.wallSurface;
             this.parent.buildSelection?.set({
@@ -351,6 +399,28 @@ class SurfaceCustomizePanel extends ModalWindow {
         return true;
     }
 
+    openRoofSurface(buildingId) {
+        const map = this.gameMap;
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(buildingId);
+        if (!roof || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        map.roofRenderer?.setBuildVisible(true);
+        this.parent.stageViewBar?.sync?.();
+        this.setTarget({
+            surface: 'roof', buildingId, roofPlanId: roof.id, roofPlan: roof
+        });
+        this.renderPalette();
+        this.redrawOverlays();
+        this.open();
+        return true;
+    }
+
+    beginUnroof(buildingId) {
+        if (!this.openRoofSurface(buildingId)) return false;
+        this.unroofBuildingId = buildingId;
+        this.parent.showMessage('Click or drag roof tiles to add or remove them.', 'info', 'Un-roof cells');
+        return true;
+    }
+
     // The elements were parented to art that has since been rebuilt, so both
     // slots are drawn again from scratch rather than moved.
     redrawOverlays() {
@@ -365,6 +435,13 @@ class SurfaceCustomizePanel extends ModalWindow {
         // target, so clicking one has to fall through to whatever is under it
         // rather than being swallowed into a no-op.
         const target = this.resolveTarget(event);
+        if (this.unroofBuildingId && target?.surface === 'roof') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            this.toggleRoofCell(target, true);
+            return;
+        }
         if (!target) {
             // "Not that one" — the same answer clicking bare map gives a
             // selected object (see ContainerInputManager.setupClickHandling).
@@ -374,6 +451,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         this.setTarget(target);
         // Alt-click takes the finish that is already here, to put on something
         // else. It used to say "Picked up wallpaper blue flower" and then hold
@@ -393,6 +471,30 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         this.renderPalette();
         this.open();
+    }
+
+    toggleRoofCell(target, force = false) {
+        if (target?.buildingId !== this.unroofBuildingId || !target.cellKey) return false;
+        if (!force && this.lastUnroofCell === target.cellKey) return false;
+        this.lastUnroofCell = target.cellKey;
+        const map = this.gameMap;
+        const current = map?.buildDocument?.level?.().roofs.forBuilding(target.buildingId);
+        if (force || this.unroofExclude === null) {
+            this.unroofExclude = !current?.excludedCells.includes(target.cellKey);
+        }
+        const committed = map?.buildTransaction?.run('Un-roof cells', (_draft, level) => {
+            const roof = level.roofs.forBuilding(target.buildingId);
+            if (!roof) return;
+            const excluded = new Set(roof.excludedCells);
+            if (this.unroofExclude) excluded.add(target.cellKey);
+            else excluded.delete(target.cellKey);
+            level.roofs.set(roof.id, { ...roof, excludedCells: [...excluded] });
+        });
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(target.buildingId);
+        if (roof) this.target = { ...this.target, roofPlan: roof };
+        this.redrawOverlays();
+        this.renderPalette();
+        return committed?.committed === true;
     }
 
     /**
@@ -428,10 +530,13 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     holdFinish(finishId, surface) {
         if (!finishId || !surface) return false;
-        this.held = { finishId, surface };
+        this.held = {
+            finishId, surface,
+            colorId: surface === 'roof' ? this.target?.roofPlan?.colorId : null
+        };
         this.renderHeld();
         this.parent.showMessage(
-            `Holding ${this.finishLabel(finishId, surface)}. Click a ${surface === 'floor' ? 'floor' : 'wall'} to paint it.`,
+            `Holding ${this.finishLabel(finishId, surface)}. Click a ${surface} to paint it.`,
             'info', 'Eyedropper'
         );
         return true;
@@ -459,7 +564,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             );
             return false;
         }
-        return this.applyFinish(this.held.finishId);
+        return this.applyFinish(this.held.finishId, null, this.held.colorId);
     }
 
     finishLabel(finishId, surface) {
@@ -486,6 +591,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     // shown on the target line and disables the palette.
     checkTarget(target = this.target) {
         if (!target) return BuildRules.deny('Nothing selected.');
+        if (target.surface === 'roof') return BuildRules.ALLOWED;
         return target.surface === 'floor'
             ? this.rules?.canPaintRoomFloor(target.room) ?? BuildRules.ALLOWED
             : this.rules?.canPaintWallFace(target.wallSurface.cell) ?? BuildRules.ALLOWED;
@@ -501,6 +607,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         const locked = !this.checkTarget().allowed;
         if (this.target.surface === 'floor') {
             return { room: this.roomName(this.target.room), surface: 'Floor', locked };
+        }
+        if (this.target.surface === 'roof') {
+            const building = this.gameMap?.buildDocument?.buildings.get(this.target.buildingId);
+            return { room: building?.displayName || 'Building', surface: 'Roof', locked };
         }
         const roomId = this.target.wallSurface.roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
@@ -523,6 +633,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     // wall that belongs to nothing.
     targetRoom() {
         if (!this.target) return null;
+        if (this.target.surface === 'roof') return null;
         if (this.target.surface === 'floor') return this.target.room;
         const roomId = this.target.wallSurface.roomId;
         return roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
@@ -567,6 +678,10 @@ class SurfaceCustomizePanel extends ModalWindow {
     // What this surface is already painted with, so the palette can say so.
     getCurrentFinishId() {
         if (!this.target) return null;
+        if (this.target.surface === 'roof') {
+            this.target.roofPlan = this.gameMap?.buildDocument?.level?.().roofs.forBuilding(this.target.buildingId);
+            return this.target.roofPlan?.finishId || null;
+        }
         if (this.target.surface === 'floor') {
             return this.target.room.properties?.floorFinishId ||
                 SiteConfig.floorSystem?.defaultFinishId ||
@@ -707,6 +822,12 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     buildRequests(finishId, scopeOverride = null) {
         if (!this.target) return [];
+        if (this.target.surface === 'roof') {
+            return [{
+                surface: 'roof', buildingId: this.target.buildingId, finishId,
+                colorId: this.target.roofPlan?.colorId
+            }];
+        }
         if (this.target.surface === 'floor') {
             return [{ surface: 'floor', roomId: this.target.room.id, finishId }];
         }
@@ -779,7 +900,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         // the whole group stands down and the panel is just its prompt.
         if (this.finishGroup) this.finishGroup.hidden = !this.target;
         if (this.finishTitle && this.target) {
-            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish' : 'Wall finish';
+            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish'
+                : this.target.surface === 'roof' ? 'Roof material' : 'Wall finish';
         }
         if (!this.target) return;
 
@@ -843,6 +965,35 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
+        if (this.target.surface === 'roof') this.renderRoofColors();
+    }
+
+    renderRoofColors() {
+        const registry = this.gameMap?.roofMaterialRegistry;
+        const plan = this.gameMap?.buildDocument?.level?.().roofs.forBuilding(this.target.buildingId);
+        if (!registry || !plan) return;
+        const group = document.createElement('div');
+        group.className = 'surface-roof-colors';
+        const swatches = registry.getFinish(plan.finishId)?.swatches || [...registry.colors.keys()];
+        for (const id of swatches) {
+            const color = registry.getColor(id);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'surface-color-swatch';
+            button.title = id.replaceAll('_', ' ');
+            button.setAttribute('aria-label', button.title);
+            button.setAttribute('aria-pressed', String(plan.colorId === id));
+            button.style.backgroundColor = color;
+            button.addEventListener('click', () => this.applyFinish(plan.finishId, null, id));
+            group.append(button);
+        }
+        const custom = document.createElement('input');
+        custom.type = 'color';
+        custom.title = 'Custom roof colour';
+        custom.value = registry.getColor(plan.colorId) || '#5d5650';
+        custom.addEventListener('change', () => this.applyFinish(plan.finishId, null, custom.value));
+        group.append(custom);
+        this.paletteElement.append(group);
     }
 
     renderScopeChoices() {
@@ -881,7 +1032,7 @@ class SurfaceCustomizePanel extends ModalWindow {
      * ids the targets carried a moment ago, replayed through the same
      * customizer so persistence and the room lighting rebuild both happen.
      */
-    applyFinish(finishId, scopeOverride = null) {
+    applyFinish(finishId, scopeOverride = null, colorId = undefined) {
         clearTimeout(this.hoverTimer);
         const customizer = this.gameMap?.surfaceCustomizer;
         if (!customizer) return false;
@@ -891,6 +1042,9 @@ class SurfaceCustomizePanel extends ModalWindow {
         // identical to the paint being applied and undo appears to skip paint.
         customizer.revertPreview();
         const requests = this.buildRequests(finishId, scopeOverride);
+        if (this.target?.surface === 'roof' && colorId !== undefined) {
+            for (const request of requests) request.colorId = colorId;
+        }
         if (requests.length === 0) return false;
 
         const usesBuildTransaction = !!this.gameMap?.buildTransaction;
@@ -959,6 +1113,11 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     getFinishSample(finishId, surface = this.target?.surface) {
         if (surface === 'floor') return this.gameMap.floorMaterialRegistry?.getTile(finishId);
+        if (surface === 'roof') {
+            const colorId = this.held?.surface === 'roof' && this.held.finishId === finishId
+                ? this.held.colorId : this.target?.roofPlan?.colorId;
+            return this.gameMap.roofMaterialRegistry?.getSample(finishId, colorId);
+        }
         return this.gameMap.wallMaterialRegistry
             ?.getSwatchColumns(finishId, this.gameMap.wallMaterialRegistry.getConstruction(this.target.piece.constructionId))
             ?.body || null;
@@ -982,6 +1141,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.scope = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.removeEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.removeEventListener('pointerup', this.boundStagePointerUp, true);
+        this.parent?.parent?.canvas?.removeEventListener('click', this.boundStageClick, true);
         this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundStagePointerLeave);
         document.body.classList.remove('customize-mode');
         super.dispose();

@@ -11,6 +11,7 @@ const sources = [
     'js/Map/Build/RoomPlanStore.js',
     'js/Map/Build/WallCellStore.js',
     'js/Map/Build/WallSurfaceAtomStore.js',
+    'js/Map/Build/RoofPlanStore.js',
     'js/Map/Build/AttachmentStore.js',
     'js/Map/Walls/WallGeometry.js',
     'js/Map/Build/BuildDocument.js'
@@ -18,7 +19,7 @@ const sources = [
 
 const context = vm.createContext({ console, Map, Set, Object, Array, Number, String, Math, JSON, Error });
 for (const source of sources) vm.runInContext(fs.readFileSync(path.join(repoRoot, source), 'utf8'), context, { filename: source });
-const core = vm.runInContext(`({ BuildKeys, StoreDelta, BuildingPlanStore, RoomPlanStore,
+const core = vm.runInContext(`({ BuildKeys, StoreDelta, BuildingPlanStore, RoomPlanStore, RoofPlanStore,
     WallCellStore, WallSurfaceAtomStore, AttachmentStore, BuildDocument })`, context);
 
 function equal(actual, expected, message) {
@@ -51,7 +52,8 @@ function sampleMapData() {
             rooms: [{
                 id: 'living', displayName: 'Living Room',
                 bounds: { x: 0, y: 0, width: 160, height: 160 },
-                properties: { floorFinishId: 'boards', wallFinishId: 'paint_sage', roomType: 'social' }
+                properties: { floorFinishId: 'boards', wallFinishId: 'paint_sage', roomType: 'social',
+                    roofStyle: 'hip', roofFinishId: 'shingle_asphalt', roofColorId: 'slate' }
             }]
         },
         walls: {
@@ -105,6 +107,13 @@ function testTypedStores() {
     equal(attachments.get('door').cells, [[1, 3], [2, 3]], 'opening footprints translate with masonry');
     equal(attachments.get('art').cells, { from: [1, 3], to: [1, 3] }, 'fixture addresses translate with masonry');
     equal(attachments.get('straddles').cells, { from: [1, 1], to: [3, 1] }, 'straddling attachments stay put');
+
+    const roofs = new core.RoofPlanStore([core.RoofPlanStore.create('house', {
+        style: 'gable', ridgeAxis: 'x', finishId: 'tile', colorId: '#884422', overhangCells: 1
+    })]);
+    assert(roofs.forBuilding('house').style === 'gable', 'roof plans key by building and level');
+    roofs.set('house@level_ground', { ...roofs.forBuilding('house'), excludedCells: ['2,2', '1,1', '2,2'] });
+    equal(roofs.forBuilding('house').excludedCells, ['1,1', '2,2'], 'roof exclusions normalize deterministically');
 }
 
 function testDocumentRoundTrip() {
@@ -116,6 +125,7 @@ function testDocumentRoundTrip() {
     equal(level.rooms.get('living').seedCells, ['1,1', '2,1', '3,1', '1,2', '2,2', '3,2', '1,3', '2,3', '3,3'],
         'room seeds are authored cells minus walls');
     assert(level.atoms.size === 4, 'legacy authored face ranges expand to half-cell atoms');
+    assert(level.roofs.forBuilding('testmap_building').style === 'hip', 'authored room properties create a roof plan');
 
     authored.buildings.set('testmap_building', { ...authored.buildings.get('testmap_building'), displayName: 'Renamed' });
     level.rooms.set('living', { ...level.rooms.get('living'), floorFinishId: 'tile' });
@@ -123,6 +133,8 @@ function testDocumentRoundTrip() {
     level.walls.setCell(5, 2, { constructionId: 'wall_basic', heightCells: 5, connectGroup: 'wall', buildingId: 'testmap_building' });
     level.atoms.set('5,2/west/0', { x: 5, y: 2, face: 'west', half: 0, finishId: 'red' });
     level.attachments.set('new_art', { id: 'new_art', cells: { from: [5, 2], to: [5, 2] }, face: 'west' });
+    const roof = level.roofs.forBuilding('testmap_building');
+    level.roofs.set(roof.id, { ...roof, style: 'gable', ridgeAxis: 'y', excludedCells: ['2,2'] });
     authored.presentation = { walls: 'cutaway' };
 
     const payload = authored.serialize();
@@ -147,6 +159,24 @@ function testLegacyReset() {
     assert(messages === 1 && document.level().walls.has('0,0'), 'legacy reset restores authored state and toasts once');
 }
 
+function testExplicitRoofPlanImport() {
+    const mapData = sampleMapData();
+    delete mapData.environment.rooms[0].properties.roofStyle;
+    delete mapData.environment.rooms[0].properties.roofFinishId;
+    delete mapData.environment.rooms[0].properties.roofColorId;
+    mapData.walls.roofPlans = [{
+        buildingId: 'testmap_building', roofStyle: 'gable', roofRidgeAxis: 'y',
+        roofFinishId: 'tile_clay', roofColorId: '#884422', roofOverhang: 1,
+        roofVisibility: 'shown', roofExcludedCells: ['2,2']
+    }];
+    const roof = core.BuildDocument.fromMapData(mapData).level().roofs.forBuilding('testmap_building');
+    assert(roof.style === 'gable' && roof.ridgeAxis === 'y' && roof.finishId === 'tile_clay',
+        'loader-authored roof plans preserve shape and material');
+    equal(roof.excludedCells, ['2,2'], 'loader-authored roof exclusions survive conversion');
+    assert(roof.overhangCells === 1 && roof.visibility === 'shown' && roof.colorId === '#884422',
+        'loader-authored roof intent survives conversion');
+}
+
 function testOpeningGapBecomesStructuralCell() {
     const mapData = sampleMapData();
     mapData.walls.cells = mapData.walls.cells.filter(cell => cell.x !== 2 || cell.y !== 0);
@@ -161,5 +191,6 @@ testStoreDelta();
 testTypedStores();
 testDocumentRoundTrip();
 testLegacyReset();
+testExplicitRoofPlanImport();
 testOpeningGapBecomesStructuralCell();
 console.log('Build document tests passed: deltas, typed stores, authored conversion, v8 round trip, v7 reset.');

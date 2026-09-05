@@ -9,7 +9,7 @@ class SurfaceCustomizer {
             ? this.gameMap?.wallMaterialRegistry
             : surface === 'floor'
                 ? this.gameMap?.floorMaterialRegistry
-                : null;
+                : surface === 'roof' ? this.gameMap?.roofMaterialRegistry : null;
         return [...(registry?.finishes || [])].map(([id, finish]) => ({ id, ...finish }));
     }
 
@@ -24,6 +24,9 @@ class SurfaceCustomizer {
             .filter(Boolean)
             .filter(entry => {
                 if (!rules) return true;
+                if (entry.surface === 'roof') {
+                    return !!this.gameMap?.buildDocument?.level?.().roofs.forBuilding(entry.buildingId);
+                }
                 if (entry.surface === 'floor') {
                     return rules.canPaintRoomFloor(this.gameMap?.regionManager?.get('room', entry.roomId)).allowed;
                 }
@@ -53,6 +56,11 @@ class SurfaceCustomizer {
         this.gameMap.wallBuilder.previewDocument = preview.document;
         this.gameMap.wallBuilder.previewCache = preview;
         this.gameMap.floorBuilder.previewDocument = preview.document;
+        if (this.gameMap.roofRenderer) {
+            this.gameMap.roofRenderer.previewDocument = preview.document;
+            this.gameMap.roofRenderer.setGeometries(preview.roofs);
+            this.gameMap.roofRenderer.invalidate(dirty.roofBuildingIds);
+        }
         this.gameMap.wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
         return true;
@@ -65,6 +73,11 @@ class SurfaceCustomizer {
         wallBuilder.previewDocument = null;
         wallBuilder.previewCache = null;
         this.gameMap.floorBuilder.previewDocument = null;
+        if (this.gameMap.roofRenderer) {
+            this.gameMap.roofRenderer.previewDocument = null;
+            this.gameMap.roofRenderer.setGeometries(this.gameMap.buildTransaction.cache.roofs);
+            this.gameMap.roofRenderer.invalidate(dirty.roofBuildingIds);
+        }
         wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
         this.previewSession = null;
@@ -98,6 +111,15 @@ class SurfaceCustomizer {
             .filter(request => request.surface === 'wall' && request.exterior && request.buildingId)
             .map(request => request.buildingId));
         for (const request of requests) {
+                if (request.surface === 'roof') {
+                    const roof = level.roofs.forBuilding(request.buildingId);
+                    if (roof) level.roofs.set(roof.id, {
+                        ...roof,
+                        finishId: request.finishId || roof.finishId,
+                        colorId: request.colorId ?? roof.colorId
+                    });
+                    continue;
+                }
                 if (request.surface === 'floor') {
                     const room = level.rooms.get(request.roomId);
                     if (room) level.rooms.set(room.id, { ...room, floorFinishId: request.finishId || null });

@@ -386,21 +386,28 @@ function runGeometryContracts(core) {
     assertEqual(bayBands[0].atoms, ['0,1/south/1', '1,1/south/0', '1,1/south/1', '2,1/south/0'],
         'both buried end halves paint with the run');
 
-    // The sides of an arm, where it leaves the wall it hangs off. That cell's
-    // post faces are flush against the wall's own masonry and cannot classify
-    // themselves, so they take the arm's surfaces — otherwise the top of a
-    // painted arm keeps a stub of somebody else's finish.
+    // An arm that ends in the middle of a run has no sides at the cell where it
+    // ends: those faces are inside the run's own masonry. The cell belongs to
+    // the run, and the arm's posts start on the far side of it. Revised
+    // 2026-09-05 — it used to hand that cell to the arm, which cut a post out
+    // of the run and left a sliver of the arm's rooms standing in the middle of
+    // a wall no one could paint in one stretch.
     const tee = make(['###', '.#.', '.#.']);
     const teeGrid = {
         ownerAt: (bx, by) => bx <= 2 && by >= 2 ? 'A' : null,
         blocksOf: roomId => roomId === 'A' ? [[0, 2], [1, 2], [2, 2]] : []
     };
-    const teePosts = core.WallFaceResolver.sections(tee, teeGrid, { walls: tee })
-        .filter(section => section.spans.some(span => span.kind.startsWith('post-')));
-    assertEqual(teePosts.map(section => section.atoms), [
-        ['1,0/west/0', '1,1/west/1', '1,2/west/1'],
-        ['1,0/east/0', '1,1/east/0', '1,2/east/0']
-    ], 'an arm carries its own sides through the junction it hangs from');
+    const teeSections = core.WallFaceResolver.sections(tee, teeGrid, { walls: tee });
+    assertEqual(teeSections.filter(section => section.spans.some(span => span.kind.startsWith('post-')))
+        .map(section => section.atoms), [
+        ['1,1/west/1', '1,2/west/1'],
+        ['1,1/east/0', '1,2/east/0']
+    ], 'an arm hanging off a run starts below the junction, not at it');
+    assertEqual(teeSections.filter(section => section.spans.some(span => span.kind === 'horizontal-band'))
+        .map(section => section.atoms), [
+        ['0,0/south/0', '0,0/south/1', '1,0/south/0'],
+        ['1,0/north/1', '2,0/south/0', '2,0/south/1']
+    ], 'the junction cell is band, and each half joins the run on its own side');
 
     // A vertical run passing straight through a junction can have a different
     // surface above and below it. The sliver at the junction goes with the half
@@ -415,7 +422,7 @@ function runGeometryContracts(core) {
     assertEqual(crossWest.map(section => section.atoms), [['1,0/west/1'], ['1,1/west/0', '1,2/west/0']],
         'a junction post takes the southern half of its run');
 
-    return 14;
+    return 15;
 }
 
 function main() {

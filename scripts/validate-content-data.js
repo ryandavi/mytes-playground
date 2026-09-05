@@ -936,6 +936,55 @@ function validateFloorMaterials() {
     }
 }
 
+function validateRoofMaterials() {
+    const filePath = 'data/map-objects/roof-materials.json';
+    if (!exists(filePath)) return;
+    const data = readJson(filePath);
+    if (!isPlainObject(data) || data.schemaVersion !== 1 || !isPlainObject(data.finishes)) {
+        fail(`${filePath} must use schemaVersion 1 and declare finishes.`);
+        return;
+    }
+    const size = Number(data.tileSize) || 32;
+    const colors = data.colors || {};
+    for (const [id, color] of Object.entries(colors)) {
+        if (!/^#[0-9a-f]{6}$/i.test(color)) fail(`${filePath} colour "${id}" must be #rrggbb.`);
+    }
+    for (const [id, finish] of Object.entries(data.finishes)) {
+        if (!!finish.sheet === (typeof finish.template === 'string')) {
+            fail(`${filePath} finish "${id}" needs exactly one of "sheet" or "template".`);
+        }
+        if (finish.sheet) {
+            if (!exists(finish.sheet)) {
+                fail(`${filePath} references missing ${finish.sheet}.`);
+                continue;
+            }
+            const sheet = decodePng(finish.sheet);
+            if (sheet && (sheet.width !== size * 16 || sheet.height !== size * 13)) {
+                fail(`${finish.sheet} must be a 16x13 atlas of ${size}px roof tiles.`);
+            }
+            const required = ['body', 'line', 'shade', 'light', 'edge'];
+            if (required.some(slot => !/^#[0-9a-f]{6}$/i.test(finish.palette?.[slot] || ''))) {
+                fail(`${filePath} finish "${id}" must declare the five #rrggbb palette slots.`);
+            }
+        } else if (!data.finishes[finish.template]?.sheet) {
+            fail(`${filePath} finish "${id}" templates on unknown direct finish "${finish.template}".`);
+        }
+        for (const swatch of finish.swatches || []) if (!colors[swatch]) {
+            fail(`${filePath} finish "${id}" references unknown colour "${swatch}".`);
+        }
+    }
+    const styles = new Set(['flat', 'hip', 'gable']);
+    for (const fileName of fs.readdirSync('data/maps').filter(name => name.endsWith('.tmx'))) {
+        const source = readText(`data/maps/${fileName}`);
+        for (const match of source.matchAll(/<property\s+name="roofStyle"\s+value="([^"]+)"/gi)) {
+            if (!styles.has(match[1])) fail(`${fileName} uses unknown roof style "${match[1]}".`);
+        }
+        for (const match of source.matchAll(/<property\s+name="roofFinishId"\s+value="([^"]+)"/gi)) {
+            if (!data.finishes[match[1]]) fail(`${fileName} uses unknown roof material "${match[1]}".`);
+        }
+    }
+}
+
 function validateWallPaintSheet(data) {
     const construction = Object.values(data.constructions || {})[0];
     if (!data.paintSheet || !exists(data.paintSheet) || !construction) return;
@@ -1287,7 +1336,8 @@ function run() {
 	validateRegionFixture();
     validateInteriorRooms();
     validateWallMaterials();
-validateFloorMaterials();
+    validateFloorMaterials();
+    validateRoofMaterials();
 
     if (warnings.length) {
         console.warn('Warnings:');

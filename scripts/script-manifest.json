@@ -325,6 +325,9 @@
     "src": "js/Map/Build/WallSurfaceAtomStore.js"
   },
   {
+    "src": "js/Map/Build/RoofPlanStore.js"
+  },
+  {
     "src": "js/Map/Build/AttachmentStore.js"
   },
   {
@@ -411,6 +414,15 @@
   },
   {
     "src": "js/Map/Roofs/RoofGeometry.js"
+  },
+  {
+    "src": "js/Map/Roofs/RoofMaterialRegistry.js"
+  },
+  {
+    "src": "js/Map/Roofs/RoofHitTest.js"
+  },
+  {
+    "src": "js/Map/Roofs/RoofRenderer.js"
   },
   {
     "src": "js/Map/Terrain/TerrainAtlas.js"

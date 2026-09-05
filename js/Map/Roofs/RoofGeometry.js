@@ -20,6 +20,7 @@ class RoofGeometry {
             height,
             RoofGeometry.otherBuildingCells(input.topology, buildingId)
         );
+        for (const key of plan.excludedCells || []) cover.delete(key);
         const style = ['flat', 'hip', 'gable'].includes(plan.style) ? plan.style : 'flat';
         const sections = RoofGeometry.components(cover).map(cells =>
             RoofGeometry.section(cells, style, plan, input.walls, input.config || {})

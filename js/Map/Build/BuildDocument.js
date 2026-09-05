@@ -1,7 +1,7 @@
 class BuildDocument {
     static VERSION = 8;
     static DEFAULT_LEVEL_ID = 'level_ground';
-    static LEVEL_STORES = Object.freeze(['walls', 'atoms', 'rooms', 'openings', 'fixtures', 'attachments']);
+    static LEVEL_STORES = Object.freeze(['walls', 'atoms', 'rooms', 'roofs', 'openings', 'fixtures', 'attachments']);
 
     constructor(authored = {}) {
         this.buildings = new BuildingPlanStore(authored.buildings || []);
@@ -12,7 +12,7 @@ class BuildDocument {
         this.authored = this.captureStores();
     }
 
-    static fromMapData(mapData = {}) {
+    static fromMapData(mapData = {}, options = {}) {
         const walls = BuildDocument.collectWallCells(mapData.walls || {});
         const wallGeometry = WallGeometry.compute(new Map(walls.map(cell => [BuildKeys.cell(cell.x, cell.y), cell])));
         const buildingData = BuildDocument.collectBuildings(mapData, walls);
@@ -23,6 +23,7 @@ class BuildDocument {
         BuildDocument.applyAuthoredAssignments(
             rooms, mapData.walls?.roomAssignments || {}, fallbackBuildingId, wallGeometry
         );
+        const roofs = BuildDocument.collectRoofs(mapData, buildingData, rooms, options.roofDefaults);
         return new BuildDocument({
             buildings: buildingData,
             levels: {
@@ -38,6 +39,7 @@ class BuildDocument {
                     })),
                     atoms: BuildDocument.collectAtoms(mapData.walls?.faceOverrides || []),
                     rooms,
+                    roofs,
                     openings: mapData.walls?.openings || [],
                     fixtures: mapData.walls?.fixtures || [],
                     attachments: mapData.walls?.attachments || []
@@ -63,6 +65,7 @@ class BuildDocument {
             walls: new WallCellStore(level.walls || []),
             atoms: new WallSurfaceAtomStore(level.atoms || []),
             rooms: new RoomPlanStore(level.rooms || []),
+            roofs: new RoofPlanStore(level.roofs || []),
             openings: new AttachmentStore(level.openings || []),
             fixtures: new AttachmentStore(level.fixtures || []),
             attachments: new AttachmentStore(level.attachments || [])
@@ -184,6 +187,28 @@ class BuildDocument {
                 priority: Number.isFinite(props.priority) ? props.priority : null,
                 properties: StoreDelta.clone(props)
             };
+        });
+    }
+
+    static collectRoofs(mapData, buildings, rooms, defaults = null) {
+        const authored = mapData.walls?.roofPlans || [];
+        return buildings.flatMap(building => {
+            const source = authored.find(plan => BuildDocument.slug(plan.buildingId) === building.id);
+            const room = rooms.find(candidate => candidate.buildingId === building.id &&
+                ['roofStyle', 'roofFinishId', 'roofColorId', 'roofOverhang', 'roofVisibility']
+                    .some(name => candidate.properties?.[name] != null));
+            const props = source || room?.properties || null;
+            if (!props && !defaults) return [];
+            return [{
+                ...RoofPlanStore.create(building.id, defaults || {}),
+                style: props?.roofStyle || props?.style || defaults?.style,
+                ridgeAxis: props?.roofRidgeAxis || props?.ridgeAxis || defaults?.ridgeAxis,
+                finishId: props?.roofFinishId || props?.finishId || defaults?.finishId,
+                colorId: props?.roofColorId || props?.colorId || defaults?.colorId,
+                overhangCells: Number(props?.roofOverhang ?? props?.overhangCells ?? defaults?.overhangCells) || 0,
+                visibility: props?.roofVisibility || props?.visibility || defaults?.visibility,
+                excludedCells: props?.roofExcludedCells || props?.excludedCells || []
+            }];
         });
     }
 

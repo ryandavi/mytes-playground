@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "tileSize": 32,
+  "colors": {
+    "slate": "#5d5650",
+    "charcoal": "#3f4248",
+    "moss": "#65705a",
+    "terracotta": "#b8623f",
+    "sand": "#aa8064",
+    "blue_grey": "#607482"
+  },
+  "finishes": {
+    "shingle_asphalt": {
+      "name": "Asphalt Shingle",
+      "sheet": "images/roofs/shingle_asphalt.png",
+      "swatches": ["slate", "charcoal", "moss"],
+      "palette": { "body": "#808080", "line": "#484848", "shade": "#666666", "light": "#9a9a9a", "edge": "#2d2d2d" }
+    },
+    "tile_clay": {
+      "name": "Clay Tile",
+      "sheet": "images/roofs/tile_clay.png",
+      "swatches": ["terracotta", "sand", "slate"],
+      "palette": { "body": "#808080", "line": "#484848", "shade": "#666666", "light": "#9a9a9a", "edge": "#2d2d2d" }
+    },
+    "metal_seam": {
+      "name": "Standing Seam",
+      "sheet": "images/roofs/metal_seam.png",
+      "swatches": ["blue_grey", "charcoal", "moss"],
+      "palette": { "body": "#808080", "line": "#484848", "shade": "#666666", "light": "#9a9a9a", "edge": "#2d2d2d" }
+    }
+  }
+}

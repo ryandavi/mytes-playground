@@ -693,6 +693,7 @@ class MapEnvironmentManager {
                 gloomFloor: Number(entry.gloomFloor.toFixed(3)),
                 colorAlpha: Number(entry.colorAlpha.toFixed(3)),
                 windowDaylight: Number(entry.windowDaylight.toFixed(3)),
+                roofCoverage: Number(entry.roofCoverage.toFixed(3)),
                 daylightGloom: entry.room.lighting.daylightGloom,
                 mode: entry.room.lighting.mode,
                 interiorCells: geometry.interiorByRoom.get(entry.room.id)?.size ?? 0,
@@ -1573,6 +1574,7 @@ class MapEnvironmentManager {
             const gloomFloor = room.lighting.daylightGloom * daylight * gloomFloorShare;
             roomState.set(room.id, {
                 room,
+                roofCoverage: this.roofCoverageForRoom(room),
                 lift: Utility.clamp(baseFloor, 0, room.lighting.ambientCeiling),
                 colorAlpha: Utility.clamp(baseFloor * 0.42, 0, 0.42),
                 windowDaylight,
@@ -1653,6 +1655,17 @@ class MapEnvironmentManager {
         });
 
         return roomState;
+    }
+
+    roofCoverageForRoom(room) {
+        const cells = room?.shape?.cells;
+        if (!cells?.size) return 0;
+        let roofed = 0;
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            if (this.gameMap?.isRoofedCell?.(x, y)) roofed++;
+        }
+        return roofed / cells.size;
     }
 
     // -- Room light geometry (F-P1) -------------------------------------------

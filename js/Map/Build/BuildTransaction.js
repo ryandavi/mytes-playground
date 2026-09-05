@@ -6,6 +6,7 @@ class BuildTransaction {
         this.width = Number(options.width);
         this.height = Number(options.height);
         this.reachBlocks = Number(options.reachBlocks) || 1;
+        this.roofDefaults = options.roofDefaults || null;
         this.geometryOptions = options.geometryOptions || {};
         this.cellSize = Number(options.cellSize) || 32;
         this.validate = options.validate || null;
@@ -39,6 +40,7 @@ class BuildTransaction {
         try {
             const draft = new BuildDocument(before);
             edit(draft, draft.level(this.levelId));
+            this.syncBuildingRoofs(before, draft);
             BuildTransaction.pruneEmptyBuildings(draft, this.levelId);
             this.assertValid(draft);
             const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
@@ -76,6 +78,7 @@ class BuildTransaction {
         const before = this.document.captureStores();
         const draft = new BuildDocument(before);
         edit(draft, draft.level(this.levelId));
+        this.syncBuildingRoofs(before, draft);
         this.assertValid(draft);
         return Object.freeze({
             ...this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid, count: false }),
@@ -95,6 +98,7 @@ class BuildTransaction {
             this.cellSize
         );
         this.renderers.floors?.setOwnershipGrid?.(this.cache.grid);
+        this.renderers.roofs?.setGeometries?.(this.cache.roofs);
         return this.cache;
     }
 
@@ -172,7 +176,23 @@ class BuildTransaction {
             plans: level.rooms, openings: level.openings.values(), revision
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
-        return Object.freeze({ geometry, grid, topology, revision });
+        const roofs = new Map(level.roofs.values().map(plan => [plan.id, RoofGeometry.compute({
+            width: this.width, height: this.height, walls: geometry.cells, topology, roofPlan: plan,
+            revision, config: { ...this.geometryOptions, cellSize: this.cellSize }
+        })]));
+        return Object.freeze({ geometry, grid, topology, roofs, revision });
+    }
+
+    syncBuildingRoofs(before, draft) {
+        const roofs = draft.level(this.levelId).roofs;
+        for (const roof of roofs.values()) if (!draft.buildings.has(roof.buildingId)) roofs.delete(roof.id);
+        if (!this.roofDefaults) return;
+        const previous = before.buildings instanceof Map ? before.buildings : new Map(Object.entries(before.buildings || {}));
+        for (const building of draft.buildings.values()) {
+            if (previous.has(building.id) || roofs.forBuilding(building.id, this.levelId)) continue;
+            const roof = RoofPlanStore.create(building.id, this.roofDefaults, this.levelId);
+            roofs.set(roof.id, roof);
+        }
     }
 
     // Thresholds belong to both sides of an opening. Filter them only from the
@@ -215,6 +235,8 @@ class BuildTransaction {
         }
         this.renderers.floors?.setOwnershipGrid?.(data.derived.grid);
         this._stats.floorChunksRedrawn += Number(this.renderers.floors?.invalidate?.(dirty.blocks)) || 0;
+        this.renderers.roofs?.setGeometries?.(data.derived.roofs);
+        this.renderers.roofs?.invalidate?.(dirty.roofBuildingIds);
         const event = Object.freeze({
             label: data.label,
             deltas: data.forward,
@@ -223,6 +245,7 @@ class BuildTransaction {
             geometry: data.derived.geometry,
             grid: data.derived.grid,
             topology: data.derived.topology,
+            roofs: data.derived.roofs,
             regions
         });
         this._stats.transactions++;

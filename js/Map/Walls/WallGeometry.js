@@ -166,7 +166,16 @@ class WallGeometry {
             if (mask === 0) return [band(0, middle, 0), band(middle, cellSize, 1)];
             return [post(inset, middle, 'post-west'), post(middle, cellSize - inset, 'post-east')];
         }
-        if (!vertical || (east !== west && WallGeometry.inheritsVerticalFace(mask))) {
+        // An arm that ends here shows no sides: its west and east faces are
+        // inside the masonry of the wall it hangs off, and what you are looking
+        // at across the whole cell is that wall's own face. This held for a
+        // corner (one horizontal neighbour) but not for a T (two), so an arm
+        // meeting the middle of a run cut a 14px post out of it — a sliver
+        // wearing the arm's rooms in the middle of an exterior wall, and a run
+        // that could never be painted in one stretch. The test is only whether
+        // the vertical passes through: through means real sides, terminating
+        // means none, however many ways the horizontal goes.
+        if (!vertical || WallGeometry.inheritsVerticalFace(mask)) {
             return [band(0, middle, 0), band(middle, cellSize, 1)];
         }
         const spans = [];

@@ -592,6 +592,27 @@
             text-transform: capitalize;
         }
     }
+
+    .surface-roof-colors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        padding-top: var(--space-xs);
+        border-top: var(--radius-xs) solid var(--border-dark);
+
+        .surface-color-swatch,
+        input[type='color'] {
+            width: 26px;
+            height: 24px;
+            padding: var(--space-2xs);
+            border-radius: var(--radius-xs);
+        }
+
+        .surface-color-swatch[aria-pressed='true'] {
+            outline: 2px solid var(--state-info-accent);
+            outline-offset: 1px;
+        }
+    }
 }
 
 // The build panels are Options windows that happen to float over the map:
@@ -2483,7 +2504,7 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
     // flush with the building they hang off.
     .build-navigator-tree ul ul {
         padding-left: var(--space-lg);
-        border-left: 1px solid var(--surface-ui-line, rgb(0 0 0 / 12%));
+        // border-left: 1px solid var(--surface-ui-line, rgb(0 0 0 / 12%));
         margin-left: var(--space-2xs);
     }
 

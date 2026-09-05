@@ -404,6 +404,7 @@ class TileMapLoader {
 		const fixtures = [];
 		const faceOverrides = [];
 		const roomAssignments = {};
+		const roofPlans = [];
 		mapData.objects = mapData.objects.filter(object => {
 			const type = String(object.properties?.type || object.name || object.type || '').toUpperCase();
 			if (type === 'WALLFINISHOVERRIDE') {
@@ -440,6 +441,18 @@ class TileMapLoader {
 				const roomId = String(object.properties?.roomId || object.id);
 				for (const key of String(object.properties?.cells || '').split(' ')) {
 					if (/^-?\d+,-?\d+$/.test(key)) roomAssignments[key] = roomId;
+				}
+				if (object.properties?.roofStyle && object.properties?.buildingId) {
+					roofPlans.push({
+						buildingId: object.properties.buildingId,
+						roofStyle: object.properties.roofStyle,
+						roofRidgeAxis: object.properties.roofRidgeAxis,
+						roofFinishId: object.properties.roofFinishId,
+						roofColorId: object.properties.roofColorId,
+						roofOverhang: Number(object.properties.roofOverhang) || 0,
+						roofVisibility: object.properties.roofVisibility,
+						roofExcludedCells: String(object.properties.roofExcludedCells || '').split(/\s+/).filter(Boolean)
+					});
 				}
 				return false;
 			}
@@ -506,7 +519,7 @@ class TileMapLoader {
 		});
 
 		mapData.walls = {
-			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, wangAtlas
+			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, roofPlans, wangAtlas
 		};
 	}
 

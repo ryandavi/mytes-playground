@@ -110,6 +110,18 @@ function testOpeningAdjacency() {
         'opening adjacency is derived from ownership beside the opening');
 }
 
+function testRoofableFootprintIgnoresExteriorOwnership() {
+    const rows = ['.......', '.#####.', '.#...#.', '.#...#.', '.#...#.', '.#####.', '.......'];
+    const geometry = core.WallGeometry.compute(wallsFrom(rows));
+    const plans = [{ id: 'inside', buildingId: 'house', seedCells: ['2,2'] }];
+    const allCells = rows.flatMap((row, y) => [...row].map((value, x) => `${x},${y}`));
+    const grid = { cellsOf: () => allCells, ownerAt: () => null };
+    const topology = core.RoomTopology.compute({ width: 7, height: 7, geometry, plans, grid });
+    assert(topology.roofableFootprint('house').size === 25,
+        'roofable footprint uses the enclosed component, not nearest-room exterior ownership');
+    assert(!topology.roofableFootprint('house').has('0,0'), 'outside corner is not roofable');
+}
+
 // Walling around a painted floor must not repaint the ground it encloses. An
 // authored plan in the same situation still fills its enclosure, which is what
 // makes "draw four walls, get a room" work.
@@ -118,4 +130,5 @@ testProposalAndProjectionData();
 testSplitCreatesStablePlan();
 testPaintedPlanDoesNotGrowIntoEnclosure();
 testOpeningAdjacency();
+testRoofableFootprintIgnoresExteriorOwnership();
 console.log('Room topology tests passed: proposals, split inheritance, footprints, shell edges, opening adjacency.');

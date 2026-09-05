@@ -254,6 +254,7 @@ class BuildInspector extends ModalWindow {
             root.append(this.propertyHeading(plan.displayName, 'Building'));
             root.append(this.nameEditor(plan.displayName, value => marquee.renameBuilding(value)));
             root.append(this.buildingTypeEditor(plan));
+            root.append(this.roofEditor(plan.id));
             // An action you cannot take reads better greyed out than as a
             // button that answers with a message when you press it.
             const parts = marquee.buildingComponents(selection.id).length;
@@ -267,6 +268,14 @@ class BuildInspector extends ModalWindow {
                     selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
                 ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
             ]));
+            return;
+        }
+        if (selection.kind === 'roof') {
+            const roof = level.roofs.get(selection.id);
+            if (!roof) return root.append(BuildInspector.message('This roof no longer exists.'));
+            const building = map.buildDocument.buildings.get(roof.buildingId);
+            root.append(this.propertyHeading(building?.displayName || roof.buildingId, 'Roof'));
+            root.append(this.roofEditor(roof.buildingId));
             return;
         }
         if (selection.kind === 'room') {
@@ -389,6 +398,108 @@ class BuildInspector extends ModalWindow {
         });
         label.append(title, select);
         return label;
+    }
+
+    roofEditor(buildingId) {
+        const map = this.parent?.parent?.gameMap;
+        const roof = map?.buildDocument?.level?.().roofs.forBuilding(buildingId);
+        const group = document.createElement('div');
+        group.className = 'settings-group build-inspector-roof';
+        const title = document.createElement('h3');
+        title.className = 'settings-group-title';
+        title.textContent = 'Roof';
+        group.append(title);
+        if (!roof) {
+            group.append(this.actionRow([['Add roof', () => this.addRoof(buildingId)]]));
+            return group;
+        }
+        const registry = map.roofMaterialRegistry;
+        group.append(
+            this.roofSelect('Style', roof.style, RoofPlanStore.STYLES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { style: value }, 'Change roof style')),
+            this.roofSelect('Material', roof.finishId, [...(registry?.finishes || [])].map(([id, finish]) =>
+                [id, finish.name || id.replaceAll('_', ' ')]),
+                value => this.editRoof(buildingId, { finishId: value }, 'Change roof material')),
+            this.roofColorEditor(roof),
+            this.roofSelect('Overhang', String(roof.overhangCells), [['0', 'Built-in eave'], ['1', 'One tile']],
+                value => this.editRoof(buildingId, { overhangCells: Number(value) }, 'Change roof overhang')),
+            this.roofSelect('Visibility', roof.visibility,
+                RoofPlanStore.VISIBILITIES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { visibility: value }, 'Change roof visibility'))
+        );
+        if (roof.style === 'gable') group.insertBefore(
+            this.roofSelect('Ridge axis', roof.ridgeAxis, RoofPlanStore.RIDGE_AXES.map(id => [id, id]),
+                value => this.editRoof(buildingId, { ridgeAxis: value }, 'Change roof ridge axis')),
+            group.children[2]
+        );
+        const geometry = map.buildTransaction?.cache?.roofs.get(roof.id);
+        const indoor = map.buildDocument.level().rooms.values().some(room => room.buildingId === buildingId &&
+            map.buildTransaction.cache.topology.planStates.get(room.id)?.indoor);
+        if (!indoor) group.append(BuildInspector.message('No indoor rooms: there is nothing to cover.'));
+        if (geometry?.sections.some(section => section.mixedHeights)) {
+            group.append(BuildInspector.message('Mixed wall heights: this roof uses the tallest wall.'));
+        }
+        group.append(this.actionRow([
+            ['Paint roof', () => this.parent.surfaceCustomizePanel.openRoofSurface(buildingId)],
+            ['Un-roof cells', () => this.parent.surfaceCustomizePanel.beginUnroof(buildingId)],
+            ['Remove roof', () => this.removeRoof(buildingId), 'is-danger']
+        ]));
+        return group;
+    }
+
+    roofSelect(titleText, value, options, commit) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = titleText;
+        const select = document.createElement('select');
+        for (const [id, text] of options) {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = text;
+            select.append(option);
+        }
+        BuildInspector.selectValue(select, value);
+        select.addEventListener('change', () => commit(select.value));
+        label.append(title, select);
+        return label;
+    }
+
+    roofColorEditor(roof) {
+        const registry = this.parent?.parent?.gameMap?.roofMaterialRegistry;
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Colour';
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = registry?.getColor(roof.colorId) || '#5d5650';
+        input.addEventListener('change', () => this.editRoof(roof.buildingId,
+            { colorId: input.value }, 'Change roof colour'));
+        label.append(title, input);
+        return label;
+    }
+
+    editRoof(buildingId, changes, label) {
+        return this.parent?.parent?.gameMap?.buildTransaction?.run(label, (_draft, level) => {
+            const roof = level.roofs.forBuilding(buildingId);
+            if (roof) level.roofs.set(roof.id, { ...roof, ...changes });
+        });
+    }
+
+    addRoof(buildingId) {
+        const defaults = SiteConfig.roofSystem.defaults;
+        return this.parent?.parent?.gameMap?.buildTransaction?.run('Add roof', (_draft, level) => {
+            const roof = RoofPlanStore.create(buildingId, defaults);
+            level.roofs.set(roof.id, roof);
+        });
+    }
+
+    removeRoof(buildingId) {
+        return this.parent?.parent?.gameMap?.buildTransaction?.run('Remove roof', (_draft, level) => {
+            const roof = level.roofs.forBuilding(buildingId);
+            if (roof) level.roofs.delete(roof.id);
+        });
     }
 
     roomTypeEditor(room) {

@@ -33,6 +33,9 @@ class BuildDirty {
             return !previous || previous.roomType !== room.roomType ||
                 JSON.stringify(previous.properties || {}) !== JSON.stringify(room.properties || {});
         });
+        const roofBuildingIds = BuildDirty.roofBuildings(
+            before, after, levelId, structuralCells, roomDelta, previousRoom
+        );
         BuildDirty.addFinishChanges(cells, blocks, roomDelta, previousRoom, nextGrid, geometry, topology);
         return Object.freeze({
             cells: Object.freeze([...cells].sort()),
@@ -41,8 +44,37 @@ class BuildDirty {
             ownershipChanged,
             roomTopologyChanged,
             roomEnvironmentChanged,
+            roofBuildingIds: Object.freeze([...roofBuildingIds].sort()),
             recordsChanged: Object.freeze(recordsChanged)
         });
+    }
+
+    static roofBuildings(before, after, levelId, structuralCells, roomDelta, previousRoom) {
+        const ids = new Set();
+        const previousWalls = before.levels?.[levelId]?.walls;
+        const nextWalls = after.levels?.[levelId]?.walls;
+        const record = (store, key) => store instanceof Map ? store.get(key) : store?.[key];
+        for (const key of structuralCells) {
+            const beforeId = record(previousWalls, key)?.buildingId;
+            const afterId = record(nextWalls, key)?.buildingId;
+            if (beforeId) ids.add(beforeId);
+            if (afterId) ids.add(afterId);
+        }
+        const roofDelta = StoreDelta.diff(before.levels?.[levelId]?.roofs, after.levels?.[levelId]?.roofs);
+        const previousRoofs = before.levels?.[levelId]?.roofs;
+        for (const roof of Object.values(roofDelta.set || {})) if (roof.buildingId) ids.add(roof.buildingId);
+        for (const key of roofDelta.removed || []) {
+            const buildingId = record(previousRoofs, key)?.buildingId;
+            if (buildingId) ids.add(buildingId);
+        }
+        for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
+            if (room.buildingId) ids.add(room.buildingId);
+            if (previousRoom(roomId)?.buildingId) ids.add(previousRoom(roomId).buildingId);
+        }
+        for (const roomId of roomDelta.removed || []) if (previousRoom(roomId)?.buildingId) {
+            ids.add(previousRoom(roomId).buildingId);
+        }
+        return ids;
     }
 
     static addBuildingFinishCells(cells, before, after, levelId) {

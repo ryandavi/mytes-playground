@@ -6,9 +6,11 @@ const repoRoot = path.resolve(__dirname, '..');
 const sources = [
     'js/Map/Build/BuildKeys.js', 'js/Map/Build/StoreDelta.js', 'js/Map/Build/BuildRecordStore.js',
     'js/Map/Build/BuildingPlanStore.js', 'js/Map/Build/RoomPlanStore.js', 'js/Map/Build/WallCellStore.js',
-    'js/Map/Build/WallSurfaceAtomStore.js', 'js/Map/Build/AttachmentStore.js', 'js/Map/Build/BuildDocument.js',
+    'js/Map/Build/WallSurfaceAtomStore.js', 'js/Map/Build/RoofPlanStore.js', 'js/Map/Build/AttachmentStore.js',
+    'js/Map/Build/BuildDocument.js',
     'js/Utility/RectUtils.js', 'js/Map/Regions/SpatialRegion.js', 'js/Map/Regions/RegionManager.js',
-    'js/Map/Walls/WallGeometry.js', 'js/Map/Walls/WallSurfaceRuns.js', 'js/Map/Walls/WallFaceResolver.js', 'js/Map/Floors/FloorOwnershipResolver.js',
+    'js/Map/Walls/WallGeometry.js', 'js/Map/Walls/WallSurfaceRuns.js', 'js/Map/Walls/WallFaceResolver.js',
+    'js/Map/Roofs/RoofGeometry.js', 'js/Map/Floors/FloorOwnershipResolver.js',
     'js/Map/Regions/RoomTopology.js', 'js/Map/Regions/RoomRegionProjection.js', 'js/Map/Build/BuildDirty.js',
     'js/Map/Build/BuildTransaction.js'
 ];
@@ -125,6 +127,23 @@ function testFinishAndAtomDirtiness() {
     assert(openingDirty.cells.includes('2,0') && openingDirty.recordsChanged.openings,
         'opening edits dirty their exact wall cells');
     assert(!openingDirty.geometryChanged, 'opening apertures do not rebuild structural pieces');
+
+    const roofDraft = new core.BuildDocument(before);
+    roofDraft.level().roofs.set('house@level_ground', {
+        id: 'house@level_ground', buildingId: 'house', levelId: 'level_ground', style: 'hip'
+    });
+    const roofDirty = core.BuildTransaction.dirty(
+        before, roofDraft.captureStores(), transaction.cache.grid, transaction.cache.grid
+    );
+    assert(roofDirty.roofBuildingIds.length === 1 && roofDirty.roofBuildingIds[0] === 'house',
+        'roof plan edits dirty their building');
+
+    const structureDraft = new core.BuildDocument(before);
+    structureDraft.level().walls.delete('0,0');
+    const structureDirty = core.BuildTransaction.dirty(
+        before, structureDraft.captureStores(), transaction.cache.grid, transaction.cache.grid
+    );
+    assert(structureDirty.roofBuildingIds.includes('house'), 'wall edits dirty the owning roof');
 }
 
 function testRejectAndPreviewAreIsolated() {
@@ -288,10 +307,32 @@ function testRandomEditSequences() {
     }
 }
 
+function testRoofPlanLifecycle() {
+    const document = authoredDocument();
+    const transaction = new core.BuildTransaction({
+        document, width: 5, height: 5,
+        roofDefaults: { style: 'flat', finishId: 'shingle', colorId: 'slate', visibility: 'auto' }
+    });
+    transaction.initialize();
+    const before = document.captureStores();
+    transaction.run('Create shed', draft => draft.buildings.set('shed', { id: 'shed', displayName: 'Shed' }));
+    const roof = document.level().roofs.forBuilding('shed');
+    assert(roof?.finishId === 'shingle', 'a new building gets one default roof plan');
+    assert(transaction.cache.roofs.get(roof.id)?.sections.length === 0, 'roof geometry derives inside the transaction');
+    const created = document.captureStores();
+    assert(transaction.undo(), 'roof creation undoes with its building');
+    same(document.captureStores(), before, 'roof creation undo is byte-equal');
+    assert(transaction.redo(), 'roof creation redoes with its building');
+    same(document.captureStores(), created, 'roof creation redo is byte-equal');
+    transaction.run('Delete shed', draft => draft.buildings.delete('shed'));
+    assert(!document.level().roofs.forBuilding('shed'), 'deleting a building deletes its roof in the same transaction');
+}
+
 testAtomicCommitUndoRedo();
 testRejectAndPreviewAreIsolated();
 testFinishAndAtomDirtiness();
 testSharedHistoryUsesExactDeltas();
 testRoomDefinitionRemovalDoesNotLeaveEmptyPlan();
+testRoofPlanLifecycle();
 testRandomEditSequences();
-console.log('Build transaction tests passed: atomic commit, rebuild budget, dirty sets, preview, undo, redo, room removal, 40 property edits.');
+console.log('Build transaction tests passed: atomic commit, rebuild budget, dirty sets, preview, undo, redo, rooms, roofs, 40 property edits.');
