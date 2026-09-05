@@ -9310,8 +9310,8 @@ class BuildRules {
         const builder = this.wallBuilder;
         const key = `${x},${y}`;
 
-        if (builder.baseCells.get(key)?.locked === true ||
-            builder.authoredBaseCells.get(key)?.locked === true) {
+        const authored = builder.wallData?.cells?.find(cell => BuildKeys.cell(cell.x, cell.y) === key);
+        if (authored?.locked === true) {
             return BuildRules.deny('This wall is part of the building and cannot be changed.');
         }
 
@@ -18510,8 +18510,11 @@ class ContainerInputManager {
     }
 
     if (this.container.gameMode?.isBuild()) {
-      if (ui?.getSelected?.()) {
+      if (ui?.buildSelection?.current || ui?.getSelected?.()) {
         ui.setSelected(null);
+        ui.buildSelection?.clear?.();
+        ui.roomPanel?.clearHighlight?.();
+        ui.surfaceCustomizePanel?.setTarget?.(null);
         return;
       }
       this.container.gameMode.setMode(GAME_MODES.PLAY);
@@ -36885,6 +36888,114 @@ class BuildDocument {
     }
 }
 ;
+/* -- js/Map/Build/BuildDirty.js -- */
+class BuildDirty {
+    static compute(before, after, previousGrid, nextGrid,
+        levelId = BuildDocument.DEFAULT_LEVEL_ID, geometry = null, topology = null) {
+        const cells = new Set();
+        const addCellDelta = delta => {
+            for (const key of [...Object.keys(delta.set || {}), ...(delta.removed || [])]) {
+                const cellKey = key.includes('/') ? key.split('/')[0] : key;
+                if (/^-?\d+,-?\d+$/.test(cellKey)) cells.add(cellKey);
+            }
+        };
+        const wallDelta = StoreDelta.diff(before.levels?.[levelId]?.walls, after.levels?.[levelId]?.walls);
+        addCellDelta(wallDelta);
+        addCellDelta(StoreDelta.diff(before.levels?.[levelId]?.atoms, after.levels?.[levelId]?.atoms));
+        BuildDirty.addBuildingFinishCells(cells, before, after, levelId);
+        const structuralCells = new Set([...Object.keys(wallDelta.set || {}), ...(wallDelta.removed || [])]);
+        const recordsChanged = BuildDirty.addRecordCells(cells, before, after, levelId);
+        const blocks = nextGrid ? [...structuralCells].flatMap(key => {
+            const { x, y } = BuildKeys.parseCell(key);
+            return BuildKeys.blocksOfCell(x, y).map(([bx, by]) => BuildKeys.block(bx, by));
+        }) : [];
+        const ownershipChanged = BuildDirty.addOwnershipBlocks(blocks, previousGrid, nextGrid);
+        const roomDelta = StoreDelta.diff(before.levels?.[levelId]?.rooms, after.levels?.[levelId]?.rooms);
+        const previousRooms = before.levels?.[levelId]?.rooms;
+        const previousRoom = id => previousRooms instanceof Map ? previousRooms.get(id) : previousRooms?.[id];
+        const removedRoom = (roomDelta.removed || []).length > 0;
+        const roomTopologyChanged = removedRoom || Object.entries(roomDelta.set || {}).some(([id, room]) => {
+            const previous = previousRoom(id);
+            return !previous || previous.buildingId !== room.buildingId ||
+                JSON.stringify(previous.seedCells || []) !== JSON.stringify(room.seedCells || []);
+        });
+        const roomEnvironmentChanged = removedRoom || Object.entries(roomDelta.set || {}).some(([id, room]) => {
+            const previous = previousRoom(id);
+            return !previous || previous.roomType !== room.roomType ||
+                JSON.stringify(previous.properties || {}) !== JSON.stringify(room.properties || {});
+        });
+        BuildDirty.addFinishChanges(cells, blocks, roomDelta, previousRoom, nextGrid, geometry, topology);
+        return Object.freeze({
+            cells: Object.freeze([...cells].sort()),
+            blocks: Object.freeze([...new Set(blocks)].sort()),
+            geometryChanged: structuralCells.size > 0,
+            ownershipChanged,
+            roomTopologyChanged,
+            roomEnvironmentChanged,
+            recordsChanged: Object.freeze(recordsChanged)
+        });
+    }
+
+    static addBuildingFinishCells(cells, before, after, levelId) {
+        const delta = StoreDelta.diff(before.buildings, after.buildings);
+        const previous = id => before.buildings instanceof Map ? before.buildings.get(id) : before.buildings?.[id];
+        const nextWalls = after.levels?.[levelId]?.walls;
+        for (const [id, building] of Object.entries(delta.set || {})) {
+            if ((previous(id)?.exteriorFinishId ?? null) === (building?.exteriorFinishId ?? null)) continue;
+            const walls = nextWalls instanceof Map ? nextWalls.values() : Object.values(nextWalls || {});
+            for (const wall of walls) if (wall.buildingId === id) cells.add(BuildKeys.cell(wall.x, wall.y));
+        }
+    }
+
+    static addRecordCells(cells, before, after, levelId) {
+        const changed = { openings: false, fixtures: false, attachments: false };
+        for (const name of Object.keys(changed)) {
+            const delta = StoreDelta.diff(before.levels?.[levelId]?.[name], after.levels?.[levelId]?.[name]);
+            const previousStore = before.levels?.[levelId]?.[name];
+            const previous = key => previousStore instanceof Map ? previousStore.get(key) : previousStore?.[key];
+            const take = record => {
+                const points = Array.isArray(record?.cells)
+                    ? record.cells : [record?.cells?.from, record?.cells?.to || record?.cells?.from];
+                for (const point of points.filter(Array.isArray)) cells.add(BuildKeys.cell(point[0], point[1]));
+            };
+            for (const record of Object.values(delta.set || {})) take(record);
+            for (const key of delta.removed || []) take(previous(key));
+            changed[name] = !StoreDelta.isEmpty(delta);
+        }
+        return changed;
+    }
+
+    static addOwnershipBlocks(blocks, previousGrid, nextGrid) {
+        let changed = !previousGrid && !!nextGrid;
+        if (!previousGrid || !nextGrid) return changed;
+        for (let by = 0; by < nextGrid.blockHeight; by++) for (let bx = 0; bx < nextGrid.blockWidth; bx++) {
+            if (previousGrid.ownerAt(bx, by) === nextGrid.ownerAt(bx, by)) continue;
+            changed = true;
+            blocks.push(BuildKeys.block(bx, by));
+        }
+        return changed;
+    }
+
+    static addFinishChanges(cells, blocks, roomDelta, previousRoom, grid, geometry, topology) {
+        for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
+            const previous = previousRoom(roomId);
+            if (grid && (previous?.floorFinishId ?? null) !== (room?.floorFinishId ?? null)) {
+                for (const [bx, by] of grid.blocksOf(roomId)) blocks.push(BuildKeys.block(bx, by));
+            }
+            if (!grid || !geometry || (previous?.wallFinishId ?? null) === (room?.wallFinishId ?? null)) continue;
+            for (const cell of geometry.cells.values()) {
+                const ownsFace = (geometry.paintSpans.get(BuildKeys.cell(cell.x, cell.y)) || []).some(span =>
+                    WallFaceResolver.visibleSurface(
+                        { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
+                        grid, { ...topology, walls: geometry }, geometry
+                    ).classification.roomId === roomId
+                );
+                if (ownsFace) cells.add(BuildKeys.cell(cell.x, cell.y));
+            }
+        }
+    }
+}
+;
 /* -- js/Map/Build/BuildTransaction.js -- */
 class BuildTransaction {
     constructor(options = {}) {
@@ -37028,7 +37139,8 @@ class BuildTransaction {
             width: this.width,
             height: this.height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            plans: level.rooms.values(),
+            expandCells: [...geometry.thresholds],
+            plans: BuildTransaction.seedsOffThresholds(level.rooms.values(), geometry.thresholds),
             reachBlocks: this.reachBlocks,
             revision
         });
@@ -37039,6 +37151,16 @@ class BuildTransaction {
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
         return Object.freeze({ geometry, grid, topology, revision });
+    }
+
+    // Thresholds belong to both sides of an opening. Filter them only from the
+    // solve; stored room definitions retain every cell the player drew.
+    static seedsOffThresholds(plans, thresholds) {
+        const list = [...plans];
+        if (!thresholds?.size) return list;
+        return list.map(plan => (plan.seedCells || []).some(key => thresholds.has(key))
+            ? { ...plan, seedCells: plan.seedCells.filter(key => !thresholds.has(key)) }
+            : plan);
     }
 
     commit(data) {
@@ -37136,88 +37258,7 @@ class BuildTransaction {
 
     static dirty(before, after, previousGrid, nextGrid, levelId = BuildDocument.DEFAULT_LEVEL_ID,
         geometry = null, topology = null) {
-        const cells = new Set();
-        const addCellDelta = delta => {
-            for (const key of [...Object.keys(delta.set || {}), ...(delta.removed || [])]) {
-                const cellKey = key.includes('/') ? key.split('/')[0] : key;
-                if (/^-?\d+,-?\d+$/.test(cellKey)) cells.add(cellKey);
-            }
-        };
-        const wallDelta = StoreDelta.diff(before.levels?.[levelId]?.walls, after.levels?.[levelId]?.walls);
-        addCellDelta(wallDelta);
-        addCellDelta(StoreDelta.diff(before.levels?.[levelId]?.atoms, after.levels?.[levelId]?.atoms));
-        const buildingDelta = StoreDelta.diff(before.buildings, after.buildings);
-        const previousBuilding = id => before.buildings instanceof Map
-            ? before.buildings.get(id)
-            : before.buildings?.[id];
-        const nextWalls = after.levels?.[levelId]?.walls;
-        for (const [buildingId, building] of Object.entries(buildingDelta.set || {})) {
-            if ((previousBuilding(buildingId)?.exteriorFinishId ?? null) ===
-                (building?.exteriorFinishId ?? null)) continue;
-            const wallValues = nextWalls instanceof Map ? nextWalls.values() : Object.values(nextWalls || {});
-            for (const wall of wallValues) if (wall.buildingId === buildingId) {
-                cells.add(BuildKeys.cell(wall.x, wall.y));
-            }
-        }
-        const structuralCells = new Set([...Object.keys(wallDelta.set || {}), ...(wallDelta.removed || [])]);
-        const recordsChanged = { openings: false, fixtures: false, attachments: false };
-        const addRecordCells = (storeName) => {
-            const delta = StoreDelta.diff(before.levels?.[levelId]?.[storeName], after.levels?.[levelId]?.[storeName]);
-            const previousStore = before.levels?.[levelId]?.[storeName];
-            const previous = key => previousStore instanceof Map ? previousStore.get(key) : previousStore?.[key];
-            const take = record => {
-                const points = Array.isArray(record?.cells)
-                    ? record.cells
-                    : [record?.cells?.from, record?.cells?.to || record?.cells?.from];
-                for (const point of points.filter(Array.isArray)) cells.add(BuildKeys.cell(point[0], point[1]));
-            };
-            for (const record of Object.values(delta.set || {})) take(record);
-            for (const key of delta.removed || []) take(previous(key));
-            recordsChanged[storeName] = !StoreDelta.isEmpty(delta);
-        };
-        for (const storeName of Object.keys(recordsChanged)) addRecordCells(storeName);
-        const blocks = nextGrid ? [...structuralCells].flatMap(key => {
-            const { x, y } = BuildKeys.parseCell(key);
-            return BuildKeys.blocksOfCell(x, y).map(([bx, by]) => BuildKeys.block(bx, by));
-        }) : [];
-        if (previousGrid && nextGrid) {
-            for (let by = 0; by < nextGrid.blockHeight; by++) for (let bx = 0; bx < nextGrid.blockWidth; bx++) {
-                if (previousGrid.ownerAt(bx, by) !== nextGrid.ownerAt(bx, by)) blocks.push(BuildKeys.block(bx, by));
-            }
-        }
-        const roomDelta = StoreDelta.diff(before.levels?.[levelId]?.rooms, after.levels?.[levelId]?.rooms);
-        const previousRooms = before.levels?.[levelId]?.rooms;
-        const previousRoom = roomId => previousRooms instanceof Map
-            ? previousRooms.get(roomId)
-            : previousRooms?.[roomId];
-        if (nextGrid) {
-            for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
-                const previous = previousRoom(roomId);
-                if ((previous?.floorFinishId ?? null) !== (room?.floorFinishId ?? null)) {
-                    for (const [bx, by] of nextGrid.blocksOf(roomId)) blocks.push(BuildKeys.block(bx, by));
-                }
-            }
-        }
-        if (nextGrid && geometry) for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
-            const previous = previousRoom(roomId);
-            if ((previous?.wallFinishId ?? null) === (room?.wallFinishId ?? null)) continue;
-            for (const cell of geometry.cells.values()) {
-                const ownsFace = BuildKeys.FACES.some(face => [0, 1].some(half =>
-                    WallFaceResolver.classify(
-                        { x: cell.x, y: cell.y, face, half },
-                        nextGrid,
-                        { ...topology, walls: geometry }
-                    ).roomId === roomId
-                ));
-                if (ownsFace) cells.add(BuildKeys.cell(cell.x, cell.y));
-            }
-        }
-        return Object.freeze({
-            cells: Object.freeze([...cells].sort()),
-            blocks: Object.freeze([...new Set(blocks)].sort()),
-            geometryChanged: structuralCells.size > 0,
-            recordsChanged: Object.freeze(recordsChanged)
-        });
+        return BuildDirty.compute(before, after, previousGrid, nextGrid, levelId, geometry, topology);
     }
 }
 ;
@@ -37658,7 +37699,11 @@ class RoomTopology {
         const createdIds = [];
         for (const component of components) {
             const candidates = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
-            const unowned = component.cells.filter(key => !seedOwner.has(key));
+            const expandable = candidates.filter(plan => plan.origin !== 'painted');
+            // Thresholds belong to both sides of their opening and are settled
+            // by expansion, so they are never proposed to a plan.
+            const unowned = component.cells.filter(key =>
+                !seedOwner.has(key) && !geometry.thresholds.has(key));
             if (!unowned.length) continue;
             if (!candidates.length) {
                 const previousId = RoomTopology.majorityPreviousOwner(unowned, input.previousGrid);
@@ -37684,8 +37729,9 @@ class RoomTopology {
                 for (const key of unowned) seedOwner.set(key, id);
                 continue;
             }
+            if (!expandable.length) continue;
             for (const key of unowned) {
-                const winner = candidates.length === 1 ? candidates[0] : RoomTopology.nearestPlan(key, candidates);
+                const winner = expandable.length === 1 ? expandable[0] : RoomTopology.nearestPlan(key, expandable);
                 winner.seedCells.push(key);
                 seedOwner.set(key, winner.id);
             }
@@ -39121,6 +39167,20 @@ class WallGeometry {
     static MASK_EAST = 2;
     static MASK_SOUTH = 4;
     static MASK_WEST = 8;
+
+    static contiguousRuns(items, predicate) {
+        const runs = [];
+        let run = [];
+        for (const item of items) {
+            if (predicate(item)) run.push(item);
+            else if (run.length) {
+                runs.push(run);
+                run = [];
+            }
+        }
+        if (run.length) runs.push(run);
+        return runs;
+    }
     static MASK_HORIZONTAL = WallGeometry.MASK_EAST | WallGeometry.MASK_WEST;
     static MASK_VERTICAL = WallGeometry.MASK_NORTH | WallGeometry.MASK_SOUTH;
 
@@ -39174,9 +39234,10 @@ class WallGeometry {
     }
 
     static fencesForMask(mask) {
+        const terminal = WallGeometry.connectionCount(mask) <= 1;
         return Object.freeze({
-            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
-            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
+            horizontal: terminal || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: terminal || (mask & WallGeometry.MASK_VERTICAL) !== 0
         });
     }
 
@@ -39305,17 +39366,41 @@ class WallGeometry {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const key = BuildKeys.cell(x, y);
                 if (cells.has(key)) continue;
-                if (WallGeometry.isThresholdAxis(x, y, 'horizontal', cells, masks) ||
-                    WallGeometry.isThresholdAxis(x, y, 'vertical', cells, masks)) thresholds.add(key);
+                const reach = (bounds.maxX - bounds.minX) + (bounds.maxY - bounds.minY) + 2;
+                if (WallGeometry.isThresholdAxis(x, y, 'horizontal', cells, masks, reach) ||
+                    WallGeometry.isThresholdAxis(x, y, 'vertical', cells, masks, reach)) thresholds.add(key);
             }
         }
         return thresholds;
     }
 
-    static isThresholdAxis(x, y, axis, cells, masks) {
+    /**
+     * Is this open cell part of a gap in the line of a wall?
+     *
+     * The gap may be any length. A doorway two or more cells wide is the same
+     * opening as a one-cell one, and used to be missed entirely — so the floor
+     * seam ran to the cell edge through the gap while sitting on the wall's
+     * centreline either side of it, and the join between two floors visibly
+     * jogged half a tile where the wall stopped.
+     *
+     * The walk is safe against mistaking a room for a gap: `pointsOutward`
+     * requires the masonry at each end to carry on ALONG this axis, so a room's
+     * own perpendicular walls never qualify however far apart they are.
+     */
+    static isThresholdAxis(x, y, axis, cells, masks, reach = 1) {
         const horizontal = axis === 'horizontal';
-        const before = cells.get(BuildKeys.cell(x - (horizontal ? 1 : 0), y - (horizontal ? 0 : 1)));
-        const after = cells.get(BuildKeys.cell(x + (horizontal ? 1 : 0), y + (horizontal ? 0 : 1)));
+        const seek = direction => {
+            for (let step = 1; step <= reach; step++) {
+                const found = cells.get(BuildKeys.cell(
+                    x + (horizontal ? step * direction : 0),
+                    y + (horizontal ? 0 : step * direction)
+                ));
+                if (found) return found;
+            }
+            return undefined;
+        };
+        const before = seek(-1);
+        const after = seek(1);
         if (!before || !after || !WallGeometry.connects(before, after)) return false;
         const beforeMask = masks.get(BuildKeys.cell(before.x, before.y)) || 0;
         const afterMask = masks.get(BuildKeys.cell(after.x, after.y)) || 0;
@@ -39386,6 +39471,104 @@ class WallFaceResolver {
         throw new Error(`Unknown wall slice kind: ${slice.kind}`);
     }
 
+    /**
+     * Resolves both the physical atom that receives paint and the surface the
+     * visible slice belongs to. At a corner the face toward the room can look
+     * straight into the returning arm of the wall. The opposite atom is the
+     * one actually visible, but semantically it continues the room-facing run.
+     */
+    static visibleSurface(slice, grid, topology = {}, geometry = null) {
+        let atom = WallFaceResolver.visibleAtom(slice, grid, topology);
+        let classification = WallFaceResolver.classify(atom, grid, topology);
+        if (slice.kind !== 'horizontal-band') return Object.freeze({ atom, classification });
+
+        const candidates = ['south', 'north'].map(face => {
+            const candidate = { x: slice.x, y: slice.y, face, half: slice.half };
+            return { atom: candidate, classification: WallFaceResolver.classify(candidate, grid, topology) };
+        });
+        const hasBuriedFace = candidates.some(candidate => candidate.classification.kind === 'buried');
+        if (classification.kind === 'buried') {
+            const visible = candidates.find(candidate => candidate.classification.kind !== 'buried');
+            if (visible) ({ atom, classification } = visible);
+        }
+        const terminalBand = geometry && WallFaceResolver.isTerminalBand(slice, geometry);
+        if (classification.kind === 'room' || (!hasBuriedFace && !terminalBand) || !geometry) {
+            return Object.freeze({ atom: Object.freeze(atom), classification });
+        }
+
+        const inherited = WallFaceResolver.neighbouringRunRoom(slice, grid, topology, geometry);
+        return Object.freeze({
+            atom: Object.freeze(atom),
+            classification: inherited || classification
+        });
+    }
+
+    static classifyPaintAtom(atom, grid, topology = {}, geometry = null) {
+        if (geometry) {
+            const key = BuildKeys.atom(atom.x, atom.y, atom.face, atom.half);
+            const spans = geometry.paintSpans?.get(BuildKeys.cell(atom.x, atom.y)) || [];
+            for (const span of spans) {
+                const resolved = WallFaceResolver.visibleSurface(
+                    { x: atom.x, y: atom.y, kind: span.kind, half: span.half },
+                    grid,
+                    topology,
+                    geometry
+                );
+                if (BuildKeys.atom(
+                    resolved.atom.x, resolved.atom.y, resolved.atom.face, resolved.atom.half
+                ) === key) return resolved.classification;
+            }
+        }
+        return WallFaceResolver.classify(atom, grid, topology);
+    }
+
+    static isTerminalBand(slice, geometry) {
+        const mask = geometry.masks?.get(BuildKeys.cell(slice.x, slice.y)) || 0;
+        const horizontalConnections = Number((mask & WallGeometry.MASK_WEST) !== 0) +
+            Number((mask & WallGeometry.MASK_EAST) !== 0);
+        const verticalConnections = Number((mask & WallGeometry.MASK_NORTH) !== 0) +
+            Number((mask & WallGeometry.MASK_SOUTH) !== 0);
+        return horizontalConnections === 1 && verticalConnections === 0;
+    }
+
+    static neighbouringRunRoom(slice, grid, topology, geometry) {
+        const startUnit = (2 * slice.x) + slice.half;
+        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
+        for (let distance = 1; distance <= limit; distance++) {
+            const rooms = new Map();
+            for (const direction of [-1, 1]) {
+                const unit = startUnit + (distance * direction);
+                if (!WallFaceResolver.horizontalUnitsConnected(startUnit, unit, slice.y, geometry)) continue;
+                const x = Math.floor(unit / 2);
+                const half = ((unit % 2) + 2) % 2;
+                const spans = geometry.paintSpans?.get(BuildKeys.cell(x, slice.y)) || [];
+                if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
+                const neighbourSlice = { x, y: slice.y, kind: 'horizontal-band', half };
+                const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
+                const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
+                if (neighbourClass.kind === 'room') rooms.set(neighbourClass.roomId, neighbourClass);
+            }
+            if (rooms.size === 1) return rooms.values().next().value;
+            if (rooms.size > 1) return null;
+        }
+        return null;
+    }
+
+    static horizontalUnitsConnected(fromUnit, toUnit, y, geometry) {
+        const direction = Math.sign(toUnit - fromUnit);
+        for (let unit = fromUnit; unit !== toUnit; unit += direction) {
+            const next = unit + direction;
+            const x = Math.floor(unit / 2);
+            const nextX = Math.floor(next / 2);
+            if (x === nextX) continue;
+            const leftX = Math.min(x, nextX);
+            const leftMask = geometry.masks?.get(BuildKeys.cell(leftX, y)) || 0;
+            const rightMask = geometry.masks?.get(BuildKeys.cell(leftX + 1, y)) || 0;
+            if (!(leftMask & WallGeometry.MASK_EAST) || !(rightMask & WallGeometry.MASK_WEST)) return false;
+        }
+        return true;
+    }
+
     static depthFromAtom(atom, roomId, grid) {
         const [bx, by] = BuildKeys.lookBlock(atom.x, atom.y, atom.face, atom.half);
         const dx = atom.face === 'west' ? -1 : atom.face === 'east' ? 1 : 0;
@@ -39400,8 +39583,9 @@ class WallFaceResolver {
         for (const [cellKey, spans] of geometry.paintSpans || []) {
             const { x, y } = BuildKeys.parseCell(cellKey);
             for (const span of spans) {
-                const atom = WallFaceResolver.visibleAtom({ x, y, kind: span.kind, half: span.half }, grid, topology);
-                const classification = WallFaceResolver.classify(atom, grid, topology);
+                const { atom, classification } = WallFaceResolver.visibleSurface(
+                    { x, y, kind: span.kind, half: span.half }, grid, topology, geometry
+                );
                 if (classification.kind === 'buried') continue;
                 const surface = classification.kind === 'room'
                     ? `room:${classification.roomId}` : `exterior:${classification.loopId ?? 'outside'}`;
@@ -39658,12 +39842,12 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
-            const atom = WallFaceResolver.visibleAtom(
+            const { atom, classification } = WallFaceResolver.visibleSurface(
                 { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
                 cache.grid,
-                topology
+                topology,
+                cache.geometry
             );
-            const classification = WallFaceResolver.classify(atom, cache.grid, topology);
             if (classification.kind === 'buried') return null;
             const roomId = classification.kind === 'room' ? classification.roomId : null;
             return {
@@ -40074,7 +40258,9 @@ class WallRenderer {
     }
 
     getLightBlockers() {
-        return [...this.cells.values()]
+        const revision = this.gameMap?.buildTransaction?.revision || 0;
+        if (this._lightBlockerCache?.revision === revision) return this._lightBlockerCache.blockers;
+        const blockers = [...this.cells.values()]
             .filter(cell => !cell.opening && cell.blocksLineOfSight !== false)
             .map(cell => {
                 const construction = this.registry.getConstruction(cell.constructionId);
@@ -40093,6 +40279,8 @@ class WallRenderer {
                     height: bottom - top
                 };
             });
+        this._lightBlockerCache = { revision, blockers };
+        return blockers;
     }
 
     async createFlatOverlay() {
@@ -40162,10 +40350,24 @@ class WallRenderer {
         }
     }
 }
-
 ;
 /* -- js/Map/Walls/WallCutawayPlan.js -- */
 class WallCutawayPlan extends WallRenderer {
+    resolveCutawayRoomIds(point) {
+        const revision = this.gameMap?.buildTransaction?.revision || 0;
+        const blockSize = this.cellSize / 2;
+        const key = `${Math.floor(point.x / blockSize)},${Math.floor(point.y / blockSize)}`;
+        if (this._cutawayRoomCache?.revision !== revision) {
+            this._cutawayRoomCache = { revision, rooms: new Map() };
+        }
+        if (this._cutawayRoomCache.rooms.has(key)) return this._cutawayRoomCache.rooms.get(key);
+        const ids = this.expandToOpenSpace(
+            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
+        ).map(room => room.id);
+        this._cutawayRoomCache.rooms.set(key, ids);
+        return ids;
+    }
+
     expandCutOverOpenings(piece, cut) {
         const spans = new Map();
         piece.cells.forEach((cell, index) => {
@@ -40452,7 +40654,6 @@ class WallCutawayPlan extends WallRenderer {
         return WallBuilder.isStraightHorizontal(this.computeMask(neighbor));
     }
 }
-
 ;
 /* -- js/Map/Walls/WallCutaway.js -- */
 class WallCutaway extends WallCutawayPlan {
@@ -40542,10 +40743,7 @@ class WallCutaway extends WallCutawayPlan {
 
     getCutawayRoomIds(subject) {
         const point = this.getCutawayPoint(subject);
-        if (!point) return [];
-        return this.expandToOpenSpace(
-            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
-        ).map(room => room.id);
+        return point ? this.resolveCutawayRoomIds(point) : [];
     }
 
     expandToOpenSpace(rooms) {
@@ -40954,7 +41152,6 @@ class WallCutaway extends WallCutawayPlan {
         return this.setPresentationOverride(null);
     }
 }
-
 ;
 /* -- js/Map/Walls/WallOpenings.js -- */
 class WallOpenings extends WallCutaway {
@@ -41623,7 +41820,6 @@ class WallFixtures extends WallOpenings {
         if (record) this.attachFixtureObject(object, record);
         this.evaluateCutaway(true);
     }
-
     createAuthoredAttachments(records) {
         for (const record of records) {
             if (this.decorations.some(decoration => decoration.id === record.id)) continue;
@@ -41655,24 +41851,28 @@ class WallFixtures extends WallOpenings {
             this.decorations.push(decoration);
         }
     }
-
     getFixtureFaceForPoint(x, y) {
         const construction = this.registry.getConstruction(this.wallData.defaults?.constructionId);
         if (!construction) return null;
         let best = null;
         for (const piece of this.pieces) {
-            // Only a straight horizontal run presents a face to this camera.
-            if (!piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) continue;
-            const left = piece.x * this.cellSize;
-            const right = left + (piece.cells.length * this.cellSize);
             const top = piece.baseline - construction.height;
-            if (x < left || x > right || y < top || y > piece.baseline) continue;
-            if (best && piece.baseline <= best.piece.baseline) continue;
-            best = { piece, surface: piece.faces?.south, left, right, top, construction };
+            if (y < top || y > piece.baseline) continue;
+
+            // Pieces include their endpoint junctions; fixtures use each
+            // straight span inside the piece, with corners as natural stops.
+            const spans = WallGeometry.contiguousRuns(piece.cells, cell => this.isHorizontalOnlyCell(cell));
+            for (const span of spans) {
+                const left = span[0].x * this.cellSize;
+                const right = (span[span.length - 1].x + 1) * this.cellSize;
+                if (x < left || x > right) continue;
+                if (!best || piece.baseline > best.piece.baseline) {
+                    best = { piece, surface: piece.faces?.south, left, right, top, construction };
+                }
+            }
         }
         return best;
     }
-
     getFixturePlacementCandidate(object, x = object.posX, y = object.posY) {
         const width = object.size?.width || 0;
         const height = object.size?.height || 0;
@@ -41690,7 +41890,6 @@ class WallFixtures extends WallOpenings {
             v: (positionY - face.top + (height / 2)) / Math.max(1, face.construction.height)
         };
     }
-
     resolveFixturePlacement(object, x = object.posX, y = object.posY) {
         const placement = this.getFixturePlacementCandidate(object, x, y);
         if (!placement || this.overlapsWallFaceObstacle(
@@ -42241,14 +42440,11 @@ class WallBuilder extends WallStructure {
         this._flatDirty = true;
         this.cells = new Map();
         this.baseCells = new Map();
-        this.authoredBaseCells = new Map();
         this.openingKeys = new Set();
         this.openingByCell = new Map();
-        this.authoredOpenings = Utility.deepClone(wallData.openings || []);
-        this.openings = Utility.deepClone(this.authoredOpenings);
+        this.openings = Utility.deepClone(wallData.openings || []);
         this.openingSlots = new Map();
-        this.authoredFixtures = Utility.deepClone(wallData.fixtures || []);
-        this.fixtures = Utility.deepClone(this.authoredFixtures);
+        this.fixtures = Utility.deepClone(wallData.fixtures || []);
         this.pieces = [];
         this._pieceByCell = new Map();
         this.decorations = [];
@@ -42273,17 +42469,9 @@ class WallBuilder extends WallStructure {
     }
 
     async initialize() {
-        if (this.gameMap.buildDocument) {
-            this.authoredBaseCells = this.gameMap.buildDocument.level().walls.snapshot();
-        } else for (const source of this.wallData.cells || []) {
-            const key = `${source.x},${source.y}`;
-            const cell = { ...source, opening: null };
-            this.authoredBaseCells.set(key, Utility.deepClone(cell));
-            this.baseCells.set(key, cell);
-        }
+        if (!this.gameMap.buildDocument) throw new Error('WallBuilder requires a BuildDocument');
         this.normalizeOpeningFootprints();
         this.pruneOrphanedRecords();
-        this.authoredOpenings = Utility.deepClone(this.openings);
         this.reindexOpenings();
         for (const [key, cell] of this.cells) {
             // A cell the author never painted, standing here only because an
@@ -42326,7 +42514,6 @@ class WallBuilder extends WallStructure {
         this._runPieceIds.clear();
         this.cells.clear();
         this.baseCells.clear();
-        this.authoredBaseCells.clear();
         this.openingSlots.clear();
         this.disposeFlatOverlay();
     }
@@ -42476,14 +42663,8 @@ class WallTiledExporter {
     rebaseline() {
         const document = this.gameMap.buildDocument;
         if (document) document.authored = document.captureStores();
-        this.builder.authoredBaseCells = new Map(
-            [...this.builder.baseCells].map(([key, cell]) => [key, Utility.deepClone(cell)])
-        );
-        this.builder.authoredOpenings = Utility.deepClone(this.builder.openings);
-        this.builder.authoredFixtures = Utility.deepClone(this.builder.fixtures);
         // Re-capturing now that the authored baseline has moved is what empties
-        // the deltas: serializeCellDeltas diffs against authoredBaseCells, and
-        // those two maps are identical again.
+        // every store delta against the new canonical baseline.
         this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
     }
 
@@ -44346,6 +44527,7 @@ class FloorOwnershipResolver {
         const blockHeight = height * 2;
         const reachBlocks = Math.max(0, Math.floor(Number(input?.reachBlocks) || 0));
         const walls = FloorOwnershipResolver.normalizeWallMasks(input?.walls);
+        const expandCells = new Set(input?.expandCells || []);
         const plans = FloorOwnershipResolver.normalizePlans(input?.plans);
         let owners = new Array(blockWidth * blockHeight).fill(null);
 
@@ -44371,6 +44553,7 @@ class FloorOwnershipResolver {
                 for (let bx = 0; bx < blockWidth; bx++) {
                     const targetIndex = by * blockWidth + bx;
                     if (previous[targetIndex] !== null) continue;
+                    if (!FloorOwnershipResolver.canExpandInto(bx, by, walls, expandCells)) continue;
                     const claims = new Map();
                     for (const step of FloorOwnershipResolver.STEPS) {
                         const sx = bx - step.dx;
@@ -44428,6 +44611,16 @@ class FloorOwnershipResolver {
             a.id.localeCompare(b.id);
     }
 
+    // Expansion exists to bury a floor under the masonry that encloses it, not
+    // to grow the room. A block on open ground is never claimed, so a floor is
+    // exactly the cells it was drawn on; only wall cells, and the threshold
+    // cells a doorway gap leaves in the line of a wall, are reachable beyond
+    // the seeds.
+    static canExpandInto(bx, by, walls, expandCells) {
+        const key = BuildKeys.cell(Math.floor(bx / 2), Math.floor(by / 2));
+        return walls.has(key) || expandCells.has(key);
+    }
+
     static canStep(sx, sy, tx, ty, walls) {
         const dx = tx - sx;
         const dy = ty - sy;
@@ -44440,7 +44633,14 @@ class FloorOwnershipResolver {
         const sourceCellY = Math.floor(sy / 2);
         const targetCellX = Math.floor(tx / 2);
         const targetCellY = Math.floor(ty / 2);
-        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) return true;
+        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) {
+            const targetMask = walls.get(BuildKeys.cell(targetCellX, targetCellY));
+            if (targetMask === undefined || targetMask === 0) return true;
+            const terminal = WallGeometry.connectionCount(targetMask) === 1;
+            if (terminal && dx !== 0 && (targetMask & WallGeometry.MASK_HORIZONTAL) !== 0) return false;
+            if (terminal && dy !== 0 && (targetMask & WallGeometry.MASK_VERTICAL) !== 0) return false;
+            return true;
+        }
         const mask = walls.get(BuildKeys.cell(sourceCellX, sourceCellY));
         if (mask === undefined) return true;
         const fences = WallGeometry.fencesForMask(mask);
@@ -44507,7 +44707,6 @@ class FloorRenderer {
         this.container = null;
         this.ownedBlocks = null;
         this.ownershipGrid = null;
-        this.ownershipSolves = 0;
         this.chunksRedrawn = 0;
     }
 
@@ -44518,8 +44717,8 @@ class FloorRenderer {
     build() {
         this.clear();
         this.ownedBlocks = null;
-        if (this.ownershipGrid) this.setOwnershipGrid(this.ownershipGrid);
-        else this.computeOwnership();
+        if (!this.ownershipGrid) throw new Error('FloorRenderer requires the canonical build ownership grid');
+        this.setOwnershipGrid(this.ownershipGrid);
         const dirty = new Set();
         for (const room of this.rooms()) {
             for (const [bx, by] of this.blocksOf(room.id)) dirty.add(this.chunkKeyOfBlock(bx, by));
@@ -44529,31 +44728,11 @@ class FloorRenderer {
         return this.surfaces.size;
     }
 
-    reconcile() {
-        if (!this.ownershipGrid) return this.build();
-        const previousGrid = this.ownershipGrid;
-        const previousFinishes = new Map([...this.surfaces].map(([roomId, surface]) => [roomId, surface.finishId]));
-        this.ownedBlocks = null;
-        this.computeOwnership();
-        const rooms = new Map(this.rooms().map(room => [room.id, room]));
-        const dirty = [];
-        for (let by = 0; by < this.ownershipGrid.blockHeight; by++) {
-            for (let bx = 0; bx < this.ownershipGrid.blockWidth; bx++) {
-                const previousOwner = previousGrid.ownerAt(bx, by);
-                const nextOwner = this.ownershipGrid.ownerAt(bx, by);
-                const previousFinish = previousFinishes.get(previousOwner) ?? null;
-                const nextFinish = this.resolveFinishId(rooms.get(nextOwner));
-                if (previousOwner !== nextOwner || previousFinish !== nextFinish) {
-                    dirty.push(BuildKeys.block(bx, by));
-                }
-            }
-        }
-        return this.invalidate(dirty);
-    }
-
     setOwnershipGrid(grid) {
         this.ownershipGrid = grid;
-        this.ownedBlocks = new Map(this.rooms().map(room => [room.id, grid.blocksOf(room.id)]));
+        this.ownedBlocks = grid
+            ? new Map(this.rooms().map(room => [room.id, grid.blocksOf(room.id)]))
+            : new Map();
     }
 
     invalidate(blockKeys) {
@@ -44588,45 +44767,13 @@ class FloorRenderer {
         return previewPlan?.floorFinishId || room?.properties?.floorFinishId || SiteConfig.floorSystem?.defaultFinishId || null;
     }
 
-    computeOwnership() {
-        this.ownershipSolves++;
-        const gridSystem = this.gameMap.gridSystem;
-        const width = Number(gridSystem?.gridWidth) || 0;
-        const height = Number(gridSystem?.gridHeight) || 0;
-        if (width <= 0 || height <= 0) {
-            this.ownedBlocks = new Map();
-            return this.ownedBlocks;
-        }
-        const geometry = WallGeometry.compute(this.gameMap.wallBuilder?.cells || new Map());
-        const rooms = this.rooms();
-        const seedsByRoom = new Map(rooms.map(room => [room.id, []]));
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const key = BuildKeys.cell(x, y);
-            if (geometry.cells.has(key)) continue;
-            const room = this.gameMap.regionManager?.innermostAt?.(
-                (x + 0.5) * this.cellSize, (y + 0.5) * this.cellSize, 'room', this.cellSize
-            );
-            if (!room || (geometry.thresholds.has(key) && room.properties?.origin !== 'painted')) continue;
-            seedsByRoom.get(room.id)?.push(key);
-        }
-        this.setOwnershipGrid(FloorOwnershipResolver.solve({
-            width,
-            height,
-            walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            plans: rooms.map(room => ({ id: room.id, seedCells: seedsByRoom.get(room.id) || [], priority: room.properties?.priority })),
-            reachBlocks: this.bleedBlocks()
-        }));
-        return this.ownedBlocks;
-    }
-
     bleedBlocks() {
         const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 0.5);
         return Math.max(0, Math.round(cells * FloorRenderer.BLOCKS_PER_CELL));
     }
 
     blocksOf(roomId) {
-        if (!this.ownedBlocks) this.computeOwnership();
-        return this.ownedBlocks.get(roomId) ?? [];
+        return this.ownedBlocks?.get(roomId) ?? [];
     }
 
     chunkKeyOfBlock(blockX, blockY) {
@@ -44787,30 +44934,7 @@ class FloorRenderer {
         };
     }
 
-    setRoomFinish(roomId, finishId, { transaction = true } = {}) {
-        const room = this.gameMap.regionManager?.get('room', roomId);
-        if (!room) return false;
-        const next = finishId || null;
-        if ((room.properties?.floorFinishId ?? null) === next) return false;
-        const build = transaction ? this.gameMap.buildTransaction : null;
-        const plan = build?.document?.level(build.levelId).rooms.get(roomId);
-        if (build && plan) {
-            return build.run('Finish room floor', (_draft, level) => {
-                level.rooms.set(roomId, { ...plan, floorFinishId: next });
-            }).committed;
-        }
-        room.properties = { ...room.properties, floorFinishId: next };
-        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
-        for (const key of dirty) this.drawChunk(key);
-        this.indexSurfaces();
-        return true;
-    }
 
-    removeRoom(roomId) {
-        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
-        this.surfaces.delete(roomId);
-        for (const key of dirty) this.drawChunk(key);
-    }
 
     clear() {
         for (const { canvas } of this.chunks.values()) canvas.remove();
@@ -44831,7 +44955,7 @@ class FloorRenderer {
 class SurfaceCustomizer {
     constructor(gameMap) {
         this.gameMap = gameMap;
-        this.previewState = null;
+        this.previewSession = null;
     }
 
     listFinishes(surface) {
@@ -44879,7 +45003,7 @@ class SurfaceCustomizer {
             before, after, build.cache.grid, preview.grid, build.levelId,
             preview.geometry, preview.topology
         );
-        this.previewState = { dirty };
+        this.previewSession = { dirty };
         this.gameMap.wallBuilder.previewDocument = preview.document;
         this.gameMap.wallBuilder.previewCache = preview;
         this.gameMap.floorBuilder.previewDocument = preview.document;
@@ -44889,15 +45013,15 @@ class SurfaceCustomizer {
     }
 
     revertPreview() {
-        if (!this.previewState) return false;
+        if (!this.previewSession) return false;
         const wallBuilder = this.gameMap?.wallBuilder;
-        const { dirty } = this.previewState;
+        const { dirty } = this.previewSession;
         wallBuilder.previewDocument = null;
         wallBuilder.previewCache = null;
         this.gameMap.floorBuilder.previewDocument = null;
         wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
-        this.previewState = null;
+        this.previewSession = null;
         return true;
     }
 
@@ -44959,10 +45083,12 @@ class SurfaceCustomizer {
                 }
         }
         if (roomWallIds.size) for (const atom of level.atoms.values()) {
-                const classification = WallFaceResolver.classify(
+                const topology = { ...cache.topology, walls: cache.geometry };
+                const classification = WallFaceResolver.classifyPaintAtom(
                     atom,
                     cache.grid,
-                    { ...cache.topology, walls: cache.geometry }
+                    topology,
+                    cache.geometry
                 );
                 if (roomWallIds.has(classification.roomId)) {
                     level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
@@ -44971,8 +45097,9 @@ class SurfaceCustomizer {
         if (exteriorBuildingIds.size) for (const atom of level.atoms.values()) {
             const wall = level.walls.get(BuildKeys.cell(atom.x, atom.y));
             if (!wall || !exteriorBuildingIds.has(wall.buildingId)) continue;
-            const classification = WallFaceResolver.classify(
-                atom, cache.grid, { ...cache.topology, walls: cache.geometry }
+            const topology = { ...cache.topology, walls: cache.geometry };
+            const classification = WallFaceResolver.classifyPaintAtom(
+                atom, cache.grid, topology, cache.geometry
             );
             if (classification.kind === 'exterior') {
                 level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
@@ -45637,7 +45764,7 @@ class GameMap {
 
         // Rooms exist by now (the environment manager registers them), and objects
         // are placed, so door topology can be derived.
-        this.buildDoorRoomTopology();
+        this.buildDoorRoomTopology(true);
 
 		// Notify the sound system of this map's audio context and begin proximity polling
 		const sm = this.soundManager;
@@ -45652,17 +45779,28 @@ class GameMap {
 	}
 
 	handleBuildCommit(event) {
+		// Every store edit, including commands issued by the Inspector, persists
+		// through the transaction boundary. Individual tools must not be the
+		// authority on whether a valid build commit reaches the save.
+		this.parent?.worldState?.captureMap?.(this);
+		this.core?.user?._scheduleSave?.();
 		// Ownership is exactly what this overlay draws, so it has to redraw
 		// whenever ownership can have moved — which is every commit.
 		this.footprintOverlay?.render();
-		for (const myte of this.mytes || []) {
-			this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+		const topologyChanged = event?.dirty?.geometryChanged || event?.dirty?.recordsChanged?.openings ||
+			event?.dirty?.ownershipChanged || event?.dirty?.roomTopologyChanged;
+		if (topologyChanged) {
+			for (const myte of this.mytes || []) {
+				this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+			}
+			this.buildDoorRoomTopology();
 		}
-		this.buildDoorRoomTopology();
-		this.environmentManager?.rebuildWindowLighting();
-		if (this.environmentManager) {
-			this.environmentManager._lightingSignature = '';
-			this.environmentManager.renderLighting(true);
+		if (topologyChanged || event?.dirty?.roomEnvironmentChanged) {
+			this.environmentManager?.rebuildWindowLighting();
+			if (this.environmentManager) {
+				this.environmentManager._lightingSignature = '';
+				this.environmentManager.renderLighting(true);
+			}
 		}
 	}
 
@@ -45723,9 +45861,12 @@ class GameMap {
 	 * nothing about movement or collision changes. Stored on the region
 	 * (`properties.doors` / `adjacentRooms`) and on the door object (`connectsRooms`).
 	 */
-	buildDoorRoomTopology() {
+	buildDoorRoomTopology(force = false) {
 		const regionManager = this.regionManager;
 		if (!regionManager) return;
+		const revision = this.buildTransaction?.revision ?? -1;
+		if (!force && this._doorTopologyRevision === revision) return;
+		this._doorTopologyRevision = revision;
 
 		const rooms = regionManager.all('room');
 		for (const room of rooms) {
@@ -69365,7 +69506,6 @@ const UIToolModes = {
     // Build-mode tools. MOVE is the furniture tool: the same drag the play-mode
     // Drag tool performs, but for objects rather than mytes.
     MOVE: 'move',
-    BUILD_SELECT: 'build-select',
     WALL: 'wall',
     // FENCE is the same drag-a-run gesture as WALL, but it drops FenceMapObjects
     // onto the map instead of editing wall tiles. See FenceBuildPanel.
@@ -69381,7 +69521,7 @@ const UIToolModes = {
 
 // Tools that only exist inside Build mode.
 const BUILD_TOOL_MODES = Object.freeze([
-    UIToolModes.BUILD_SELECT, UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.FENCE, UIToolModes.ROOM,
+    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.FENCE, UIToolModes.ROOM,
     UIToolModes.SURFACE, UIToolModes.TERRAIN
 ]);
 
@@ -71956,15 +72096,34 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const level = map?.buildDocument?.level?.();
         if (!level || !map.buildDocument.buildings.has(buildingId)) return null;
+        const wallKeys = new Set(level.walls.entries()
+            .filter(([, wall]) => wall.buildingId === buildingId)
+            .map(([key]) => key));
+        const touchesWall = record => {
+            if (Array.isArray(record.cells)) {
+                return record.cells.some(([x, y]) => wallKeys.has(BuildKeys.cell(x, y)));
+            }
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (!from || !to) return false;
+            for (let y = Math.min(from[1], to[1]); y <= Math.max(from[1], to[1]); y++) {
+                for (let x = Math.min(from[0], to[0]); x <= Math.max(from[0], to[0]); x++) {
+                    if (wallKeys.has(BuildKeys.cell(x, y))) return true;
+                }
+            }
+            return false;
+        };
+        const objectIds = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level[name].values().filter(touchesWall).map(record => String(record.id))
+        ));
         return {
             id: buildingId,
             buildingId,
-            cellKeys: new Set(level.walls.entries()
-                .filter(([, wall]) => wall.buildingId === buildingId)
-                .map(([key]) => key)),
+            cellKeys: wallKeys,
             roomIds: new Set(level.rooms.values()
                 .filter(room => room.buildingId === buildingId)
-                .map(room => room.id))
+                .map(room => room.id)),
+            objectIds
         };
     }
 
@@ -72039,7 +72198,10 @@ class BuildMarqueeSelection extends UIComponent {
             ? [...new Set([...this.selectionRoomIds, ...component.roomIds])]
             : [...component.roomIds];
         this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : (cells[0] ? { ...cells[0] } : null);
-        this.parent.selectionManager.setSelection([]);
+        const objects = [...(component.objectIds || [])]
+            .map(id => this.container?.gameMap?.getObjectById?.(id))
+            .filter(Boolean);
+        this.parent.selectionManager.setSelection(objects);
         this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
@@ -72327,10 +72489,12 @@ class BuildMarqueeSelection extends UIComponent {
         const title = this.selectionKind === 'building'
             ? this.buildingName() || 'this building'
             : 'the selected structure';
+        const objects = this.parent.selectionManager.getSelectedObjects();
+        const objectNames = objects.slice(0, 4).map(object => object.getDisplayName?.() || object.type).join(', ');
         const details = [
             `${count} wall cell${count === 1 ? '' : 's'} will be removed.`,
             rooms ? `${rooms} room${rooms === 1 ? '' : 's'} and their floor assignments will be removed.` : null,
-            'Wall-mounted openings and fixtures that prevent demolition will be protected.',
+            objects.length ? `${objects.length} attached object${objects.length === 1 ? '' : 's'} will stay on the map and protect their wall cells${objectNames ? `: ${objectNames}${objects.length > 4 ? ', …' : ''}` : '.'}` : null,
             'Ctrl+Z restores the change.'
         ].filter(Boolean).join('\n');
         if (!window.confirm(`Demolish ${title}?\n\n${details}`)) return false;
@@ -72340,38 +72504,47 @@ class BuildMarqueeSelection extends UIComponent {
     storeSelection() {
         const inventory = this.container?.inventory;
         const objects = this.parent.selectionManager.getSelectedObjects();
-        const unstored = objects.filter(object => inventory?.storeMapObject?.(object) !== true);
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         if (!builder || !map.buildTransaction) return false;
+        const level = map.buildDocument.level();
+        const attachedIds = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level[name].values().map(record => String(record.id))
+        ));
+        const protectedObjects = objects.filter(object => attachedIds.has(String(object.id)));
+        const unstored = [
+            ...protectedObjects,
+            ...objects.filter(object => !attachedIds.has(String(object.id)) && inventory?.storeMapObject?.(object) !== true)
+        ];
         const wallCells = [...this.selectedWallCells];
         const removalCells = this.selectionKind === 'run'
             ? this.parent?.wallBuildPanel?.includeOrphanedBranches?.(builder, wallCells) ?? wallCells
             : wallCells;
         const roomIds = new Set(this.selectionRoomIds);
         const buildingIds = this.selectionKind === 'building'
-            ? [...new Set(this.selectionRoomIds.map(id =>
-                map.buildDocument.level().rooms.get(id)?.buildingId).filter(Boolean))]
+            ? this.selectedBuildingIds()
             : [];
         const wallResult = removalCells.length
             ? builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })), {
                 deleteRoomIds: this.selectionKind === 'building' ? [...roomIds] : [],
                 deleteBuildingIds: buildingIds,
+                atomic: this.selectionKind === 'building',
                 label: `${this.selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${removalCells.length} cells)`
             })
             : null;
         this.parent.selectionManager.setSelection(unstored);
-        this.selectedWallCells = [];
-        this.clearVisuals();
         if (unstored.length) this.parent.showMessage?.(
-            `${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`,
+            `${unstored.length} attached object${unstored.length === 1 ? '' : 's'} remain on the map.`,
             'warning', 'Selection'
         );
         if (wallResult?.rejected?.length) this.parent.showMessage?.(
             `${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`,
             'warning', 'Selection'
         );
-        return !!wallResult?.applied?.length;
+        if (!wallResult?.applied?.length) return false;
+        this.selectedWallCells = [];
+        this.clearVisuals();
+        return true;
     }
 
     clearVisuals() {
@@ -76522,6 +76695,7 @@ class BuildInspector extends ModalWindow {
     roomBadge(room) {
         if (room.seedCells.length === 0) return 'Empty';
         const state = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.planStates?.get(room.id);
+        if ((state?.componentIds?.length || 0) > 1) return 'Disconnected';
         if (!state?.indoor) return 'Open';
         const adjacency = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.adjacency || [];
         return adjacency.some(edge => edge.roomA === room.id || edge.roomB === room.id) ? null : 'No entrance';
@@ -76534,7 +76708,7 @@ class BuildInspector extends ModalWindow {
             if (component) marquee.selectBuilding(component);
         } else if (kind === 'room') {
             marquee.clearSelection();
-            this.parent.roomPanel.selected = id;
+            this.parent.roomPanel.select(id);
         } else if (kind === 'wall' && id === 'unassigned') {
             const walls = this.parent.parent.gameMap.buildDocument.level().walls.values()
                 .filter(wall => !wall.buildingId).map(({ x, y }) => ({ x, y }));
@@ -76563,6 +76737,7 @@ class BuildInspector extends ModalWindow {
             root.append(this.propertyHeading(plan.displayName, 'Building'));
             root.append(this.nameEditor(plan.displayName, value => this.parent.buildMarqueeSelection.renameBuilding(value)));
             root.append(this.actionRow([
+                ['Move', () => this.beginBuildingMove()],
                 ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
                 ['Separate', () => this.parent.buildMarqueeSelection.separateBuilding()],
                 ['Merge', () => this.parent.buildMarqueeSelection.mergeSelectedBuildings()],
@@ -76575,13 +76750,22 @@ class BuildInspector extends ModalWindow {
             if (!room) return root.append(BuildInspector.message('This room no longer exists.'));
             root.append(this.propertyHeading(room.displayName, room.buildingId ? 'Room' : 'Area'));
             root.append(this.nameEditor(room.displayName, value => this.parent.roomPanel.commitRoom(
-                room.id, { displayName: value }, `Rename ${room.displayName}`
+                room.id, { name: value }, `Rename ${room.displayName}`
             )));
+            root.append(this.roomBuildingEditor(room));
             root.append(this.actionRow([
                 ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
                 ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
                 ['Paint walls', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'wall')]
             ]));
+            return;
+        }
+        if (selection.kind === 'atom') {
+            const details = this.atomDetails(selection.id, map);
+            if (!details) return root.append(BuildInspector.message('This wall surface no longer exists.'));
+            root.append(this.propertyHeading(details.Surface, 'Wall surface'));
+            delete details.Surface;
+            root.append(this.detailsList(details));
             return;
         }
         const details = document.createElement('dl');
@@ -76594,6 +76778,86 @@ class BuildInspector extends ModalWindow {
             details.append(term, description);
         }
         root.append(details);
+    }
+
+    beginBuildingMove() {
+        this.parent.showMessage?.('Drag the selected building on the map to move it.', 'info', 'Move Building');
+        return true;
+    }
+
+    roomBuildingEditor(room) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Move to building';
+        const select = document.createElement('select');
+        const site = document.createElement('option');
+        site.value = '';
+        site.textContent = 'Site (outdoor area)';
+        select.append(site);
+        const map = this.parent?.parent?.gameMap;
+        for (const building of map?.buildDocument?.buildings?.values?.() || []) {
+            const option = document.createElement('option');
+            option.value = building.id;
+            option.textContent = building.displayName;
+            select.append(option);
+        }
+        select.value = room.buildingId || '';
+        select.addEventListener('change', () => {
+            map?.buildTransaction?.run(`Move ${room.displayName}`, (_draft, level) => {
+                const current = level.rooms.get(room.id);
+                if (current) level.rooms.set(room.id, { ...current, buildingId: select.value || null });
+            });
+        });
+        label.append(title, select);
+        return label;
+    }
+
+    atomDetails(id, map) {
+        const match = String(id).match(/^(-?\d+),(-?\d+)\/([^/]+)\/([01])$/);
+        if (!match) return null;
+        const [, xText, yText, face, halfText] = match;
+        const x = Number(xText);
+        const y = Number(yText);
+        const half = Number(halfText);
+        const level = map?.buildDocument?.level?.();
+        const wall = level?.walls.get(BuildKeys.cell(x, y));
+        if (!wall) return null;
+        const surface = map.wallBuilder.getCellSurfaces({
+            ...wall,
+            mask: map.buildTransaction?.cache?.geometry?.masks?.get(BuildKeys.cell(x, y)) || 0
+        }).find(candidate => candidate.face === face && candidate.half === half);
+        if (!surface) return null;
+        const explicit = level.atoms.get(id)?.finishId || null;
+        const room = surface.roomId ? level.rooms.get(surface.roomId) : null;
+        const building = wall.buildingId ? map.buildDocument.buildings.get(wall.buildingId) : null;
+        const buildingFinish = !room ? building?.exteriorFinishId : null;
+        const finishId = explicit || room?.wallFinishId || buildingFinish || map.wallBuilder.wallData.defaults.finishId;
+        const source = explicit ? 'Atom override'
+            : room?.wallFinishId ? 'Room default'
+                : buildingFinish ? 'Building default'
+                    : 'Construction default';
+        return {
+            Surface: `${face} half ${half + 1}`,
+            Construction: wall.constructionId,
+            Finish: finishId,
+            Source: source,
+            Building: building?.displayName || 'Unassigned',
+            'Adjacent room': room?.displayName || 'Exterior'
+        };
+    }
+
+    detailsList(values) {
+        const details = document.createElement('dl');
+        details.className = 'build-inspector-details';
+        for (const [label, value] of Object.entries(values)) {
+            const term = document.createElement('dt');
+            term.textContent = label;
+            const description = document.createElement('dd');
+            description.textContent = value == null ? '—' : String(value);
+            details.append(term, description);
+        }
+        return details;
     }
 
     renderPalette() {
@@ -79870,7 +80134,7 @@ class BuildDebug {
         return Object.freeze({
             transactions: transaction.transactions || 0,
             wallRebuilds: hasTransaction ? transaction.wallRebuilds || 0 : map?.wallBuilder?.rebuilds || 0,
-            ownershipSolves: hasTransaction ? transaction.ownershipSolves || 0 : map?.floorBuilder?.ownershipSolves || 0,
+            ownershipSolves: hasTransaction ? transaction.ownershipSolves || 0 : 0,
             topologyRebuilds: hasTransaction ? transaction.topologyRebuilds || 0 : 0,
             floorChunksRedrawn: map?.floorBuilder?.chunksRedrawn || transaction.floorChunksRedrawn || 0,
             wallPiecesRedrawn: map?.wallBuilder?.piecesRedrawn || transaction.wallPiecesRedrawn || 0,
@@ -80060,10 +80324,14 @@ const SurfaceDebug = {
 
 	_floorPlanOwners() {
 		const map = this._map();
-		const ownership = map.floorBuilder?.computeOwnership?.() ?? new Map();
+		const grid = map.buildTransaction?.cache?.grid;
 		const ownerByBlock = new Map();
-		for (const [roomId, blocks] of ownership) {
-			for (const [blockX, blockY] of blocks) ownerByBlock.set(`${blockX},${blockY}`, roomId);
+		if (!grid) return ownerByBlock;
+		for (let blockY = 0; blockY < grid.blockHeight; blockY++) {
+			for (let blockX = 0; blockX < grid.blockWidth; blockX++) {
+				const roomId = grid.ownerAt(blockX, blockY);
+				if (roomId !== null) ownerByBlock.set(`${blockX},${blockY}`, roomId);
+			}
 		}
 		return ownerByBlock;
 	},
@@ -81867,10 +82135,12 @@ class SurfaceCustomizePanel extends ModalWindow {
     classifyWallSurface(surface) {
         const cache = this.gameMap?.buildTransaction?.cache;
         if (!cache || !surface) return null;
-        return WallFaceResolver.classify(
+        const topology = { ...cache.topology, walls: cache.geometry };
+        return WallFaceResolver.classifyPaintAtom(
             { x: surface.cell.x, y: surface.cell.y, face: surface.face, half: surface.half },
             cache.grid,
-            { ...cache.topology, walls: cache.geometry }
+            topology,
+            cache.geometry
         );
     }
 
@@ -84625,6 +84895,7 @@ class RoomPanel extends ModalWindow {
             : null;
 
         const rooms = this.rooms();
+        this.syncOperationAvailability(rooms);
         this.listElement.replaceChildren(
             ...(rooms.length ? rooms.map(entry => this.createRow(entry)) : [RoomPanel.emptyState()])
         );
@@ -84636,6 +84907,16 @@ class RoomPanel extends ModalWindow {
                 ?.focus();
         }
         if (this.scrollContainer) this.scrollContainer.scrollTop = scroll;
+    }
+
+    syncOperationAvailability(rooms = this.rooms()) {
+        const canChoose = rooms.some(entry => entry.cells > 0);
+        const choose = this.operationSegment?.buttons.find(button =>
+            button.dataset.value === RoomPanel.OPERATIONS.SELECT);
+        if (choose) choose.disabled = !canChoose;
+        if (!canChoose && this.getOperation() === RoomPanel.OPERATIONS.SELECT) {
+            this.operationSegment.select(RoomPanel.OPERATIONS.ADD);
+        }
     }
 
     /**
@@ -84907,7 +85188,6 @@ class RoomPanel extends ModalWindow {
         const room = this.gameMap?.regionManager?.get('room', roomId);
         const islands = this.roomIslands(room);
         if (!room || islands.length < 2) return false;
-
         const baseName = this.label(room);
         const type = room.properties?.roomType ?? SiteConfig.rooms.defaultType;
         const specs = [];
@@ -84917,45 +85197,32 @@ class RoomPanel extends ModalWindow {
             ...(this.gameMap?.regionManager?.all('room') ?? []).map(entry => entry.id)
         ]);
         const mintId = () => {
-            for (let number = 1; ; number += 1) {
+            for (let number = 1; ; number++) {
                 const candidate = `${RoomPanel.PAINTED_PREFIX}${number}`;
-                if (taken.has(candidate)) continue;
-                taken.add(candidate);
-                return candidate;
+                if (!taken.has(candidate)) {
+                    taken.add(candidate);
+                    return candidate;
+                }
             }
         };
-        for (let index = 1; index < islands.length; index += 1) {
+        for (let index = 1; index < islands.length; index++) {
             const id = mintId();
             const generic = /^(Room|Area) \d+$/.exec(baseName);
             const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
             specs.push({
-                id,
-                name,
-                type,
+                id, name, type,
                 buildingId: room.properties?.buildingId ?? null,
                 floorFinishId: room.properties?.floorFinishId ?? null,
                 wallFinishId: room.properties?.wallFinishId ?? null
             });
             for (const key of islands[index]) {
-                const [x, y] = key.split(',').map(Number);
+                const { x, y } = BuildKeys.parseCell(key);
                 changes.push({ x, y, roomId: id });
             }
         }
-
         const result = this.applySplitChanges(changes, specs);
-        if (!result || result.applied.length === 0) return false;
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Split Room (${islands.length} islands)`,
-                undo: () => this.applySplitChanges(backward, []),
-                redo: () => this.applySplitChanges(forward, specs)
-            });
-        }
-        this.parent.showMessage(
-            `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
-        );
+        if (!result?.applied.length) return false;
+        this.parent.showMessage(`${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms');
         return true;
     }
 
@@ -85071,42 +85338,19 @@ class RoomPanel extends ModalWindow {
     }
 
     demolishRoom(room, plan = this.demolitionPlan(room)) {
-        // Clicking rebuilds the room row before its demolition button can emit
-        // pointerleave, so explicitly remove the striped hover preview.
         this.clearPerimeterGaps();
         const builder = this.gameMap?.wallBuilder;
+        if (!builder || !this.gameMap?.buildTransaction) return false;
         const roomCells = this.roomCells(room.id);
         const heir = this.largestNeighbour(room.id, roomCells);
-        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
         const roomChanges = roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null }));
-        const wallResult = builder?.applyWallCellChanges(
+        const wallResult = builder.applyWallCellChanges(
             plan.removable.map(cell => ({ ...cell, data: null })),
-            usesBuildTransaction ? { roomChanges, label: `Demolish ${this.label(room)}` } : {}
+            { roomChanges, label: `Demolish ${this.label(room)}` }
         );
-        const roomResult = usesBuildTransaction ? { applied: roomChanges, inverse: [] } :
-            this.assignments?.applyChanges(roomChanges, { emit: false });
-        if ((!wallResult || wallResult.applied.length === 0) &&
-            (!roomResult || roomResult.applied.length === 0)) return false;
-
-        const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
-        const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
-        const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
-        const backwardRooms = Utility.deepClone(roomResult?.inverse ?? []);
-        const replay = (walls, rooms) => {
-            if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-            if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
-            this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-            this.gameMap?.core?.user?._scheduleSave?.();
-        };
-        if (!usesBuildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Demolish ${this.label(room)}`,
-                undo: () => replay(backwardWalls, backwardRooms),
-                redo: () => replay(forwardWalls, forwardRooms)
-            });
-        }
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        if (!wallResult?.applied.length && roomChanges.length === 0) return false;
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         this.parent.showMessage(
             `${wallResult?.applied.length ?? 0} exterior wall cells removed. Shared and occupied walls stayed.`,
             'success', 'Rooms'
@@ -85134,27 +85378,20 @@ class RoomPanel extends ModalWindow {
     encloseRoom(roomId) {
         const room = this.gameMap?.regionManager?.get('room', roomId);
         const plan = this.perimeterPlan(room);
-        if (!room || plan.missing.length === 0) return false;
         const builder = this.gameMap?.wallBuilder;
-        const changes = plan.missing.map(cell => ({ ...cell, data: {} }));
-        const result = builder?.applyWallCellChanges(changes);
-        if (!result || result.applied.length === 0) {
+        if (!room || !builder || !this.gameMap?.buildTransaction || plan.missing.length === 0) return false;
+        const result = builder.applyWallCellChanges(
+            plan.missing.map(cell => ({ ...cell, data: {} })),
+            { label: `Enclose ${this.label(room)}` }
+        );
+        if (!result?.applied.length) {
             const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';
             this.parent.showMessage(`The room was not enclosed — ${reason.toLowerCase()}`, 'warning', 'Rooms');
             return false;
         }
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
-                undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-                redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
-            });
-        }
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         const blocked = result.rejected.length;
         this.parent.showMessage(
             blocked
@@ -85213,33 +85450,45 @@ class RoomPanel extends ModalWindow {
         // nothing to undo. It goes when you say so.
         if (roomId === this.pending?.id) return this.cancelPending();
         const room = this.gameMap?.regionManager?.get('room', roomId);
+        const plan = this.gameMap?.buildDocument?.level?.().rooms.get(roomId);
         const cells = this.roomCells(roomId);
-        if (!room || cells.length === 0) {
-            this.parent.showMessage('That room has no floor left to give away.', 'info', 'Rooms');
+        if (!plan) {
+            this.parent.showMessage('That room definition is already gone.', 'info', 'Rooms');
             return false;
         }
         const heir = this.largestNeighbour(roomId, cells);
-        if (!this.canDissolve(roomId, cells, heir)) {
-            this.parent.showMessage(
-                'The walls define this room. Demolish its exterior walls or edit the walls directly.',
-                'info', 'Rooms'
-            );
-            return false;
-        }
         if (!window.confirm(
-            `Remove the ${this.label(room)} definition?\n\n` +
-            `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
-            `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` +
+            `Remove the ${this.label(room || { id: plan.id, properties: plan })} definition?\n\n` +
+            `${cells.length ? `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
+                `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` : ''}` +
             'Its walls and everything attached to them stay. Ctrl+Z undoes this.'
         )) return false;
 
         if (this.selected === roomId) this.selected = heir?.id ?? null;
-        return this.commitCells(cells, heir?.id ?? null);
+        return this.dissolveRoomPlan(roomId, heir?.id ?? null);
     }
 
-    canDissolve(roomId, cells = this.roomCells(roomId), heir = this.largestNeighbour(roomId, cells)) {
-        const next = heir?.id ?? null;
-        return cells.some(cell => this.assignments?.get(cell.x, cell.y) !== next);
+    canDissolve(roomId) {
+        return roomId === this.pending?.id ||
+            this.gameMap?.buildDocument?.level?.().rooms.has(roomId) === true;
+    }
+
+    dissolveRoomPlan(roomId, heirId = null) {
+        const transaction = this.gameMap?.buildTransaction;
+        const source = transaction?.document?.level(transaction.levelId).rooms.get(roomId);
+        if (!transaction || !source) return false;
+        const label = `Remove ${source.displayName || source.id}`;
+        const result = transaction.run(label, (_draft, level) => {
+            if (heirId && level.rooms.has(heirId)) {
+                for (const key of source.seedCells) level.rooms.assignSeed(heirId, key);
+            }
+            level.rooms.delete(roomId);
+        });
+        if (!result.committed) return false;
+        this.playSound(SiteConfig.buildMode.sounds.paint);
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        return true;
     }
 
     /**
@@ -85780,49 +86029,18 @@ class RoomPanel extends ModalWindow {
     }
 
     commitCells(cells, roomId) {
-        const assignments = this.assignments;
-        if (!assignments || !cells?.length) return false;
-        const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })), {
-            emit: false,
-            label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)`
-        });
-        // Nothing changed is not a refusal: painting a room over floor that is
-        // already in that room is the most ordinary thing to do with a brush,
-        // and answering it with an error noise taught people the tool was
-        // broken. Silence, the way an inert wall cell is silent.
-        if (!result || result.applied.length === 0) return false;
-
-        const forward = result.applied.map(change => ({ ...change }));
-        const backward = result.inverse.map(change => ({ ...change }));
-        const count = result.applied.length;
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
-                undo: () => this.replayCellChanges(backward),
-                redo: () => this.replayCellChanges(forward)
-            });
-        }
-
-        this.playSound(SiteConfig.buildMode.sounds.paint);
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
-        return true;
-    }
-
-    replayCellChanges(changes) {
-        this.cancelDrag();
-        this.clearHover();
-        this.clearPerimeterGaps();
-        this.clearRoomTints();
-        this.clearHighlight();
-        const result = this.assignments?.applyChanges(
-            changes.map(change => ({ ...change })), { emit: false }
+        if (!this.gameMap?.buildTransaction || !cells?.length) return false;
+        const result = this.applyRoomCellChanges(
+            cells.map(cell => ({ ...cell, roomId })),
+            { label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)` }
         );
-        if (!result || result.applied.length === 0) return false;
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        if (!result?.applied.length) return false;
+        this.playSound(SiteConfig.buildMode.sounds.paint);
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         return true;
     }
+
 
     /**
      * A room's name and type. The same edit the panel's own inputs make, through
@@ -85832,57 +86050,20 @@ class RoomPanel extends ModalWindow {
      * rooms should own their names.
      */
     commitRoom(roomId, patch, label) {
-        // A room with no floor yet is not in the region manager: its name and
-        // type live on the pending record until it has one, and settlePending
-        // writes them across. Nothing to undo — none of it is on the map yet.
         if (roomId === this.pending?.id) {
             this.pending = { ...this.pending, ...patch };
             return true;
         }
         const build = this.gameMap?.buildTransaction;
         const plan = build?.document?.level(build.levelId).rooms.get(roomId);
-        if (build && plan) {
-            const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
-            const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
-            return build.run(label, (_draft, level) => level.rooms.set(roomId, {
-                ...plan,
-                displayName: nextName ?? plan.authoredDisplayName ?? roomId,
-                roomType: nextType
-            })).committed;
-        }
-        const region = this.gameMap?.regionManager?.get('room', roomId);
-        if (!region) return false;
-        const previous = {
-            name: region.properties?.playerName ?? null,
-            type: region.properties?.roomType ?? SiteConfig.rooms.defaultType
-        };
-        const next = { ...previous, ...patch };
-        if (next.name === previous.name && next.type === previous.type) return false;
-
-        const apply = (state) => {
-            const target = this.gameMap?.regionManager?.get('room', roomId);
-            if (!target) return false;
-            target.properties = {
-                ...target.properties,
-                playerName: state.name,
-                roomType: state.type,
-                displayName: state.name
-                    ?? target.properties.authoredDisplayName
-                    ?? target.properties.displayName
-            };
-            this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
-            this.gameMap.core?.user?._scheduleSave?.();
-            this.syncRow(roomId);
-            return true;
-        };
-
-        if (!apply(next)) return false;
-        this.parent.parent?.buildHistory?.push({
-            label,
-            undo: () => apply(previous),
-            redo: () => apply(next)
-        });
-        return true;
+        if (!build || !plan) return false;
+        const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
+        const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
+        return build.run(label, (_draft, level) => level.rooms.set(roomId, {
+            ...plan,
+            displayName: nextName ?? plan.authoredDisplayName ?? roomId,
+            roomType: nextType
+        })).committed;
     }
 
     playSound(soundId, options = {}) {

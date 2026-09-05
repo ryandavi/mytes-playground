@@ -389,7 +389,7 @@ class BuildMarqueeSelection extends UIComponent {
 
     buildingName() {
         const map = this.container?.gameMap;
-        const buildingId = this.selectedRooms()
+        const buildingId = this.selectedBuildingIds()[0] || this.selectedRooms()
             .map(room => map?.buildDocument?.level?.().rooms.get(room.id)?.buildingId)
             .find(Boolean);
         const planName = buildingId ? map?.buildDocument?.buildings.get(buildingId)?.displayName : null;
@@ -508,7 +508,7 @@ class BuildMarqueeSelection extends UIComponent {
     renameBuilding(name) {
         const map = this.container?.gameMap;
         const build = map?.buildTransaction;
-        const buildingId = this.selectedRooms()
+        const buildingId = this.selectedBuildingIds()[0] || this.selectedRooms()
             .map(room => build?.document?.level(build.levelId).rooms.get(room.id)?.buildingId)
             .find(Boolean);
         const building = buildingId ? build?.document?.buildings.get(buildingId) : null;
@@ -539,15 +539,34 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const level = map?.buildDocument?.level?.();
         if (!level || !map.buildDocument.buildings.has(buildingId)) return null;
+        const wallKeys = new Set(level.walls.entries()
+            .filter(([, wall]) => wall.buildingId === buildingId)
+            .map(([key]) => key));
+        const touchesWall = record => {
+            if (Array.isArray(record.cells)) {
+                return record.cells.some(([x, y]) => wallKeys.has(BuildKeys.cell(x, y)));
+            }
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (!from || !to) return false;
+            for (let y = Math.min(from[1], to[1]); y <= Math.max(from[1], to[1]); y++) {
+                for (let x = Math.min(from[0], to[0]); x <= Math.max(from[0], to[0]); x++) {
+                    if (wallKeys.has(BuildKeys.cell(x, y))) return true;
+                }
+            }
+            return false;
+        };
+        const objectIds = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level[name].values().filter(touchesWall).map(record => String(record.id))
+        ));
         return {
             id: buildingId,
             buildingId,
-            cellKeys: new Set(level.walls.entries()
-                .filter(([, wall]) => wall.buildingId === buildingId)
-                .map(([key]) => key)),
+            cellKeys: wallKeys,
             roomIds: new Set(level.rooms.values()
                 .filter(room => room.buildingId === buildingId)
-                .map(room => room.id))
+                .map(room => room.id)),
+            objectIds
         };
     }
 
@@ -622,7 +641,12 @@ class BuildMarqueeSelection extends UIComponent {
             ? [...new Set([...this.selectionRoomIds, ...component.roomIds])]
             : [...component.roomIds];
         this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : (cells[0] ? { ...cells[0] } : null);
-        this.parent.selectionManager.setSelection([]);
+        const objects = [...(component.objectIds || [])]
+            .map(id => this.container?.gameMap?.getObjectById?.(id))
+            .filter(Boolean);
+        this.parent.selectionManager.setSelection(additive
+            ? [...this.parent.selectionManager.getSelectedObjects(), ...objects]
+            : objects);
         this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
@@ -910,10 +934,12 @@ class BuildMarqueeSelection extends UIComponent {
         const title = this.selectionKind === 'building'
             ? this.buildingName() || 'this building'
             : 'the selected structure';
+        const objects = this.parent.selectionManager.getSelectedObjects();
+        const objectNames = objects.slice(0, 4).map(object => object.getDisplayName?.() || object.type).join(', ');
         const details = [
             `${count} wall cell${count === 1 ? '' : 's'} will be removed.`,
             rooms ? `${rooms} room${rooms === 1 ? '' : 's'} and their floor assignments will be removed.` : null,
-            'Wall-mounted openings and fixtures that prevent demolition will be protected.',
+            objects.length ? `${objects.length} attached object${objects.length === 1 ? '' : 's'} will stay on the map and protect their wall cells${objectNames ? `: ${objectNames}${objects.length > 4 ? ', …' : ''}` : '.'}` : null,
             'Ctrl+Z restores the change.'
         ].filter(Boolean).join('\n');
         if (!window.confirm(`Demolish ${title}?\n\n${details}`)) return false;
@@ -923,38 +949,47 @@ class BuildMarqueeSelection extends UIComponent {
     storeSelection() {
         const inventory = this.container?.inventory;
         const objects = this.parent.selectionManager.getSelectedObjects();
-        const unstored = objects.filter(object => inventory?.storeMapObject?.(object) !== true);
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         if (!builder || !map.buildTransaction) return false;
+        const level = map.buildDocument.level();
+        const attachedIds = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level[name].values().map(record => String(record.id))
+        ));
+        const protectedObjects = objects.filter(object => attachedIds.has(String(object.id)));
+        const unstored = [
+            ...protectedObjects,
+            ...objects.filter(object => !attachedIds.has(String(object.id)) && inventory?.storeMapObject?.(object) !== true)
+        ];
         const wallCells = [...this.selectedWallCells];
         const removalCells = this.selectionKind === 'run'
             ? this.parent?.wallBuildPanel?.includeOrphanedBranches?.(builder, wallCells) ?? wallCells
             : wallCells;
         const roomIds = new Set(this.selectionRoomIds);
         const buildingIds = this.selectionKind === 'building'
-            ? [...new Set(this.selectionRoomIds.map(id =>
-                map.buildDocument.level().rooms.get(id)?.buildingId).filter(Boolean))]
+            ? this.selectedBuildingIds()
             : [];
         const wallResult = removalCells.length
             ? builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })), {
                 deleteRoomIds: this.selectionKind === 'building' ? [...roomIds] : [],
                 deleteBuildingIds: buildingIds,
+                atomic: this.selectionKind === 'building',
                 label: `${this.selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${removalCells.length} cells)`
             })
             : null;
         this.parent.selectionManager.setSelection(unstored);
-        this.selectedWallCells = [];
-        this.clearVisuals();
         if (unstored.length) this.parent.showMessage?.(
-            `${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`,
+            `${unstored.length} attached object${unstored.length === 1 ? '' : 's'} remain on the map.`,
             'warning', 'Selection'
         );
         if (wallResult?.rejected?.length) this.parent.showMessage?.(
             `${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`,
             'warning', 'Selection'
         );
-        return !!wallResult?.applied?.length;
+        if (!wallResult?.applied?.length) return false;
+        this.selectedWallCells = [];
+        this.clearVisuals();
+        return true;
     }
 
     clearVisuals() {

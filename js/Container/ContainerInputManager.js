@@ -504,8 +504,11 @@ class ContainerInputManager {
     }
 
     if (this.container.gameMode?.isBuild()) {
-      if (ui?.getSelected?.()) {
+      if (ui?.buildSelection?.current || ui?.getSelected?.()) {
         ui.setSelected(null);
+        ui.buildSelection?.clear?.();
+        ui.roomPanel?.clearHighlight?.();
+        ui.surfaceCustomizePanel?.setTarget?.(null);
         return;
       }
       this.container.gameMode.setMode(GAME_MODES.PLAY);

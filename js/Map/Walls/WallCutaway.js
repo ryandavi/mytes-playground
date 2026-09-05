@@ -85,10 +85,7 @@ class WallCutaway extends WallCutawayPlan {
 
     getCutawayRoomIds(subject) {
         const point = this.getCutawayPoint(subject);
-        if (!point) return [];
-        return this.expandToOpenSpace(
-            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
-        ).map(room => room.id);
+        return point ? this.resolveCutawayRoomIds(point) : [];
     }
 
     expandToOpenSpace(rooms) {
@@ -497,4 +494,3 @@ class WallCutaway extends WallCutawayPlan {
         return this.setPresentationOverride(null);
     }
 }
-

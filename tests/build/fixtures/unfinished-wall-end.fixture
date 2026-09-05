@@ -1,0 +1,7 @@
+name: floor does not enter an unfinished wall end lengthwise
+reach: 1
+map:
+  A##.
+expect:
+  AA......
+  AA......

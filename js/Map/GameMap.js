@@ -648,7 +648,7 @@ class GameMap {
 
         // Rooms exist by now (the environment manager registers them), and objects
         // are placed, so door topology can be derived.
-        this.buildDoorRoomTopology();
+        this.buildDoorRoomTopology(true);
 
 		// Notify the sound system of this map's audio context and begin proximity polling
 		const sm = this.soundManager;
@@ -663,17 +663,28 @@ class GameMap {
 	}
 
 	handleBuildCommit(event) {
+		// Every store edit, including commands issued by the Inspector, persists
+		// through the transaction boundary. Individual tools must not be the
+		// authority on whether a valid build commit reaches the save.
+		this.parent?.worldState?.captureMap?.(this);
+		this.core?.user?._scheduleSave?.();
 		// Ownership is exactly what this overlay draws, so it has to redraw
 		// whenever ownership can have moved — which is every commit.
 		this.footprintOverlay?.render();
-		for (const myte of this.mytes || []) {
-			this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+		const topologyChanged = event?.dirty?.geometryChanged || event?.dirty?.recordsChanged?.openings ||
+			event?.dirty?.ownershipChanged || event?.dirty?.roomTopologyChanged;
+		if (topologyChanged) {
+			for (const myte of this.mytes || []) {
+				this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+			}
+			this.buildDoorRoomTopology();
 		}
-		this.buildDoorRoomTopology();
-		this.environmentManager?.rebuildWindowLighting();
-		if (this.environmentManager) {
-			this.environmentManager._lightingSignature = '';
-			this.environmentManager.renderLighting(true);
+		if (topologyChanged || event?.dirty?.roomEnvironmentChanged) {
+			this.environmentManager?.rebuildWindowLighting();
+			if (this.environmentManager) {
+				this.environmentManager._lightingSignature = '';
+				this.environmentManager.renderLighting(true);
+			}
 		}
 	}
 
@@ -734,9 +745,12 @@ class GameMap {
 	 * nothing about movement or collision changes. Stored on the region
 	 * (`properties.doors` / `adjacentRooms`) and on the door object (`connectsRooms`).
 	 */
-	buildDoorRoomTopology() {
+	buildDoorRoomTopology(force = false) {
 		const regionManager = this.regionManager;
 		if (!regionManager) return;
+		const revision = this.buildTransaction?.revision ?? -1;
+		if (!force && this._doorTopologyRevision === revision) return;
+		this._doorTopologyRevision = revision;
 
 		const rooms = regionManager.all('room');
 		for (const room of rooms) {

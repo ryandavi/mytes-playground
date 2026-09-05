@@ -83,6 +83,17 @@ function testSplitCreatesStablePlan() {
     assert(created.buildingId === 'house', 'new room inherits the majority enclosing building');
 }
 
+function testPaintedPlanDoesNotGrowIntoEnclosure() {
+    const geometry = core.WallGeometry.compute(wallsFrom(['#####', '#...#', '#...#', '#...#', '#####']));
+    const proposal = core.RoomTopology.proposeSeeds({
+        width: 5, height: 5, geometry,
+        plans: [{ id: 'painted', buildingId: 'house', displayName: 'Painted', origin: 'painted',
+            seedCells: ['2,2'], floorFinishId: 'boards', wallFinishId: 'sage', properties: {} }]
+    });
+    assert(proposal.plans[0].seedCells.join(' ') === '2,2',
+        'walling around a painted floor does not enlarge its authored footprint');
+}
+
 function testOpeningAdjacency() {
     const rows = ['#####', '#.#.#', '#.#.#', '#.#.#', '#####'];
     const geometry = core.WallGeometry.compute(wallsFrom(rows));
@@ -105,5 +116,6 @@ function testOpeningAdjacency() {
 
 testProposalAndProjectionData();
 testSplitCreatesStablePlan();
+testPaintedPlanDoesNotGrowIntoEnclosure();
 testOpeningAdjacency();
 console.log('Room topology tests passed: proposals, split inheritance, footprints, shell edges, opening adjacency.');

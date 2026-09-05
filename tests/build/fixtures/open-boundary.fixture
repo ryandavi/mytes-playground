@@ -1,0 +1,7 @@
+name: two plans on open ground leave the cell between them bare
+reach: 1
+map:
+  A.B
+expect:
+  AA..BB
+  AA..BB

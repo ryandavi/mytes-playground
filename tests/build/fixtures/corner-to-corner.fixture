@@ -1,0 +1,10 @@
+name: corner-to-corner plans own exactly the cells they were drawn on
+reach: 1
+map:
+  A.
+  .B
+expect:
+  AA..
+  AA..
+  ..BB
+  ..BB

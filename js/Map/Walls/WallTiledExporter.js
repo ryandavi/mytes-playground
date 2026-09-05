@@ -141,14 +141,8 @@ class WallTiledExporter {
     rebaseline() {
         const document = this.gameMap.buildDocument;
         if (document) document.authored = document.captureStores();
-        this.builder.authoredBaseCells = new Map(
-            [...this.builder.baseCells].map(([key, cell]) => [key, Utility.deepClone(cell)])
-        );
-        this.builder.authoredOpenings = Utility.deepClone(this.builder.openings);
-        this.builder.authoredFixtures = Utility.deepClone(this.builder.fixtures);
         // Re-capturing now that the authored baseline has moved is what empties
-        // the deltas: serializeCellDeltas diffs against authoredBaseCells, and
-        // those two maps are identical again.
+        // every store delta against the new canonical baseline.
         this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
     }
 

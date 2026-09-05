@@ -1,0 +1,17 @@
+name: wall pull copies explicit paint from the anchored end
+reach: 0
+map:
+  A
+expect:
+  AA
+  AA
+atoms:
+  1,0/south/0 = blue
+  1,0/south/1 = green
+atom-ops:
+  copy 1,0 2,0
+expect-atoms:
+  1,0/south/0 = blue
+  1,0/south/1 = green
+  2,0/south/0 = blue
+  2,0/south/1 = green

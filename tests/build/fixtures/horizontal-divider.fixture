@@ -1,0 +1,18 @@
+name: two plans split under a horizontal wall
+reach: 1
+map:
+  A
+  #
+  B
+expect:
+  AA
+  AA
+  AA
+  BB
+  BB
+  BB
+faces:
+  0,1/north/0 = A
+  0,1/north/1 = A
+  0,1/south/0 = B
+  0,1/south/1 = B

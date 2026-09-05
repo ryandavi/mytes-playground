@@ -39,6 +39,104 @@ class WallFaceResolver {
         throw new Error(`Unknown wall slice kind: ${slice.kind}`);
     }
 
+    /**
+     * Resolves both the physical atom that receives paint and the surface the
+     * visible slice belongs to. At a corner the face toward the room can look
+     * straight into the returning arm of the wall. The opposite atom is the
+     * one actually visible, but semantically it continues the room-facing run.
+     */
+    static visibleSurface(slice, grid, topology = {}, geometry = null) {
+        let atom = WallFaceResolver.visibleAtom(slice, grid, topology);
+        let classification = WallFaceResolver.classify(atom, grid, topology);
+        if (slice.kind !== 'horizontal-band') return Object.freeze({ atom, classification });
+
+        const candidates = ['south', 'north'].map(face => {
+            const candidate = { x: slice.x, y: slice.y, face, half: slice.half };
+            return { atom: candidate, classification: WallFaceResolver.classify(candidate, grid, topology) };
+        });
+        const hasBuriedFace = candidates.some(candidate => candidate.classification.kind === 'buried');
+        if (classification.kind === 'buried') {
+            const visible = candidates.find(candidate => candidate.classification.kind !== 'buried');
+            if (visible) ({ atom, classification } = visible);
+        }
+        const terminalBand = geometry && WallFaceResolver.isTerminalBand(slice, geometry);
+        if (classification.kind === 'room' || (!hasBuriedFace && !terminalBand) || !geometry) {
+            return Object.freeze({ atom: Object.freeze(atom), classification });
+        }
+
+        const inherited = WallFaceResolver.neighbouringRunRoom(slice, grid, topology, geometry);
+        return Object.freeze({
+            atom: Object.freeze(atom),
+            classification: inherited || classification
+        });
+    }
+
+    static classifyPaintAtom(atom, grid, topology = {}, geometry = null) {
+        if (geometry) {
+            const key = BuildKeys.atom(atom.x, atom.y, atom.face, atom.half);
+            const spans = geometry.paintSpans?.get(BuildKeys.cell(atom.x, atom.y)) || [];
+            for (const span of spans) {
+                const resolved = WallFaceResolver.visibleSurface(
+                    { x: atom.x, y: atom.y, kind: span.kind, half: span.half },
+                    grid,
+                    topology,
+                    geometry
+                );
+                if (BuildKeys.atom(
+                    resolved.atom.x, resolved.atom.y, resolved.atom.face, resolved.atom.half
+                ) === key) return resolved.classification;
+            }
+        }
+        return WallFaceResolver.classify(atom, grid, topology);
+    }
+
+    static isTerminalBand(slice, geometry) {
+        const mask = geometry.masks?.get(BuildKeys.cell(slice.x, slice.y)) || 0;
+        const horizontalConnections = Number((mask & WallGeometry.MASK_WEST) !== 0) +
+            Number((mask & WallGeometry.MASK_EAST) !== 0);
+        const verticalConnections = Number((mask & WallGeometry.MASK_NORTH) !== 0) +
+            Number((mask & WallGeometry.MASK_SOUTH) !== 0);
+        return horizontalConnections === 1 && verticalConnections === 0;
+    }
+
+    static neighbouringRunRoom(slice, grid, topology, geometry) {
+        const startUnit = (2 * slice.x) + slice.half;
+        const limit = Math.max(1, (geometry.cells?.size || 1) * 2);
+        for (let distance = 1; distance <= limit; distance++) {
+            const rooms = new Map();
+            for (const direction of [-1, 1]) {
+                const unit = startUnit + (distance * direction);
+                if (!WallFaceResolver.horizontalUnitsConnected(startUnit, unit, slice.y, geometry)) continue;
+                const x = Math.floor(unit / 2);
+                const half = ((unit % 2) + 2) % 2;
+                const spans = geometry.paintSpans?.get(BuildKeys.cell(x, slice.y)) || [];
+                if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
+                const neighbourSlice = { x, y: slice.y, kind: 'horizontal-band', half };
+                const neighbourAtom = WallFaceResolver.visibleAtom(neighbourSlice, grid, topology);
+                const neighbourClass = WallFaceResolver.classify(neighbourAtom, grid, topology);
+                if (neighbourClass.kind === 'room') rooms.set(neighbourClass.roomId, neighbourClass);
+            }
+            if (rooms.size === 1) return rooms.values().next().value;
+            if (rooms.size > 1) return null;
+        }
+        return null;
+    }
+
+    static horizontalUnitsConnected(fromUnit, toUnit, y, geometry) {
+        const direction = Math.sign(toUnit - fromUnit);
+        for (let unit = fromUnit; unit !== toUnit; unit += direction) {
+            const next = unit + direction;
+            const x = Math.floor(unit / 2);
+            const nextX = Math.floor(next / 2);
+            if (x === nextX) continue;
+            const leftX = Math.min(x, nextX);
+            const leftMask = geometry.masks?.get(BuildKeys.cell(leftX, y)) || 0;
+            const rightMask = geometry.masks?.get(BuildKeys.cell(leftX + 1, y)) || 0;
+            if (!(leftMask & WallGeometry.MASK_EAST) || !(rightMask & WallGeometry.MASK_WEST)) return false;
+        }
+        return true;
+    }
+
     static depthFromAtom(atom, roomId, grid) {
         const [bx, by] = BuildKeys.lookBlock(atom.x, atom.y, atom.face, atom.half);
         const dx = atom.face === 'west' ? -1 : atom.face === 'east' ? 1 : 0;
@@ -53,8 +151,9 @@ class WallFaceResolver {
         for (const [cellKey, spans] of geometry.paintSpans || []) {
             const { x, y } = BuildKeys.parseCell(cellKey);
             for (const span of spans) {
-                const atom = WallFaceResolver.visibleAtom({ x, y, kind: span.kind, half: span.half }, grid, topology);
-                const classification = WallFaceResolver.classify(atom, grid, topology);
+                const { atom, classification } = WallFaceResolver.visibleSurface(
+                    { x, y, kind: span.kind, half: span.half }, grid, topology, geometry
+                );
                 if (classification.kind === 'buried') continue;
                 const surface = classification.kind === 'room'
                     ? `room:${classification.roomId}` : `exterior:${classification.loopId ?? 'outside'}`;

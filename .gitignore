@@ -3,7 +3,7 @@ node_modules/
 
 # Build output
 dist/
-build/
+/build/
 !js/Map/Build/
 !js/Map/Build/*.js
 out/

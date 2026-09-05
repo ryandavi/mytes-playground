@@ -175,10 +175,14 @@ const SurfaceDebug = {
 
 	_floorPlanOwners() {
 		const map = this._map();
-		const ownership = map.floorBuilder?.computeOwnership?.() ?? new Map();
+		const grid = map.buildTransaction?.cache?.grid;
 		const ownerByBlock = new Map();
-		for (const [roomId, blocks] of ownership) {
-			for (const [blockX, blockY] of blocks) ownerByBlock.set(`${blockX},${blockY}`, roomId);
+		if (!grid) return ownerByBlock;
+		for (let blockY = 0; blockY < grid.blockHeight; blockY++) {
+			for (let blockX = 0; blockX < grid.blockWidth; blockX++) {
+				const roomId = grid.ownerAt(blockX, blockY);
+				if (roomId !== null) ownerByBlock.set(`${blockX},${blockY}`, roomId);
+			}
 		}
 		return ownerByBlock;
 	},

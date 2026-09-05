@@ -766,6 +766,10 @@ body.debug .stage-bar__debug-only {
     display: flex;
     width: 100%;
 
+    + .segment-control {
+        margin-top: var(--space-sm);
+    }
+
     &[hidden] {
         display: none;
     }

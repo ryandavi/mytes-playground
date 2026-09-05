@@ -140,7 +140,8 @@ class BuildTransaction {
             width: this.width,
             height: this.height,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            plans: level.rooms.values(),
+            expandCells: [...geometry.thresholds],
+            plans: BuildTransaction.seedsOffThresholds(level.rooms.values(), geometry.thresholds),
             reachBlocks: this.reachBlocks,
             revision
         });
@@ -151,6 +152,16 @@ class BuildTransaction {
         });
         if (options.count !== false) this._stats.topologyRebuilds++;
         return Object.freeze({ geometry, grid, topology, revision });
+    }
+
+    // Thresholds belong to both sides of an opening. Filter them only from the
+    // solve; stored room definitions retain every cell the player drew.
+    static seedsOffThresholds(plans, thresholds) {
+        const list = [...plans];
+        if (!thresholds?.size) return list;
+        return list.map(plan => (plan.seedCells || []).some(key => thresholds.has(key))
+            ? { ...plan, seedCells: plan.seedCells.filter(key => !thresholds.has(key)) }
+            : plan);
     }
 
     commit(data) {
@@ -248,87 +259,6 @@ class BuildTransaction {
 
     static dirty(before, after, previousGrid, nextGrid, levelId = BuildDocument.DEFAULT_LEVEL_ID,
         geometry = null, topology = null) {
-        const cells = new Set();
-        const addCellDelta = delta => {
-            for (const key of [...Object.keys(delta.set || {}), ...(delta.removed || [])]) {
-                const cellKey = key.includes('/') ? key.split('/')[0] : key;
-                if (/^-?\d+,-?\d+$/.test(cellKey)) cells.add(cellKey);
-            }
-        };
-        const wallDelta = StoreDelta.diff(before.levels?.[levelId]?.walls, after.levels?.[levelId]?.walls);
-        addCellDelta(wallDelta);
-        addCellDelta(StoreDelta.diff(before.levels?.[levelId]?.atoms, after.levels?.[levelId]?.atoms));
-        const buildingDelta = StoreDelta.diff(before.buildings, after.buildings);
-        const previousBuilding = id => before.buildings instanceof Map
-            ? before.buildings.get(id)
-            : before.buildings?.[id];
-        const nextWalls = after.levels?.[levelId]?.walls;
-        for (const [buildingId, building] of Object.entries(buildingDelta.set || {})) {
-            if ((previousBuilding(buildingId)?.exteriorFinishId ?? null) ===
-                (building?.exteriorFinishId ?? null)) continue;
-            const wallValues = nextWalls instanceof Map ? nextWalls.values() : Object.values(nextWalls || {});
-            for (const wall of wallValues) if (wall.buildingId === buildingId) {
-                cells.add(BuildKeys.cell(wall.x, wall.y));
-            }
-        }
-        const structuralCells = new Set([...Object.keys(wallDelta.set || {}), ...(wallDelta.removed || [])]);
-        const recordsChanged = { openings: false, fixtures: false, attachments: false };
-        const addRecordCells = (storeName) => {
-            const delta = StoreDelta.diff(before.levels?.[levelId]?.[storeName], after.levels?.[levelId]?.[storeName]);
-            const previousStore = before.levels?.[levelId]?.[storeName];
-            const previous = key => previousStore instanceof Map ? previousStore.get(key) : previousStore?.[key];
-            const take = record => {
-                const points = Array.isArray(record?.cells)
-                    ? record.cells
-                    : [record?.cells?.from, record?.cells?.to || record?.cells?.from];
-                for (const point of points.filter(Array.isArray)) cells.add(BuildKeys.cell(point[0], point[1]));
-            };
-            for (const record of Object.values(delta.set || {})) take(record);
-            for (const key of delta.removed || []) take(previous(key));
-            recordsChanged[storeName] = !StoreDelta.isEmpty(delta);
-        };
-        for (const storeName of Object.keys(recordsChanged)) addRecordCells(storeName);
-        const blocks = nextGrid ? [...structuralCells].flatMap(key => {
-            const { x, y } = BuildKeys.parseCell(key);
-            return BuildKeys.blocksOfCell(x, y).map(([bx, by]) => BuildKeys.block(bx, by));
-        }) : [];
-        if (previousGrid && nextGrid) {
-            for (let by = 0; by < nextGrid.blockHeight; by++) for (let bx = 0; bx < nextGrid.blockWidth; bx++) {
-                if (previousGrid.ownerAt(bx, by) !== nextGrid.ownerAt(bx, by)) blocks.push(BuildKeys.block(bx, by));
-            }
-        }
-        const roomDelta = StoreDelta.diff(before.levels?.[levelId]?.rooms, after.levels?.[levelId]?.rooms);
-        const previousRooms = before.levels?.[levelId]?.rooms;
-        const previousRoom = roomId => previousRooms instanceof Map
-            ? previousRooms.get(roomId)
-            : previousRooms?.[roomId];
-        if (nextGrid) {
-            for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
-                const previous = previousRoom(roomId);
-                if ((previous?.floorFinishId ?? null) !== (room?.floorFinishId ?? null)) {
-                    for (const [bx, by] of nextGrid.blocksOf(roomId)) blocks.push(BuildKeys.block(bx, by));
-                }
-            }
-        }
-        if (nextGrid && geometry) for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
-            const previous = previousRoom(roomId);
-            if ((previous?.wallFinishId ?? null) === (room?.wallFinishId ?? null)) continue;
-            for (const cell of geometry.cells.values()) {
-                const ownsFace = BuildKeys.FACES.some(face => [0, 1].some(half =>
-                    WallFaceResolver.classify(
-                        { x: cell.x, y: cell.y, face, half },
-                        nextGrid,
-                        { ...topology, walls: geometry }
-                    ).roomId === roomId
-                ));
-                if (ownsFace) cells.add(BuildKeys.cell(cell.x, cell.y));
-            }
-        }
-        return Object.freeze({
-            cells: Object.freeze([...cells].sort()),
-            blocks: Object.freeze([...new Set(blocks)].sort()),
-            geometryChanged: structuralCells.size > 0,
-            recordsChanged: Object.freeze(recordsChanged)
-        });
+        return BuildDirty.compute(before, after, previousGrid, nextGrid, levelId, geometry, topology);
     }
 }

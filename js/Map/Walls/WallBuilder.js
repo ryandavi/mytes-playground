@@ -61,14 +61,11 @@ class WallBuilder extends WallStructure {
         this._flatDirty = true;
         this.cells = new Map();
         this.baseCells = new Map();
-        this.authoredBaseCells = new Map();
         this.openingKeys = new Set();
         this.openingByCell = new Map();
-        this.authoredOpenings = Utility.deepClone(wallData.openings || []);
-        this.openings = Utility.deepClone(this.authoredOpenings);
+        this.openings = Utility.deepClone(wallData.openings || []);
         this.openingSlots = new Map();
-        this.authoredFixtures = Utility.deepClone(wallData.fixtures || []);
-        this.fixtures = Utility.deepClone(this.authoredFixtures);
+        this.fixtures = Utility.deepClone(wallData.fixtures || []);
         this.pieces = [];
         this._pieceByCell = new Map();
         this.decorations = [];
@@ -93,17 +90,9 @@ class WallBuilder extends WallStructure {
     }
 
     async initialize() {
-        if (this.gameMap.buildDocument) {
-            this.authoredBaseCells = this.gameMap.buildDocument.level().walls.snapshot();
-        } else for (const source of this.wallData.cells || []) {
-            const key = `${source.x},${source.y}`;
-            const cell = { ...source, opening: null };
-            this.authoredBaseCells.set(key, Utility.deepClone(cell));
-            this.baseCells.set(key, cell);
-        }
+        if (!this.gameMap.buildDocument) throw new Error('WallBuilder requires a BuildDocument');
         this.normalizeOpeningFootprints();
         this.pruneOrphanedRecords();
-        this.authoredOpenings = Utility.deepClone(this.openings);
         this.reindexOpenings();
         for (const [key, cell] of this.cells) {
             // A cell the author never painted, standing here only because an
@@ -146,7 +135,6 @@ class WallBuilder extends WallStructure {
         this._runPieceIds.clear();
         this.cells.clear();
         this.baseCells.clear();
-        this.authoredBaseCells.clear();
         this.openingSlots.clear();
         this.disposeFlatOverlay();
     }

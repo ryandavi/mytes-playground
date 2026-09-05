@@ -48,28 +48,44 @@ The last two are enforced by `validate-content-data.js`; the first is a judgemen
 
 ## 5. Rendering
 
-One canvas per room, inside the background layer — above the baked map image, below ground decor, so objects, mytes and walls all still draw over it.
+Floors render from the canonical immutable `FloorOwnershipGrid`, which resolves
+on a 2×2 half-cell lattice. The background layer holds 8×8-cell chunk canvases,
+above the baked map image and below ground decor, objects, mytes, and walls.
+Only chunks intersecting changed ownership blocks or changed finishes redraw.
 
 Two things that are easy to get wrong:
 
 - **The repeat is anchored to the world grid, not the room's corner.** Otherwise two rooms sharing a finish show a seam wherever their bounds happen to start, most visibly across a doorway.
 - **A layer child is already in map coordinates.** `.layer` is positioned at `--map-render-inset-*` by CSS and sized to the map, so applying `getRenderOffset()` to a floor shifts it by the reserved strip a second time. This was written wrong once and caught by asserting placement drift against room bounds.
 
-Rooms are rect, polygon **or** tilemask. A tilemask room is not a rectangle, so the fill is clipped to the room's real shape — filling its bounding box would paint over the bordering walls and the corridor outside it.
+Each chunk clips its world-anchored pattern to the blocks owned by that room
+plan. Rectangles, polygons, and tilemasks are authoring inputs; the ownership
+grid is the only runtime floor shape and can split one map cell between rooms.
 
 ### Edge bleed
 
-A room's bounds stop one cell short of the wall enclosing it, and that wall covers only its centred `thickness` — so painting the bounds exactly leaves a strip of the map's authored ground showing along every outer edge.
+A room owns every block in its seed cells outright. Fenced expansion may extend
+that ownership by `floorSystem.edgeBleedCells` only into wall cells and derived
+threshold cells; it never grows over ordinary open ground.
 
-Each room's floor is therefore grown by `floorSystem.edgeBleedCells` and clamped to the map, putting floor *underneath* the surrounding wall, which then draws over it.
+Wall-mask fences stop the expansion on the wall centreline. Corners, junctions,
+crossings, terminal caps, doorway openings, and gaps all use this same solve;
+there are no corrective bleed or room-subtraction passes.
 
 The default is **half a cell**, because that is the wall's centreline: a wall is `thickness` centred in its own cell, so its middle sits at `(cell - thickness) / 2 + thickness / 2`, which is `cell / 2` whatever the thickness. The floor edge therefore ends buried under the wall. A **full** cell reaches the far side of the wall's cell and spills `(cell - thickness) / 2` px past the wall's outer face onto the exterior, which reads as the floor leaking out of the building.
 
-The grown area is masked by **the room's own shape, minus every other room**. That subtraction is the important half: it stops the bleed spilling across a shared wall into a neighbour that owns its own floor, so room-to-room boundaries render exactly as they did and only the outer edges gain a tile. A polygon room is dilated by stroking its outline with round joins; a tilemask room by growing each cell.
+Every half-cell block has at most one owner. Simultaneous claims resolve by
+straight reach, then explicit priority, then stable plan identity, independent
+of iteration or draw order. Threshold cells are filtered from plan seeds only
+for the solve so floors from both sides meet on the same centreline through an
+arbitrary-width doorway.
 
 ## 6. Runtime
 
-`gameMap.floorBuilder.setRoomFinish(roomId, finishId)` repaints one room, the floor equivalent of swapping a wall finish. Tiles are cached per finish, so a repaint is a cache hit. Passing a falsy id removes the override and restores the authored ground.
+Floor edits update `RoomPlan.floorFinishId` through `BuildTransaction`. The
+transaction derives ownership once, updates the room-region projection, and
+invalidates only dirty floor chunks. Tiles remain cached per finish. Passing a
+falsy finish restores authored ground wherever that plan owns blocks.
 
 ## 7. Adding a floor
 

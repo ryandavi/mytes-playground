@@ -1,0 +1,13 @@
+name: horizontal terminal caps keep a straight boundary
+reach: 1
+map:
+  AAA
+  ###
+  BBB
+expect:
+  AAAAAA
+  AAAAAA
+  AAAAAA
+  BBBBBB
+  BBBBBB
+  BBBBBB

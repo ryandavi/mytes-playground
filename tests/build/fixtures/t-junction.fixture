@@ -1,0 +1,19 @@
+name: vertical divider meets outer horizontal wall
+reach: 1
+map:
+  #####
+  #A#B#
+  #A#B#
+  #A#B#
+  #####
+expect:
+  ..........
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  ..........

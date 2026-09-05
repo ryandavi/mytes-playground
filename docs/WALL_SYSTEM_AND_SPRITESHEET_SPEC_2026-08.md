@@ -385,21 +385,33 @@ Planned `data/map-objects/wall-materials.json` shape:
 
 Exact atlas offsets remain data. Renderer code must not hard-code them.
 
-Persist customization against map geometry and face:
+Runtime build state is version 8 and persists explicit paint on physical
+half-face atoms:
 
 ```jsonc
 {
-  "mapId": "House",
-  "axis": "horizontal",
-  "cells": { "from": [4, 8], "to": [9, 8] },
-  "face": "north",
+  "x": 4,
+  "y": 8,
+  "face": "south",
+  "half": 0,
   "finishId": "wallpaper_blue_flower"
 }
 ```
 
-Cell/range keys survive run merging, splitting, and regeneration. On load, `WallBuilder` intersects overrides with newly generated segments.
+The canonical key is `x,y/face/half`. Atom identity survives run merging,
+splitting, and regeneration because render pieces are derived and have no
+persistent identity. An explicit atom finish wins over the adjacent room's
+`wallFinishId`, then the building's `exteriorFinishId`, then the construction
+default. Whole-room and whole-building paint update those defaults and remove
+the explicit atoms they supersede.
 
-Wall-state payload version 6 persists opening and fixture records as well as presentation, face finishes, and attachments, so moved wall objects recreate their sockets and cutouts on reload. Version 6 also migrates the prototype's top-edge fixture height into the canonical center-based `v` coordinate.
+`BuildDocument` owns level-scoped wall, atom, room, opening, fixture, and
+attachment stores and serializes generic deltas over the authored Tiled
+baseline. `WallTiledExporter` reads those stores; it converts atoms back to
+`WallFinishOverride` objects only as a Tiled interchange format. Payloads from
+version 7 or earlier are reset to the authored baseline rather than migrated.
+Moved walls translate their atoms and attachment records in the same build
+transaction, so sockets, cutouts, and paint remain aligned after reload.
 
 ## 9. Wall attachments
 

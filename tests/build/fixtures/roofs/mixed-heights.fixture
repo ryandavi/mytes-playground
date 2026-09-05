@@ -1,0 +1,9 @@
+name: mixed-heights-warning
+style: flat
+mixed: true
+map:
+AB
+AB
+parts:
+FF
+FF

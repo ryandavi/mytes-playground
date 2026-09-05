@@ -1,0 +1,25 @@
+name: four rooms remain divided through a crossing
+reach: 1
+map:
+  #######
+  #AA#BB#
+  #AA#BB#
+  #######
+  #CC#EE#
+  #CC#EE#
+  #######
+expect:
+  ..............
+  .AAAAAABBBBBB.
+  .AAAAAABBBBBB.
+  .AAAAAABBBBBB.
+  .AAAAAABBBBBB.
+  .AAAAAABBBBBB.
+  .AAAAAABBBBBB.
+  .CCCCCCEEEEEE.
+  .CCCCCCEEEEEE.
+  .CCCCCCEEEEEE.
+  .CCCCCCEEEEEE.
+  .CCCCCCEEEEEE.
+  .CCCCCCEEEEEE.
+  ..............

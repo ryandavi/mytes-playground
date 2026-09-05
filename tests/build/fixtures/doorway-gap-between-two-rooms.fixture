@@ -1,0 +1,21 @@
+name: doorway gap between two rooms
+reach: 1
+map:
+  ##########
+  #AAAA#BBB#
+  #AAAA.BBB#
+  #AAAA#BBB#
+  ##########
+expect:
+  ....................
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  ....................
+thresholds:
+  5,2

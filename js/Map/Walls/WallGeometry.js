@@ -3,6 +3,20 @@ class WallGeometry {
     static MASK_EAST = 2;
     static MASK_SOUTH = 4;
     static MASK_WEST = 8;
+
+    static contiguousRuns(items, predicate) {
+        const runs = [];
+        let run = [];
+        for (const item of items) {
+            if (predicate(item)) run.push(item);
+            else if (run.length) {
+                runs.push(run);
+                run = [];
+            }
+        }
+        if (run.length) runs.push(run);
+        return runs;
+    }
     static MASK_HORIZONTAL = WallGeometry.MASK_EAST | WallGeometry.MASK_WEST;
     static MASK_VERTICAL = WallGeometry.MASK_NORTH | WallGeometry.MASK_SOUTH;
 
@@ -56,9 +70,10 @@ class WallGeometry {
     }
 
     static fencesForMask(mask) {
+        const terminal = WallGeometry.connectionCount(mask) <= 1;
         return Object.freeze({
-            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
-            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
+            horizontal: terminal || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: terminal || (mask & WallGeometry.MASK_VERTICAL) !== 0
         });
     }
 
@@ -187,17 +202,41 @@ class WallGeometry {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const key = BuildKeys.cell(x, y);
                 if (cells.has(key)) continue;
-                if (WallGeometry.isThresholdAxis(x, y, 'horizontal', cells, masks) ||
-                    WallGeometry.isThresholdAxis(x, y, 'vertical', cells, masks)) thresholds.add(key);
+                const reach = (bounds.maxX - bounds.minX) + (bounds.maxY - bounds.minY) + 2;
+                if (WallGeometry.isThresholdAxis(x, y, 'horizontal', cells, masks, reach) ||
+                    WallGeometry.isThresholdAxis(x, y, 'vertical', cells, masks, reach)) thresholds.add(key);
             }
         }
         return thresholds;
     }
 
-    static isThresholdAxis(x, y, axis, cells, masks) {
+    /**
+     * Is this open cell part of a gap in the line of a wall?
+     *
+     * The gap may be any length. A doorway two or more cells wide is the same
+     * opening as a one-cell one, and used to be missed entirely — so the floor
+     * seam ran to the cell edge through the gap while sitting on the wall's
+     * centreline either side of it, and the join between two floors visibly
+     * jogged half a tile where the wall stopped.
+     *
+     * The walk is safe against mistaking a room for a gap: `pointsOutward`
+     * requires the masonry at each end to carry on ALONG this axis, so a room's
+     * own perpendicular walls never qualify however far apart they are.
+     */
+    static isThresholdAxis(x, y, axis, cells, masks, reach = 1) {
         const horizontal = axis === 'horizontal';
-        const before = cells.get(BuildKeys.cell(x - (horizontal ? 1 : 0), y - (horizontal ? 0 : 1)));
-        const after = cells.get(BuildKeys.cell(x + (horizontal ? 1 : 0), y + (horizontal ? 0 : 1)));
+        const seek = direction => {
+            for (let step = 1; step <= reach; step++) {
+                const found = cells.get(BuildKeys.cell(
+                    x + (horizontal ? step * direction : 0),
+                    y + (horizontal ? 0 : step * direction)
+                ));
+                if (found) return found;
+            }
+            return undefined;
+        };
+        const before = seek(-1);
+        const after = seek(1);
         if (!before || !after || !WallGeometry.connects(before, after)) return false;
         const beforeMask = masks.get(BuildKeys.cell(before.x, before.y)) || 0;
         const afterMask = masks.get(BuildKeys.cell(after.x, after.y)) || 0;

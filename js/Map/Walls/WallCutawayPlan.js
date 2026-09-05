@@ -1,4 +1,19 @@
 class WallCutawayPlan extends WallRenderer {
+    resolveCutawayRoomIds(point) {
+        const revision = this.gameMap?.buildTransaction?.revision || 0;
+        const blockSize = this.cellSize / 2;
+        const key = `${Math.floor(point.x / blockSize)},${Math.floor(point.y / blockSize)}`;
+        if (this._cutawayRoomCache?.revision !== revision) {
+            this._cutawayRoomCache = { revision, rooms: new Map() };
+        }
+        if (this._cutawayRoomCache.rooms.has(key)) return this._cutawayRoomCache.rooms.get(key);
+        const ids = this.expandToOpenSpace(
+            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
+        ).map(room => room.id);
+        this._cutawayRoomCache.rooms.set(key, ids);
+        return ids;
+    }
+
     expandCutOverOpenings(piece, cut) {
         const spans = new Map();
         piece.cells.forEach((cell, index) => {
@@ -285,4 +300,3 @@ class WallCutawayPlan extends WallRenderer {
         return WallBuilder.isStraightHorizontal(this.computeMask(neighbor));
     }
 }
-

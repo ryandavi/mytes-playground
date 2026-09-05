@@ -1,0 +1,9 @@
+name: two-detached-sections
+style: flat
+sections: 2
+map:
+##...##
+##...##
+parts:
+FF...FF
+FF...FF

@@ -1,0 +1,12 @@
+name: two plans split under a vertical wall
+reach: 1
+map:
+  A#B
+expect:
+  AAABBB
+  AAABBB
+faces:
+  1,0/west/0 = A
+  1,0/west/1 = A
+  1,0/east/0 = B
+  1,0/east/1 = B

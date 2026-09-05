@@ -1,0 +1,19 @@
+name: closed rectangle
+reach: 1
+map:
+  #####
+  #AAA#
+  #AAA#
+  #AAA#
+  #####
+expect:
+  ..........
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  .AAAAAAAA.
+  ..........

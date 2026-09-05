@@ -97,7 +97,9 @@ function buildInput(fixture, core, reverse = false) {
     const geometry = core.WallGeometry.compute(new Map(walls));
     let plans = [...planSeeds.entries()].map(([id, seedCells]) => ({
         id,
-        seedCells: seedCells.filter(key => fixture.origins[id] === 'painted' || !geometry.thresholds.has(key))
+        // Thresholds are dropped from every seed list, painted included: an
+        // opening belongs to both sides and is settled by expansion.
+        seedCells: seedCells.filter(key => !geometry.thresholds.has(key))
     }));
     if (reverse) plans = plans.reverse().map(plan => ({ ...plan, seedCells: [...plan.seedCells].reverse() }));
     return {
@@ -107,6 +109,7 @@ function buildInput(fixture, core, reverse = false) {
             width: fixture.map[0].length,
             height: fixture.map.length,
             walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
+            expandCells: [...geometry.thresholds],
             plans,
             reachBlocks: fixture.reach
         }
@@ -335,7 +338,32 @@ function runGeometryContracts(core) {
         ['0,1/south/0', '0,1/south/1', '1,1/south/0', '1,1/south/1', '2,1/south/0', '2,1/south/1'],
         'section grouping returns the physical atoms it will paint');
 
-    return 7;
+    const corner = make(['...', '###', '..#']);
+    const cornerGrid = {
+        ownerAt: (bx, by) => by >= 4 && bx < 4 ? 'A' : null,
+        blocksOf: roomId => roomId === 'A' ? [[0, 4], [1, 4], [2, 4], [3, 4]] : []
+    };
+    const cornerSections = core.WallFaceResolver.sections(corner, cornerGrid, { walls: corner });
+    const cornerBand = cornerSections.find(section => section.surface.roomId === 'A');
+    assertEqual(cornerBand.spans.filter(span => span.kind === 'horizontal-band').length, 6,
+        'a returning corner stays in its visible wall section');
+    assertEqual(cornerBand.atoms.includes('2,1/north/1'), true,
+        'corner paint is stored on the visible non-buried atom');
+    assertEqual(core.WallFaceResolver.classifyPaintAtom(
+        { x: 2, y: 1, face: 'north', half: 1 }, cornerGrid, { walls: corner }, corner
+    ).roomId, 'A', 'corner atom keeps its inherited room classification for paint commands');
+
+    const terminal = make(['...', '###', '...']);
+    const terminalGrid = {
+        ownerAt: (bx, by) => by >= 4 && bx >= 2 ? 'A' : null,
+        blocksOf: roomId => roomId === 'A' ? [[2, 4], [3, 4], [4, 4], [5, 4]] : []
+    };
+    const terminalSections = core.WallFaceResolver.sections(terminal, terminalGrid, { walls: terminal });
+    const terminalBand = terminalSections.find(section => section.surface.roomId === 'A');
+    assertEqual(terminalBand.spans.filter(span => span.kind === 'horizontal-band').length, 6,
+        'a terminal half outside the room footprint stays in the continuing wall section');
+
+    return 11;
 }
 
 function main() {

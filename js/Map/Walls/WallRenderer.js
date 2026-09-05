@@ -12,12 +12,12 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
-            const atom = WallFaceResolver.visibleAtom(
+            const { atom, classification } = WallFaceResolver.visibleSurface(
                 { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
                 cache.grid,
-                topology
+                topology,
+                cache.geometry
             );
-            const classification = WallFaceResolver.classify(atom, cache.grid, topology);
             if (classification.kind === 'buried') return null;
             const roomId = classification.kind === 'room' ? classification.roomId : null;
             return {
@@ -428,7 +428,9 @@ class WallRenderer {
     }
 
     getLightBlockers() {
-        return [...this.cells.values()]
+        const revision = this.gameMap?.buildTransaction?.revision || 0;
+        if (this._lightBlockerCache?.revision === revision) return this._lightBlockerCache.blockers;
+        const blockers = [...this.cells.values()]
             .filter(cell => !cell.opening && cell.blocksLineOfSight !== false)
             .map(cell => {
                 const construction = this.registry.getConstruction(cell.constructionId);
@@ -447,6 +449,8 @@ class WallRenderer {
                     height: bottom - top
                 };
             });
+        this._lightBlockerCache = { revision, blockers };
+        return blockers;
     }
 
     async createFlatOverlay() {
@@ -516,4 +520,3 @@ class WallRenderer {
         }
     }
 }
-

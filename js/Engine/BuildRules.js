@@ -97,8 +97,8 @@ class BuildRules {
         const builder = this.wallBuilder;
         const key = `${x},${y}`;
 
-        if (builder.baseCells.get(key)?.locked === true ||
-            builder.authoredBaseCells.get(key)?.locked === true) {
+        const authored = builder.wallData?.cells?.find(cell => BuildKeys.cell(cell.x, cell.y) === key);
+        if (authored?.locked === true) {
             return BuildRules.deny('This wall is part of the building and cannot be changed.');
         }
 

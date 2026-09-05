@@ -20,7 +20,7 @@ class BuildDebug {
         return Object.freeze({
             transactions: transaction.transactions || 0,
             wallRebuilds: hasTransaction ? transaction.wallRebuilds || 0 : map?.wallBuilder?.rebuilds || 0,
-            ownershipSolves: hasTransaction ? transaction.ownershipSolves || 0 : map?.floorBuilder?.ownershipSolves || 0,
+            ownershipSolves: hasTransaction ? transaction.ownershipSolves || 0 : 0,
             topologyRebuilds: hasTransaction ? transaction.topologyRebuilds || 0 : 0,
             floorChunksRedrawn: map?.floorBuilder?.chunksRedrawn || transaction.floorChunksRedrawn || 0,
             wallPiecesRedrawn: map?.wallBuilder?.piecesRedrawn || transaction.wallPiecesRedrawn || 0,

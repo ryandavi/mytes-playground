@@ -1,0 +1,13 @@
+name: overhang-zero
+style: flat
+overhang: 0
+map:
+.....
+.###.
+.###.
+.....
+parts:
+.....
+.FFF.
+.FFF.
+.....

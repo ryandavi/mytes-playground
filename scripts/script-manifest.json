@@ -331,6 +331,9 @@
     "src": "js/Map/Build/BuildDocument.js"
   },
   {
+    "src": "js/Map/Build/BuildDirty.js"
+  },
+  {
     "src": "js/Map/Build/BuildTransaction.js"
   },
   {

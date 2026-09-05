@@ -1,0 +1,16 @@
+name: wall removal deletes only removed atoms and preserves painted stubs
+reach: 0
+map:
+  A
+expect:
+  AA
+  AA
+atoms:
+  0,0/south/0 = red
+  1,0/south/0 = green
+  2,0/south/0 = blue
+atom-ops:
+  delete 1,0
+expect-atoms:
+  0,0/south/0 = red
+  2,0/south/0 = blue

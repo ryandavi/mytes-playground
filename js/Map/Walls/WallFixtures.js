@@ -132,7 +132,6 @@ class WallFixtures extends WallOpenings {
         if (record) this.attachFixtureObject(object, record);
         this.evaluateCutaway(true);
     }
-
     createAuthoredAttachments(records) {
         for (const record of records) {
             if (this.decorations.some(decoration => decoration.id === record.id)) continue;
@@ -164,24 +163,28 @@ class WallFixtures extends WallOpenings {
             this.decorations.push(decoration);
         }
     }
-
     getFixtureFaceForPoint(x, y) {
         const construction = this.registry.getConstruction(this.wallData.defaults?.constructionId);
         if (!construction) return null;
         let best = null;
         for (const piece of this.pieces) {
-            // Only a straight horizontal run presents a face to this camera.
-            if (!piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) continue;
-            const left = piece.x * this.cellSize;
-            const right = left + (piece.cells.length * this.cellSize);
             const top = piece.baseline - construction.height;
-            if (x < left || x > right || y < top || y > piece.baseline) continue;
-            if (best && piece.baseline <= best.piece.baseline) continue;
-            best = { piece, surface: piece.faces?.south, left, right, top, construction };
+            if (y < top || y > piece.baseline) continue;
+
+            // Pieces include their endpoint junctions; fixtures use each
+            // straight span inside the piece, with corners as natural stops.
+            const spans = WallGeometry.contiguousRuns(piece.cells, cell => this.isHorizontalOnlyCell(cell));
+            for (const span of spans) {
+                const left = span[0].x * this.cellSize;
+                const right = (span[span.length - 1].x + 1) * this.cellSize;
+                if (x < left || x > right) continue;
+                if (!best || piece.baseline > best.piece.baseline) {
+                    best = { piece, surface: piece.faces?.south, left, right, top, construction };
+                }
+            }
         }
         return best;
     }
-
     getFixturePlacementCandidate(object, x = object.posX, y = object.posY) {
         const width = object.size?.width || 0;
         const height = object.size?.height || 0;
@@ -199,7 +202,6 @@ class WallFixtures extends WallOpenings {
             v: (positionY - face.top + (height / 2)) / Math.max(1, face.construction.height)
         };
     }
-
     resolveFixturePlacement(object, x = object.posX, y = object.posY) {
         const placement = this.getFixturePlacementCandidate(object, x, y);
         if (!placement || this.overlapsWallFaceObstacle(

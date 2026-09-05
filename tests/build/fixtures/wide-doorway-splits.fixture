@@ -1,0 +1,24 @@
+name: a doorway wider than one cell still splits down its centreline
+reach: 1
+map:
+  #####
+  #A#B#
+  #A.B#
+  #A.B#
+  #A#B#
+  #####
+expect:
+  ..........
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  .AAAABBBB.
+  ..........
+thresholds:
+  2,2 2,3

@@ -1,0 +1,19 @@
+name: courtyard remains unowned behind its enclosing wall
+reach: 1
+map:
+  AAAAA
+  A###A
+  A#.#A
+  A###A
+  AAAAA
+expect:
+  AAAAAAAAAA
+  AAAAAAAAAA
+  AAAAAAAAAA
+  AAA....AAA
+  AAA....AAA
+  AAA....AAA
+  AAA....AAA
+  AAAAAAAAAA
+  AAAAAAAAAA
+  AAAAAAAAAA

@@ -11,7 +11,6 @@ class FloorRenderer {
         this.container = null;
         this.ownedBlocks = null;
         this.ownershipGrid = null;
-        this.ownershipSolves = 0;
         this.chunksRedrawn = 0;
     }
 
@@ -22,8 +21,8 @@ class FloorRenderer {
     build() {
         this.clear();
         this.ownedBlocks = null;
-        if (this.ownershipGrid) this.setOwnershipGrid(this.ownershipGrid);
-        else this.computeOwnership();
+        if (!this.ownershipGrid) throw new Error('FloorRenderer requires the canonical build ownership grid');
+        this.setOwnershipGrid(this.ownershipGrid);
         const dirty = new Set();
         for (const room of this.rooms()) {
             for (const [bx, by] of this.blocksOf(room.id)) dirty.add(this.chunkKeyOfBlock(bx, by));
@@ -33,31 +32,11 @@ class FloorRenderer {
         return this.surfaces.size;
     }
 
-    reconcile() {
-        if (!this.ownershipGrid) return this.build();
-        const previousGrid = this.ownershipGrid;
-        const previousFinishes = new Map([...this.surfaces].map(([roomId, surface]) => [roomId, surface.finishId]));
-        this.ownedBlocks = null;
-        this.computeOwnership();
-        const rooms = new Map(this.rooms().map(room => [room.id, room]));
-        const dirty = [];
-        for (let by = 0; by < this.ownershipGrid.blockHeight; by++) {
-            for (let bx = 0; bx < this.ownershipGrid.blockWidth; bx++) {
-                const previousOwner = previousGrid.ownerAt(bx, by);
-                const nextOwner = this.ownershipGrid.ownerAt(bx, by);
-                const previousFinish = previousFinishes.get(previousOwner) ?? null;
-                const nextFinish = this.resolveFinishId(rooms.get(nextOwner));
-                if (previousOwner !== nextOwner || previousFinish !== nextFinish) {
-                    dirty.push(BuildKeys.block(bx, by));
-                }
-            }
-        }
-        return this.invalidate(dirty);
-    }
-
     setOwnershipGrid(grid) {
         this.ownershipGrid = grid;
-        this.ownedBlocks = new Map(this.rooms().map(room => [room.id, grid.blocksOf(room.id)]));
+        this.ownedBlocks = grid
+            ? new Map(this.rooms().map(room => [room.id, grid.blocksOf(room.id)]))
+            : new Map();
     }
 
     invalidate(blockKeys) {
@@ -92,45 +71,13 @@ class FloorRenderer {
         return previewPlan?.floorFinishId || room?.properties?.floorFinishId || SiteConfig.floorSystem?.defaultFinishId || null;
     }
 
-    computeOwnership() {
-        this.ownershipSolves++;
-        const gridSystem = this.gameMap.gridSystem;
-        const width = Number(gridSystem?.gridWidth) || 0;
-        const height = Number(gridSystem?.gridHeight) || 0;
-        if (width <= 0 || height <= 0) {
-            this.ownedBlocks = new Map();
-            return this.ownedBlocks;
-        }
-        const geometry = WallGeometry.compute(this.gameMap.wallBuilder?.cells || new Map());
-        const rooms = this.rooms();
-        const seedsByRoom = new Map(rooms.map(room => [room.id, []]));
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const key = BuildKeys.cell(x, y);
-            if (geometry.cells.has(key)) continue;
-            const room = this.gameMap.regionManager?.innermostAt?.(
-                (x + 0.5) * this.cellSize, (y + 0.5) * this.cellSize, 'room', this.cellSize
-            );
-            if (!room || (geometry.thresholds.has(key) && room.properties?.origin !== 'painted')) continue;
-            seedsByRoom.get(room.id)?.push(key);
-        }
-        this.setOwnershipGrid(FloorOwnershipResolver.solve({
-            width,
-            height,
-            walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
-            plans: rooms.map(room => ({ id: room.id, seedCells: seedsByRoom.get(room.id) || [], priority: room.properties?.priority })),
-            reachBlocks: this.bleedBlocks()
-        }));
-        return this.ownedBlocks;
-    }
-
     bleedBlocks() {
         const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 0.5);
         return Math.max(0, Math.round(cells * FloorRenderer.BLOCKS_PER_CELL));
     }
 
     blocksOf(roomId) {
-        if (!this.ownedBlocks) this.computeOwnership();
-        return this.ownedBlocks.get(roomId) ?? [];
+        return this.ownedBlocks?.get(roomId) ?? [];
     }
 
     chunkKeyOfBlock(blockX, blockY) {
@@ -291,30 +238,7 @@ class FloorRenderer {
         };
     }
 
-    setRoomFinish(roomId, finishId, { transaction = true } = {}) {
-        const room = this.gameMap.regionManager?.get('room', roomId);
-        if (!room) return false;
-        const next = finishId || null;
-        if ((room.properties?.floorFinishId ?? null) === next) return false;
-        const build = transaction ? this.gameMap.buildTransaction : null;
-        const plan = build?.document?.level(build.levelId).rooms.get(roomId);
-        if (build && plan) {
-            return build.run('Finish room floor', (_draft, level) => {
-                level.rooms.set(roomId, { ...plan, floorFinishId: next });
-            }).committed;
-        }
-        room.properties = { ...room.properties, floorFinishId: next };
-        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
-        for (const key of dirty) this.drawChunk(key);
-        this.indexSurfaces();
-        return true;
-    }
 
-    removeRoom(roomId) {
-        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
-        this.surfaces.delete(roomId);
-        for (const key of dirty) this.drawChunk(key);
-    }
 
     clear() {
         for (const { canvas } of this.chunks.values()) canvas.remove();

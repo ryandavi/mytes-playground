@@ -1,0 +1,13 @@
+name: double wall leaves buried middle blocks unowned
+reach: 1
+map:
+  A##B
+  A##B
+  A##B
+expect:
+  AAA..BBB
+  AAA..BBB
+  AAA..BBB
+  AAA..BBB
+  AAA..BBB
+  AAA..BBB

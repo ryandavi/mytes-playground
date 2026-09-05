@@ -1,0 +1,11 @@
+name: excluded-cells
+style: flat
+excluded: 2,1
+map:
+#####
+#####
+#####
+parts:
+FFFFF
+FF.FF
+FFFFF

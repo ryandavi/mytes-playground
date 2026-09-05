@@ -572,10 +572,12 @@ class SurfaceCustomizePanel extends ModalWindow {
     classifyWallSurface(surface) {
         const cache = this.gameMap?.buildTransaction?.cache;
         if (!cache || !surface) return null;
-        return WallFaceResolver.classify(
+        const topology = { ...cache.topology, walls: cache.geometry };
+        return WallFaceResolver.classifyPaintAtom(
             { x: surface.cell.x, y: surface.cell.y, face: surface.face, half: surface.half },
             cache.grid,
-            { ...cache.topology, walls: cache.geometry }
+            topology,
+            cache.geometry
         );
     }
 

@@ -1,0 +1,24 @@
+name: shallower room supplies the visible horizontal wall face
+reach: 1
+map:
+  ...
+  AAA
+  ###
+  BBB
+  BBB
+expect:
+  ......
+  ......
+  AAAAAA
+  AAAAAA
+  AAAAAA
+  BBBBBB
+  BBBBBB
+  BBBBBB
+  BBBBBB
+  BBBBBB
+faces:
+  1,2/north/0 = A
+  1,2/south/0 = B
+visible:
+  1,2/horizontal-band/0 = 1,2/north/0

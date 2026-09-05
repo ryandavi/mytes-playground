@@ -8,12 +8,13 @@ const sources = [
     'js/Map/Build/BuildingPlanStore.js', 'js/Map/Build/RoomPlanStore.js', 'js/Map/Build/WallCellStore.js',
     'js/Map/Build/WallSurfaceAtomStore.js', 'js/Map/Build/AttachmentStore.js', 'js/Map/Build/BuildDocument.js',
     'js/Utility/RectUtils.js', 'js/Map/Regions/SpatialRegion.js', 'js/Map/Regions/RegionManager.js',
-    'js/Map/Walls/WallGeometry.js', 'js/Map/Floors/FloorOwnershipResolver.js',
-    'js/Map/Regions/RoomTopology.js', 'js/Map/Regions/RoomRegionProjection.js', 'js/Map/Build/BuildTransaction.js'
+    'js/Map/Walls/WallGeometry.js', 'js/Map/Walls/WallFaceResolver.js', 'js/Map/Floors/FloorOwnershipResolver.js',
+    'js/Map/Regions/RoomTopology.js', 'js/Map/Regions/RoomRegionProjection.js', 'js/Map/Build/BuildDirty.js',
+    'js/Map/Build/BuildTransaction.js'
 ];
 const context = vm.createContext({ console, Map, Set, Object, Array, Number, String, Math, JSON, Error });
 for (const source of sources) vm.runInContext(fs.readFileSync(path.join(repoRoot, source), 'utf8'), context, { filename: source });
-const core = vm.runInContext('({ StoreDelta, BuildDocument, BuildTransaction, RegionManager })', context);
+const core = vm.runInContext('({ BuildKeys, StoreDelta, BuildDocument, BuildTransaction, RegionManager })', context);
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
@@ -93,6 +94,8 @@ function testFinishAndAtomDirtiness() {
     );
     assert(finishDirty.blocks.length === transaction.cache.grid.blocksOf('living').length,
         'floor finish changes dirty every owned block in the room');
+    assert(!finishDirty.ownershipChanged && !finishDirty.roomTopologyChanged && !finishDirty.roomEnvironmentChanged,
+        'a finish-only room edit does not invalidate topology or environment consumers');
 
     const atomDraft = new core.BuildDocument(before);
     atomDraft.level().atoms.set('0,0/south/0', { x: 0, y: 0, face: 'south', half: 0, finishId: 'blue' });
@@ -111,6 +114,8 @@ function testFinishAndAtomDirtiness() {
     );
     assert(wallFinishDirty.blocks.length === 0,
         'room wall finishes do not masquerade as floor finish changes');
+    assert(!wallFinishDirty.roomTopologyChanged && !wallFinishDirty.roomEnvironmentChanged,
+        'wall finish changes do not invalidate room consumers');
 
     const openingDraft = new core.BuildDocument(before);
     openingDraft.level().openings.set('door', { id: 'door', cells: [[2, 0]], axis: 'horizontal' });
@@ -169,8 +174,124 @@ function testSharedHistoryUsesExactDeltas() {
     assert(commands.length === 1, 'history replay does not create duplicate commands');
 }
 
+function testRoomDefinitionRemovalDoesNotLeaveEmptyPlan() {
+    const document = authoredDocument();
+    const transaction = new core.BuildTransaction({ document, width: 5, height: 5 });
+    transaction.initialize();
+    const original = document.captureStores();
+    const removed = transaction.run('Remove Living', (_draft, level) => level.rooms.delete('living'));
+    assert(removed.committed, 'room definition removal commits');
+    assert(!document.level().rooms.has('living'), 'removed room plan is deleted instead of retained with zero tiles');
+    assert(document.level().rooms.values().every(room => room.seedCells.length > 0),
+        'topology replacement never leaves a grey zero-tile plan behind');
+    assert(transaction.undo(), 'room definition removal is undoable');
+    same(document.captureStores(), original, 'undo restores the exact removed room definition');
+}
+
+function testRandomEditSequences() {
+    let state = 0x6d2b79f5;
+    const random = () => {
+        state = Math.imul(state ^ (state >>> 15), state | 1);
+        state ^= state + Math.imul(state ^ (state >>> 7), state | 61);
+        return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+    };
+    const document = authoredDocument();
+    document.level().rooms.set('painted', {
+        id: 'painted', buildingId: 'house', displayName: 'Painted', origin: 'painted', seedCells: []
+    });
+    document.authored = document.captureStores();
+    const transaction = new core.BuildTransaction({ document, width: 5, height: 5 });
+    transaction.initialize();
+    const wallRecord = { constructionId: 'basic', heightCells: 5, connectGroup: 'wall', buildingId: 'house' };
+    for (let run = 0; run < 40; run++) {
+        const before = document.captureStores();
+        const beforeStats = transaction.stats();
+        const x = Math.floor(random() * 5);
+        const y = Math.floor(random() * 5);
+        const key = core.BuildKeys.cell(x, y);
+        const touchedAtoms = new Set();
+        const result = transaction.run(`Property edit ${run}`, (_draft, level) => {
+            if (run % 10 === 0) {
+                const walls = level.walls.values();
+                const source = walls[run % walls.length];
+                const target = Array.from({ length: 25 }, (_, index) => ({ x: index % 5, y: Math.floor(index / 5) }))
+                    .find(cell => !level.walls.has(core.BuildKeys.cell(cell.x, cell.y)));
+                if (source && target) {
+                    const sourceKey = core.BuildKeys.cell(source.x, source.y);
+                    const targetKey = core.BuildKeys.cell(target.x, target.y);
+                    const movingAtoms = level.atoms.atomsOfCell(source.x, source.y);
+                    for (const atom of movingAtoms) {
+                        touchedAtoms.add(core.BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
+                        touchedAtoms.add(core.BuildKeys.atom(target.x, target.y, atom.face, atom.half));
+                    }
+                    const owner = level.rooms.ownerOfSeed(targetKey);
+                    if (owner) level.rooms.removeSeed(owner, targetKey);
+                    level.walls.delete(sourceKey);
+                    level.walls.setCell(target.x, target.y, source);
+                    level.atoms.translateCells(new Set([sourceKey]), target.x - source.x, target.y - source.y);
+                    return;
+                }
+            }
+            const existing = level.walls.get(key);
+            if (existing && run % 4 === 0) {
+                level.walls.delete(key);
+                for (const atom of level.atoms.atomsOfCell(x, y)) {
+                    touchedAtoms.add(core.BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
+                }
+                level.atoms.deleteCell(x, y);
+                return;
+            }
+            if (existing) {
+                const atomKey = core.BuildKeys.atom(x, y, 'south', run % 2);
+                touchedAtoms.add(atomKey);
+                const current = level.atoms.get(atomKey)?.finishId;
+                const finishId = current === 'finish_a' ? 'finish_b' : 'finish_a';
+                level.atoms.set(atomKey, { x, y, face: 'south', half: run % 2, finishId });
+                return;
+            }
+            if (run % 3 === 0) {
+                const owner = level.rooms.ownerOfSeed(key);
+                if (owner) level.rooms.removeSeed(owner, key);
+                level.walls.setCell(x, y, wallRecord);
+                return;
+            }
+            level.rooms.assignSeed(level.rooms.ownerOfSeed(key) === 'painted' ? 'living' : 'painted', key);
+        });
+        assert(result.committed, `property edit ${run} commits`);
+        const after = document.captureStores();
+        const afterStats = transaction.stats();
+        for (const counter of ['transactions', 'wallRebuilds', 'ownershipSolves', 'topologyRebuilds']) {
+            assert(afterStats[counter] === beforeStats[counter] + 1,
+                `property edit ${run} performs exactly one ${counter}`);
+        }
+        for (const [atomKey, atom] of before.levels.level_ground.atoms) {
+            if (!touchedAtoms.has(atomKey) && after.levels.level_ground.atoms.has(atomKey)) {
+                same(after.levels.level_ground.atoms.get(atomKey), atom,
+                    `property edit ${run} preserves unchanged atom ${atomKey}`);
+            }
+        }
+        for (const [wallKey] of before.levels.level_ground.walls) {
+            if (after.levels.level_ground.walls.has(wallKey)) continue;
+            assert(![...after.levels.level_ground.atoms.keys()].some(atomKey => atomKey.startsWith(`${wallKey}/`)),
+                `property edit ${run} removes atoms with their wall cell`);
+        }
+        const first = transaction.derive(document, { proposeSeeds: false, count: false });
+        const second = transaction.derive(document, { proposeSeeds: false, count: false });
+        same(first.grid.owner, second.grid.owner, `property edit ${run} ownership is idempotent`);
+        same(first.topology.components.map(component => [component.id, component.cells, component.planIds]),
+            second.topology.components.map(component => [component.id, component.cells, component.planIds]),
+            `property edit ${run} topology is idempotent`);
+        assert(transaction.undo(), `property edit ${run} can undo`);
+        same(document.captureStores(), before, `property edit ${run} undo is byte-equal`);
+        assert(transaction.redo(), `property edit ${run} can redo`);
+        same(document.captureStores(), after, `property edit ${run} redo is byte-equal`);
+    }
+}
+
 testAtomicCommitUndoRedo();
 testRejectAndPreviewAreIsolated();
 testFinishAndAtomDirtiness();
 testSharedHistoryUsesExactDeltas();
-console.log('Build transaction tests passed: atomic commit, rebuild budget, dirty sets, preview, undo, redo.');
+testRoomDefinitionRemovalDoesNotLeaveEmptyPlan();
+testRandomEditSequences();
+console.log('Build transaction tests passed: atomic commit, rebuild budget, dirty sets, preview, undo, redo, room removal, 40 property edits.');

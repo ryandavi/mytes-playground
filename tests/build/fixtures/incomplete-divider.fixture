@@ -1,0 +1,21 @@
+name: incomplete divider resolves its gap without a corrective pass
+reach: 1
+map:
+  AA#BB
+  AA#BB
+  AA.BB
+  AA#BB
+  AA#BB
+expect:
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+  AAAAABBBBB
+thresholds:
+  2,2

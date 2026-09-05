@@ -1,0 +1,13 @@
+name: overhang-one
+style: flat
+overhang: 1
+map:
+.....
+.###.
+.###.
+.....
+parts:
+FFFFF
+FFFFF
+FFFFF
+FFFFF

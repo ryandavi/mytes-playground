@@ -1,6 +1,6 @@
 # Build Surface Model Refactor Plan — September 2026
 
-**Status:** proposed, revised 2026-09-03
+**Status:** implemented, verified 2026-09-05
 **Scope:** build-mode structure, wall paint, floor ownership, room/building identity, persistence, undo, module boundaries, render budget
 **Supersedes:** room-scoped wall-face overrides; corrective multi-pass floor bleed; auto-room delete-and-recreate; `WallBuilder` as the home of everything wall-shaped
 **Keeps:** wall art, the cutaway state machine, openings/fixtures behaviour, Tiled as the authoring path, the Win98–XP UI language
@@ -51,7 +51,7 @@ These are five forms of one architectural issue: transient topology is used as p
 ### 3.2 Floors
 
 - Every block has at most one owner. Ownership is a single pure function of (wall snapshot, seed cells, priorities, reach).
-- A room reaches `reach` blocks (default 1, i.e. half a cell) beyond its seed cells, in every direction, through open ground and under masonry alike, and stops at a wall's centreline.
+- A room reaches `reach` blocks (default 1, i.e. half a cell) beyond its seed cells only under masonry and through threshold cells, and stops at a wall's centreline. It never grows across ordinary open ground.
 - Two regions that meet divide blocks at the shared half-tile boundary. Straight reach beats diagonal reach; then explicit priority; never draw order.
 - Walls conceal floor; they do not own it. There is no second ownership system for wall cells.
 - Doorways, gaps, end caps, T junctions, crossings, incomplete enclosures and corridors all use the same resolver. Special topology enters only as *inputs* (fences, thresholds), never as post-passes.
@@ -209,6 +209,7 @@ Openings, fixtures and decorations key on the same face address as atoms: `{ cel
 {
     width, height,                        // cells
     walls: Map<'x,y', { mask }>,          // from WallGeometry; openings are wall cells
+    expandCells: ['x,y', ...],            // the only open cells expansion may enter: geometry.thresholds
     plans: [{ id, seedCells, priority }], // seed cells never include wall cells
     reachBlocks: 1                        // SiteConfig.floorSystem.edgeBleedCells * 2
 }
@@ -228,11 +229,12 @@ Openings, fixtures and decorations key on the same face address as atoms: `{ cel
 
 1. **Seed.** For every plan, every seed cell's four blocks are owned at distance 0. Seeds are disjoint by construction (a cell has one owner in the store), so no conflict is possible here.
 2. **Fences.** Each wall cell contributes internal fences derived from its mask:
-   - a horizontal fence (separating its north pair from its south pair) if the mask has `W` or `E`, or the mask is 0;
-   - a vertical fence (separating its west pair from its east pair) if the mask has `N` or `S`, or the mask is 0.
+   - a horizontal fence (separating its north pair from its south pair) if the mask has `W` or `E`;
+   - a vertical fence (separating its west pair from its east pair) if the mask has `N` or `S`;
+   - both fences for a lone post or terminal cap.
    A straight run has one fence; corners, T's, crossings and lone posts have two. Fences exist only *inside* a cell. Steps between cells are always open.
-3. **Passability.** A straight step between adjacent blocks is passable unless both blocks lie in the same cell on opposite sides of one of that cell's fences. A diagonal step is passable only if both of its straight legs are passable (no corner cutting).
-4. **Expansion.** For `round = 1 .. reachBlocks`: every unowned block that is passable-adjacent to a block owned in the previous round is claimed. All claims in a round are computed against the previous round's grid, so iteration order cannot matter. When several plans reach one block in the same round:
+3. **Passability.** A straight step between adjacent blocks is passable unless both blocks lie in the same cell on opposite sides of one of that cell's fences. Entry into a terminal cap is also blocked lengthwise along its run, preventing ownership from flooding beyond an unfinished wall end. A diagonal step is passable only if both of its straight legs are passable (no corner cutting).
+4. **Expansion.** For `round = 1 .. reachBlocks`: every unowned block that is passable-adjacent to a block owned in the previous round **and lies in a wall cell or an `expandCells` cell** is claimed. Expansion buries a floor under the masonry enclosing it; it does not grow the room. A block on open ground is never claimed, so a floor is exactly the cells it was drawn on — anything else means the player aims at half-tiles that are not really part of the room. All claims in a round are computed against the previous round's grid, so iteration order cannot matter. When several plans reach one block in the same round:
    - a claimant reaching by a straight step beats one reaching diagonally;
    - then the higher `priority` wins; the default priority is smaller seed area first, then lower id.
 5. **Done.** Emit one immutable grid. There is no step 6.
@@ -244,11 +246,11 @@ Openings, fixtures and decorations key on the same face address as atoms: `{ cel
 - *T junctions and crossings.* Two fences make four quadrants, each reachable only from its own side. Nothing needs to inspect faces.
 - *End caps and gaps.* An end cap keeps its fence across the full cell, so the floor edge stays straight past the end of the wall rather than stepping sideways. A gap cell is open and is resolved by expansion from both sides, meeting at the centre.
 - *Doorways with an opening record.* The opening's cell is a wall cell with the same fences. Both floors meet under the door on its centreline.
-- *Removing a perimeter wall.* The vacated cell is open with no seed. The room reaches one block into it: a half-tile edge, never a full or quarter tile.
+- *Removing a perimeter wall.* The vacated cell is open with no seed, and expansion does not enter open ground, so the floor edge stays on the drawn cells. The player extends the room by drawing it, the same gesture that made it.
 - *Open-plan boundaries.* Two seeded plans with no wall between them touch at seed edges; there is nothing to contest.
 - *Outside corners of two rooms meeting corner to corner.* Straight-beats-diagonal decides the shared quarter, which was the 2026-08-16 fix, now a rule instead of a mask subtraction.
 
-**Thresholds.** A *threshold* is an open cell lying in the line of a wall: both of its neighbours along one axis are wall cells, and each is either connected outward along that axis or is a single-connection end cap. Seeds of `origin: 'authored'` or `'detected'` skip threshold cells so a doorway drawn as a gap splits at its centre rather than belonging wholesale to whichever rectangle covered it. A `painted` seed on a threshold is kept: the player said so. `WallGeometry.thresholds(snapshot)` computes them; the resolver only consumes seed lists.
+**Thresholds.** Thresholds are the one open-ground exception, passed in as `expandCells` so a doorway gap is floored from both sides rather than showing bare ground. A *threshold* is an open cell lying in the line of a wall: masonry exists at both ends of the gap along one axis, and each end is either connected outward along that axis or is a single-connection end cap. Seeds of every origin skip threshold cells during the solve so a doorway splits at its centre rather than belonging wholesale to whichever rectangle covered it. Stored seed lists remain untouched. `WallGeometry.thresholds(snapshot)` computes them; the resolver only consumes the filtered plan snapshots.
 
 **Size.** House is 30×30 cells, Outside 30×40: 3,600–4,800 blocks. One round over that is well under a millisecond. Even `reachBlocks: 4` is trivial.
 
@@ -282,7 +284,7 @@ Exterior atoms group into paint sections by `loopId`, which is how the Exterior 
 
 1. Seed cells that became wall cells are removed from their plan.
 2. Every enclosed component is matched to the plans whose seeds it contains.
-3. Enclosed cells owned by no plan are **proposed**: if the component contains exactly one plan, they join it; if it contains several, each unowned cell joins the plan with the nearest seed (straight distance, then priority); if it contains none, a new `origin: 'detected'` plan is created, parented to the building owning most of its enclosing wall cells, named `Room N`, and inheriting finishes and lighting from the plan that previously owned the majority of those cells if any (dividing a room does not redecorate it).
+3. Enclosed cells owned by no plan are **proposed**: authored and detected plans may absorb them (one plan directly; several by nearest seed, straight distance, then priority), but a painted plan never grows beyond the cells the player drew. If the component contains no plan, a new `origin: 'detected'` plan is created, parented to the building owning most of its enclosing wall cells, named `Room N`, and inheriting finishes and lighting from the plan that previously owned the majority of those cells if any (dividing a room does not redecorate it).
 4. Cells a plan already owns are never moved. Merging two rooms by removing a wall leaves both plans with their cells and the Navigator shows them as one open space; the player paints one into the other if they want one room.
 5. Unenclosed painted cells stay with their plan and the plan is marked outdoor (`Area`).
 
@@ -341,6 +343,7 @@ js/Map/Build/
   WallSurfaceAtomStore.js      CRUD + translate/extend + delta                   ≤ 200
   StoreDelta.js                diff/apply/invert for any keyed store             ≤ 150   pure
   BuildDocument.js             authored baseline + level scoping + version       ≤ 300
+  BuildDirty.js                dirty cells/blocks + consumer invalidation         ≤ 150
   BuildTransaction.js          the pipeline in §5, preview scratch, stats        ≤ 350
 
 js/Map/Regions/
@@ -577,7 +580,7 @@ Reviewers should not reopen these without a fixture that breaks them.
 
 ## 13a. Findings from playtesting, 2026-09-04
 
-**Notes only — no code was changed.** A session of fixes against these was written and then reverted at Ryan's request; the repo is back to the state before it. What follows is what was learned, so the same ground is not covered twice. Everything below was measured against Ryan's own Sandbox save (three painted rooms with partial walls), not a synthetic fixture.
+Implemented findings are marked below. Everything here was measured against Ryan's own Sandbox save (three painted rooms with partial walls), not a synthetic fixture.
 
 ### How to verify anything in this area
 
@@ -588,15 +591,37 @@ This cost most of the session and is the single most useful finding.
 - **The default House map has zero unowned cells** — all 900 belong to a `zone_*` plan. Any rule conditioned on "neighbouring ground is unowned" is dead on that map and cannot be reproduced there.
 - Load a real save instead: `copy(JSON.stringify(localStorage))` from the browser, inject it with Playwright's `addInitScript`, and measure `buildTransaction.cache.grid` — or drive the actual tool buttons (`#tool-room`, `#tool-wall`) after neutralising the headless loading modal and the stage's `visibility: hidden` (see the `verify` skill).
 
-### 1. Part-tile of floor hanging off the end of an unfinished wall
+### 0. A floor is exactly the cells it was drawn on — IMPLEMENTED
+
+Expansion claimed any passable-adjacent block, so a room drawn on open ground bled half a tile outward on every side. That put a half-tile skirt around every floor which looked like part of the room and was not, so nudging a room's edge tile by tile never matched the gesture. Expansion is now restricted to wall cells and `expandCells` (thresholds).
+
+Measured on Ryan's Sandbox save, `room_painted_3` (drawn `x44..53, y2..17`): the left edge sits at **43.5** on rows with a wall at x=43 and at **44** on rows of open grass; the right edge at **54** on open rows and **54.5** where the wall at x=54 runs. Exactly the drawn cells, except where the floor runs under a wall.
+
+Five fixtures were re-expected (`corner-to-corner`, `l-room`, `open-boundary`, `open-corridor`, `red-line-split`). Every walled fixture is unchanged, which is the check that the wall tuck and the doorway split survived.
+
+### 0b. A doorway wider than one cell now splits down its centreline — IMPLEMENTED
+
+`WallGeometry.findThresholds` only recognised a **single** open cell in the line of a wall, so a doorway two or more cells long was not a threshold at all. Its cells were seeded by whichever plan was drawn over them, so that plan's floor ran to the far edge of the opening while the same two floors met on the wall's centreline either side of it — the join between two floors visibly jogged half a tile exactly where the wall stopped.
+
+`isThresholdAxis` now walks the run of open cells to the masonry at each end. It cannot mistake a room for a gap: `pointsOutward` already requires the wall at each end to carry on *along* that axis, so a room's own perpendicular walls never qualify however far apart they are.
+
+Paired with it, threshold cells are dropped from every plan's seeds before ownership is solved (`BuildTransaction.seedsOffThresholds`), painted plans included — an opening belongs to both sides. **Stored room definitions are untouched**; only the solve sees the filtered list.
+
+Measured on Ryan's Sandbox save, rooms 4 and 5 either side of the divider at `x=29` (wall present at `y34–36` and `y41–42`, missing at `y37–40`): the seam was `29.5` beside the wall and `30` through the gap, and is now **29.5 on every row**. Fixture `wide-doorway-splits`.
+
+**This supersedes §14 item 3**, which kept a painted seed on a threshold.
+
+### 1. Part-tile of floor hanging off the end of an unfinished wall — **FIXED**
 
 `FloorOwnershipResolver.canStep` applies a wall cell's fences **only to moves inside that cell**; entering a wall cell from a neighbouring cell is always permitted. So a room lying past the end of a wall flows into the end-cap cell *lengthwise* and fills it, and a cap's rounded art does not cover a whole cell — the surplus shows as a part-tile hanging off the wall.
 
 Note this contradicts §4.7, which already claims "an end cap keeps its fence across the full cell". `fencesForMask` does not do that: for a cap mask (one connection) it returns a fence on one axis only.
 
 A fix was written and verified — all 10 end caps on Ryan's save went from flooded to clean with all fixtures still green:
-- allow entry into a wall cell only **perpendicular to the run** (a lone post, having no length, still takes floor from every side); and
+- allow entry into a terminal wall cell only **perpendicular to its run** (a lone post, having no length, still takes floor from every side); and
 - give a cap (`connectionCount(mask) <= 1`) a fence on **both** axes.
+
+The fix is now retained and guarded by the rotation/mirroring fixture `unfinished-wall-end`.
 
 ### 2. A wall drawn beside a room moves that room's floor half a cell
 
@@ -620,7 +645,7 @@ y16–y18  x = 36.5   (bare ground again → pulled in)
 
 Insetting against neighbouring plans as well makes each edge uniform but leaves a full cell of bare terrain at every room-to-room junction, which is worse. For the three cases to agree, the wall would have to occupy the room's **own** boundary cell — a change to what a room's footprint means, not a resolver tweak. Do not re-attempt without that.
 
-### 4. Wall paint breaks off a half-cell section at every corner
+### 4. Wall paint breaks off a half-cell section at every corner — IMPLEMENTED
 
 A corner cell's band is buried on the room side by the arm turning away from the run, so classified on its own it becomes an `exterior` section — a 16px paint target at each end of a run that refuses the colour the rest of the wall takes. On the House map a wall run resolved as 19 sections where 17 were correct.
 
@@ -628,11 +653,25 @@ A fix was written and verified: a single entry point returning the visible atom 
 
 ### 5. Smaller findings
 
-- **Thresholds are never filtered out of seeds in the live path.** `BuildTransaction.derive` passes raw `seedCells` to the resolver, so whichever plan's rectangle covers a doorway gap takes the whole opening and wears its floor across to the far side. §4.7 says authored/detected seeds should skip threshold cells; the code does not implement it. Ryan's call on 2026-09-04 was that painted seeds should skip them too — painting across a doorway says which floor goes there, not that one room owns the opening. **This supersedes §14 item 3.**
-- **`WallGeometry.findThresholds` only recognises single-cell gaps.** A two-cell doorway is not a threshold and never splits.
-- **`RoomTopology.proposeSeeds` grows any plan into newly enclosed ground.** Drawing a wall one tile outside a painted floor turned 12 seeds into 30 — the floor silently claimed the whole enclosed ring.
-- **`FloorRenderer.computeOwnership` is a second, region-seeded ownership engine.** Only `SurfaceDebug` still reaches it, and calling it **overwrites the live grid** as a side effect. §15 forbids a second production ownership engine; this is one.
+- **Threshold seeds in the live path — FIXED.** `BuildTransaction.derive` filters threshold cells from every plan snapshot passed to the resolver; stored room definitions remain untouched. Ryan's call on 2026-09-04 was that painted seeds skip them too — painting across a doorway says which floor goes there, not that one room owns the opening. **This supersedes §14 item 3.**
+- **Wide thresholds — FIXED.** `WallGeometry.findThresholds` walks across an arbitrary-length gap to the masonry at both ends, so multi-cell doorways split consistently.
+- **Painted plans growing into newly enclosed ground — FIXED.** `RoomTopology.proposeSeeds` no longer enlarges an `origin: 'painted'` plan. Authored/detected enclosure filling and wholly new detected rooms retain the plan's original behavior.
+- **`FloorRenderer.computeOwnership` was a second, region-seeded ownership engine. — FIXED.** It has been removed. `FloorRenderer` accepts only the canonical grid supplied by `BuildTransaction`, and `SurfaceDebug` reads that same cached grid without mutating renderer state.
 - **The build grid is bounded to `.canvas`, which is the padded render area.** The map reserves render padding for tall wall art (160px above, one cell all round), so the grid tiles across space nothing can be placed in — 32×36 cells drawn for a 30×30 map. The debug overlay draws only the real grid, which is why it reads better.
+- **Removing a room definition left its empty plan behind. — FIXED.** Room removal now transfers the plan's authored seed cells to its chosen neighbour, deletes the source `RoomPlan` in the same transaction, and remains undoable. A still-enclosed space may immediately receive a fresh detected plan, but the removed zero-tile definition no longer remains as a grey row.
+- **Choose was selectable with no room on the map. — FIXED.** The Room Areas panel disables Choose when no projected room owns tiles and switches the active operation to Add.
+
+## 13b. Cutover verification, 2026-09-05
+
+- The v8 stores, transaction, ownership resolver, topology projection, atom renderer, chunked floors, geometric wall hit testing, Tiled exporter and shared build history are live. The former room-assignment, enclosure, building-topology and floor engines are deleted from production and the manifest.
+- The module budgets in §6 pass. `BuildTransaction` is 264 lines; the four named wall subsystems are within their hard limits; `WallBuilder` is a 141-line facade. `BuildDirty` owns renderer and consumer invalidation so the transaction stays below its limit.
+- The Node suite passes 23 fixtures in 184 orientations, 11 geometry contracts, 100 randomized ownership cases, 40 randomized transaction edits, v8 round trips, v7 reset, exact undo/redo and geometric hit-test cases.
+- Real House-map browser checks pass Section, Room, three-plan Space, Exterior and Floor preview/apply parity. Each gesture performs one geometry build, one ownership solve and one topology build; previews do not mutate live stores; undo restores the stores exactly.
+- Navigator and canvas selection share `BuildSelection`. The Inspector exposes persisted building/room names, room-to-building assignment, atom finish provenance, building attachments and the required building commands. Tool keys `1`–`5`, layered Escape, duplicate, merge, separate, demolish, undo and redo were driven in the browser.
+- Fresh saves contain only `build`, `droppedItems`, `mapId`, `objects`, `savedAt` and `terrain`. A v8 save restored byte-identical serialized deltas and stores, and a real page reload preserved room wall/floor finishes, names and building assignment.
+- House renders without console or page errors in Up, Cutaway, Down and Hidden presentations at native zoom. Solid wall points resolve atom addresses, opening apertures fall through, and pointer sweeps leave `imageDataReads` at zero.
+- Moving and cancelling both an opening and a fixture keeps the live object, renderer cache and canonical attachment store aligned. One completed drag produces one shared-history command with exact undo/redo. Fixture placement now resolves straight spans inside geometry pieces, so endpoint junctions no longer make every House wall reject a returned painting.
+- Build commits are the persistence and derived-consumer boundary. Paint-only commits skip door topology and lighting; structural revisions invalidate those consumers once. Content, time-source and text-encoding validation pass.
 
 ## 14. Questions closed 2026-09-03
 
@@ -640,7 +679,7 @@ Ryan's direction: do whatever gives the best result; migration is unnecessary; l
 
 1. **Visible band when both sides are rooms:** the depth rule, as a pure function (§4.10).
 2. **Old saves:** reset, no migration, no legacy folder (§10.2).
-3. **Thresholds:** a gap cell in the line of a wall splits at its centre unless the player painted it (§4.7).
+3. **Thresholds:** every gap cell in the line of a wall splits at its centre, including cells present in a painted plan's stored seeds (§4.7 and §13a.0b).
 4. **Reference screenshot:** described as the `red-line-split` fixture in §11.4; WP0 encodes it as the first fixture.
 
 Nothing remains open. WP0 and WP1 can start.

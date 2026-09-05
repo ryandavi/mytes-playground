@@ -1,0 +1,19 @@
+name: doorway opening between two rooms
+reach: 1
+map:
+  ##########
+  #AAAA#BBB#
+  #AAAADBBB#
+  #AAAA#BBB#
+  ##########
+expect:
+  ....................
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  .AAAAAAAAAABBBBBBBB.
+  ....................

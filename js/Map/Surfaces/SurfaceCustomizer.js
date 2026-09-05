@@ -1,7 +1,7 @@
 class SurfaceCustomizer {
     constructor(gameMap) {
         this.gameMap = gameMap;
-        this.previewState = null;
+        this.previewSession = null;
     }
 
     listFinishes(surface) {
@@ -49,7 +49,7 @@ class SurfaceCustomizer {
             before, after, build.cache.grid, preview.grid, build.levelId,
             preview.geometry, preview.topology
         );
-        this.previewState = { dirty };
+        this.previewSession = { dirty };
         this.gameMap.wallBuilder.previewDocument = preview.document;
         this.gameMap.wallBuilder.previewCache = preview;
         this.gameMap.floorBuilder.previewDocument = preview.document;
@@ -59,15 +59,15 @@ class SurfaceCustomizer {
     }
 
     revertPreview() {
-        if (!this.previewState) return false;
+        if (!this.previewSession) return false;
         const wallBuilder = this.gameMap?.wallBuilder;
-        const { dirty } = this.previewState;
+        const { dirty } = this.previewSession;
         wallBuilder.previewDocument = null;
         wallBuilder.previewCache = null;
         this.gameMap.floorBuilder.previewDocument = null;
         wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
         this.gameMap.floorBuilder.invalidate(dirty.blocks);
-        this.previewState = null;
+        this.previewSession = null;
         return true;
     }
 
@@ -129,10 +129,12 @@ class SurfaceCustomizer {
                 }
         }
         if (roomWallIds.size) for (const atom of level.atoms.values()) {
-                const classification = WallFaceResolver.classify(
+                const topology = { ...cache.topology, walls: cache.geometry };
+                const classification = WallFaceResolver.classifyPaintAtom(
                     atom,
                     cache.grid,
-                    { ...cache.topology, walls: cache.geometry }
+                    topology,
+                    cache.geometry
                 );
                 if (roomWallIds.has(classification.roomId)) {
                     level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
@@ -141,8 +143,9 @@ class SurfaceCustomizer {
         if (exteriorBuildingIds.size) for (const atom of level.atoms.values()) {
             const wall = level.walls.get(BuildKeys.cell(atom.x, atom.y));
             if (!wall || !exteriorBuildingIds.has(wall.buildingId)) continue;
-            const classification = WallFaceResolver.classify(
-                atom, cache.grid, { ...cache.topology, walls: cache.geometry }
+            const topology = { ...cache.topology, walls: cache.geometry };
+            const classification = WallFaceResolver.classifyPaintAtom(
+                atom, cache.grid, topology, cache.geometry
             );
             if (classification.kind === 'exterior') {
                 level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));

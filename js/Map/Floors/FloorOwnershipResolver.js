@@ -17,6 +17,7 @@ class FloorOwnershipResolver {
         const blockHeight = height * 2;
         const reachBlocks = Math.max(0, Math.floor(Number(input?.reachBlocks) || 0));
         const walls = FloorOwnershipResolver.normalizeWallMasks(input?.walls);
+        const expandCells = new Set(input?.expandCells || []);
         const plans = FloorOwnershipResolver.normalizePlans(input?.plans);
         let owners = new Array(blockWidth * blockHeight).fill(null);
 
@@ -42,6 +43,7 @@ class FloorOwnershipResolver {
                 for (let bx = 0; bx < blockWidth; bx++) {
                     const targetIndex = by * blockWidth + bx;
                     if (previous[targetIndex] !== null) continue;
+                    if (!FloorOwnershipResolver.canExpandInto(bx, by, walls, expandCells)) continue;
                     const claims = new Map();
                     for (const step of FloorOwnershipResolver.STEPS) {
                         const sx = bx - step.dx;
@@ -99,6 +101,16 @@ class FloorOwnershipResolver {
             a.id.localeCompare(b.id);
     }
 
+    // Expansion exists to bury a floor under the masonry that encloses it, not
+    // to grow the room. A block on open ground is never claimed, so a floor is
+    // exactly the cells it was drawn on; only wall cells, and the threshold
+    // cells a doorway gap leaves in the line of a wall, are reachable beyond
+    // the seeds.
+    static canExpandInto(bx, by, walls, expandCells) {
+        const key = BuildKeys.cell(Math.floor(bx / 2), Math.floor(by / 2));
+        return walls.has(key) || expandCells.has(key);
+    }
+
     static canStep(sx, sy, tx, ty, walls) {
         const dx = tx - sx;
         const dy = ty - sy;
@@ -111,7 +123,14 @@ class FloorOwnershipResolver {
         const sourceCellY = Math.floor(sy / 2);
         const targetCellX = Math.floor(tx / 2);
         const targetCellY = Math.floor(ty / 2);
-        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) return true;
+        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) {
+            const targetMask = walls.get(BuildKeys.cell(targetCellX, targetCellY));
+            if (targetMask === undefined || targetMask === 0) return true;
+            const terminal = WallGeometry.connectionCount(targetMask) === 1;
+            if (terminal && dx !== 0 && (targetMask & WallGeometry.MASK_HORIZONTAL) !== 0) return false;
+            if (terminal && dy !== 0 && (targetMask & WallGeometry.MASK_VERTICAL) !== 0) return false;
+            return true;
+        }
         const mask = walls.get(BuildKeys.cell(sourceCellX, sourceCellY));
         if (mask === undefined) return true;
         const fences = WallGeometry.fencesForMask(mask);

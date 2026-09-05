@@ -58,7 +58,11 @@ class RoomTopology {
         const createdIds = [];
         for (const component of components) {
             const candidates = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
-            const unowned = component.cells.filter(key => !seedOwner.has(key));
+            const expandable = candidates.filter(plan => plan.origin !== 'painted');
+            // Thresholds belong to both sides of their opening and are settled
+            // by expansion, so they are never proposed to a plan.
+            const unowned = component.cells.filter(key =>
+                !seedOwner.has(key) && !geometry.thresholds.has(key));
             if (!unowned.length) continue;
             if (!candidates.length) {
                 const previousId = RoomTopology.majorityPreviousOwner(unowned, input.previousGrid);
@@ -84,8 +88,9 @@ class RoomTopology {
                 for (const key of unowned) seedOwner.set(key, id);
                 continue;
             }
+            if (!expandable.length) continue;
             for (const key of unowned) {
-                const winner = candidates.length === 1 ? candidates[0] : RoomTopology.nearestPlan(key, candidates);
+                const winner = expandable.length === 1 ? expandable[0] : RoomTopology.nearestPlan(key, expandable);
                 winner.seedCells.push(key);
                 seedOwner.set(key, winner.id);
             }

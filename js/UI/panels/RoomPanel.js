@@ -360,6 +360,7 @@ class RoomPanel extends ModalWindow {
             : null;
 
         const rooms = this.rooms();
+        this.syncOperationAvailability(rooms);
         this.listElement.replaceChildren(
             ...(rooms.length ? rooms.map(entry => this.createRow(entry)) : [RoomPanel.emptyState()])
         );
@@ -371,6 +372,16 @@ class RoomPanel extends ModalWindow {
                 ?.focus();
         }
         if (this.scrollContainer) this.scrollContainer.scrollTop = scroll;
+    }
+
+    syncOperationAvailability(rooms = this.rooms()) {
+        const canChoose = rooms.some(entry => entry.cells > 0);
+        const choose = this.operationSegment?.buttons.find(button =>
+            button.dataset.value === RoomPanel.OPERATIONS.SELECT);
+        if (choose) choose.disabled = !canChoose;
+        if (!canChoose && this.getOperation() === RoomPanel.OPERATIONS.SELECT) {
+            this.operationSegment.select(RoomPanel.OPERATIONS.ADD);
+        }
     }
 
     /**
@@ -642,7 +653,6 @@ class RoomPanel extends ModalWindow {
         const room = this.gameMap?.regionManager?.get('room', roomId);
         const islands = this.roomIslands(room);
         if (!room || islands.length < 2) return false;
-
         const baseName = this.label(room);
         const type = room.properties?.roomType ?? SiteConfig.rooms.defaultType;
         const specs = [];
@@ -652,45 +662,32 @@ class RoomPanel extends ModalWindow {
             ...(this.gameMap?.regionManager?.all('room') ?? []).map(entry => entry.id)
         ]);
         const mintId = () => {
-            for (let number = 1; ; number += 1) {
+            for (let number = 1; ; number++) {
                 const candidate = `${RoomPanel.PAINTED_PREFIX}${number}`;
-                if (taken.has(candidate)) continue;
-                taken.add(candidate);
-                return candidate;
+                if (!taken.has(candidate)) {
+                    taken.add(candidate);
+                    return candidate;
+                }
             }
         };
-        for (let index = 1; index < islands.length; index += 1) {
+        for (let index = 1; index < islands.length; index++) {
             const id = mintId();
             const generic = /^(Room|Area) \d+$/.exec(baseName);
             const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
             specs.push({
-                id,
-                name,
-                type,
+                id, name, type,
                 buildingId: room.properties?.buildingId ?? null,
                 floorFinishId: room.properties?.floorFinishId ?? null,
                 wallFinishId: room.properties?.wallFinishId ?? null
             });
             for (const key of islands[index]) {
-                const [x, y] = key.split(',').map(Number);
+                const { x, y } = BuildKeys.parseCell(key);
                 changes.push({ x, y, roomId: id });
             }
         }
-
         const result = this.applySplitChanges(changes, specs);
-        if (!result || result.applied.length === 0) return false;
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Split Room (${islands.length} islands)`,
-                undo: () => this.applySplitChanges(backward, []),
-                redo: () => this.applySplitChanges(forward, specs)
-            });
-        }
-        this.parent.showMessage(
-            `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
-        );
+        if (!result?.applied.length) return false;
+        this.parent.showMessage(`${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms');
         return true;
     }
 
@@ -806,42 +803,19 @@ class RoomPanel extends ModalWindow {
     }
 
     demolishRoom(room, plan = this.demolitionPlan(room)) {
-        // Clicking rebuilds the room row before its demolition button can emit
-        // pointerleave, so explicitly remove the striped hover preview.
         this.clearPerimeterGaps();
         const builder = this.gameMap?.wallBuilder;
+        if (!builder || !this.gameMap?.buildTransaction) return false;
         const roomCells = this.roomCells(room.id);
         const heir = this.largestNeighbour(room.id, roomCells);
-        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
         const roomChanges = roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null }));
-        const wallResult = builder?.applyWallCellChanges(
+        const wallResult = builder.applyWallCellChanges(
             plan.removable.map(cell => ({ ...cell, data: null })),
-            usesBuildTransaction ? { roomChanges, label: `Demolish ${this.label(room)}` } : {}
+            { roomChanges, label: `Demolish ${this.label(room)}` }
         );
-        const roomResult = usesBuildTransaction ? { applied: roomChanges, inverse: [] } :
-            this.assignments?.applyChanges(roomChanges, { emit: false });
-        if ((!wallResult || wallResult.applied.length === 0) &&
-            (!roomResult || roomResult.applied.length === 0)) return false;
-
-        const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
-        const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
-        const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
-        const backwardRooms = Utility.deepClone(roomResult?.inverse ?? []);
-        const replay = (walls, rooms) => {
-            if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-            if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
-            this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-            this.gameMap?.core?.user?._scheduleSave?.();
-        };
-        if (!usesBuildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Demolish ${this.label(room)}`,
-                undo: () => replay(backwardWalls, backwardRooms),
-                redo: () => replay(forwardWalls, forwardRooms)
-            });
-        }
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        if (!wallResult?.applied.length && roomChanges.length === 0) return false;
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         this.parent.showMessage(
             `${wallResult?.applied.length ?? 0} exterior wall cells removed. Shared and occupied walls stayed.`,
             'success', 'Rooms'
@@ -869,27 +843,20 @@ class RoomPanel extends ModalWindow {
     encloseRoom(roomId) {
         const room = this.gameMap?.regionManager?.get('room', roomId);
         const plan = this.perimeterPlan(room);
-        if (!room || plan.missing.length === 0) return false;
         const builder = this.gameMap?.wallBuilder;
-        const changes = plan.missing.map(cell => ({ ...cell, data: {} }));
-        const result = builder?.applyWallCellChanges(changes);
-        if (!result || result.applied.length === 0) {
+        if (!room || !builder || !this.gameMap?.buildTransaction || plan.missing.length === 0) return false;
+        const result = builder.applyWallCellChanges(
+            plan.missing.map(cell => ({ ...cell, data: {} })),
+            { label: `Enclose ${this.label(room)}` }
+        );
+        if (!result?.applied.length) {
             const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';
             this.parent.showMessage(`The room was not enclosed — ${reason.toLowerCase()}`, 'warning', 'Rooms');
             return false;
         }
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
-                undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-                redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
-            });
-        }
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         const blocked = result.rejected.length;
         this.parent.showMessage(
             blocked
@@ -948,33 +915,45 @@ class RoomPanel extends ModalWindow {
         // nothing to undo. It goes when you say so.
         if (roomId === this.pending?.id) return this.cancelPending();
         const room = this.gameMap?.regionManager?.get('room', roomId);
+        const plan = this.gameMap?.buildDocument?.level?.().rooms.get(roomId);
         const cells = this.roomCells(roomId);
-        if (!room || cells.length === 0) {
-            this.parent.showMessage('That room has no floor left to give away.', 'info', 'Rooms');
+        if (!plan) {
+            this.parent.showMessage('That room definition is already gone.', 'info', 'Rooms');
             return false;
         }
         const heir = this.largestNeighbour(roomId, cells);
-        if (!this.canDissolve(roomId, cells, heir)) {
-            this.parent.showMessage(
-                'The walls define this room. Demolish its exterior walls or edit the walls directly.',
-                'info', 'Rooms'
-            );
-            return false;
-        }
         if (!window.confirm(
-            `Remove the ${this.label(room)} definition?\n\n` +
-            `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
-            `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` +
+            `Remove the ${this.label(room || { id: plan.id, properties: plan })} definition?\n\n` +
+            `${cells.length ? `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
+                `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` : ''}` +
             'Its walls and everything attached to them stay. Ctrl+Z undoes this.'
         )) return false;
 
         if (this.selected === roomId) this.selected = heir?.id ?? null;
-        return this.commitCells(cells, heir?.id ?? null);
+        return this.dissolveRoomPlan(roomId, heir?.id ?? null);
     }
 
-    canDissolve(roomId, cells = this.roomCells(roomId), heir = this.largestNeighbour(roomId, cells)) {
-        const next = heir?.id ?? null;
-        return cells.some(cell => this.assignments?.get(cell.x, cell.y) !== next);
+    canDissolve(roomId) {
+        return roomId === this.pending?.id ||
+            this.gameMap?.buildDocument?.level?.().rooms.has(roomId) === true;
+    }
+
+    dissolveRoomPlan(roomId, heirId = null) {
+        const transaction = this.gameMap?.buildTransaction;
+        const source = transaction?.document?.level(transaction.levelId).rooms.get(roomId);
+        if (!transaction || !source) return false;
+        const label = `Remove ${source.displayName || source.id}`;
+        const result = transaction.run(label, (_draft, level) => {
+            if (heirId && level.rooms.has(heirId)) {
+                for (const key of source.seedCells) level.rooms.assignSeed(heirId, key);
+            }
+            level.rooms.delete(roomId);
+        });
+        if (!result.committed) return false;
+        this.playSound(SiteConfig.buildMode.sounds.paint);
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        return true;
     }
 
     /**
@@ -1061,6 +1040,9 @@ class RoomPanel extends ModalWindow {
         }
         this.markSelection();
         this.renderHighlight();
+        if (this.gameMap?.buildDocument?.level?.().rooms.has(value)) {
+            this.parent.buildSelection?.set({ kind: 'room', id: value });
+        }
     }
 
     /**
@@ -1340,7 +1322,7 @@ class RoomPanel extends ModalWindow {
             // this, painting with New Room left the brush on "New Room" and the
             // next stroke made a second one — which is exactly the "why did that
             // make another room?" that made this tool confusing.
-            this.selected = roomId;
+            this.select(roomId);
         }
     }
 
@@ -1515,49 +1497,18 @@ class RoomPanel extends ModalWindow {
     }
 
     commitCells(cells, roomId) {
-        const assignments = this.assignments;
-        if (!assignments || !cells?.length) return false;
-        const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })), {
-            emit: false,
-            label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)`
-        });
-        // Nothing changed is not a refusal: painting a room over floor that is
-        // already in that room is the most ordinary thing to do with a brush,
-        // and answering it with an error noise taught people the tool was
-        // broken. Silence, the way an inert wall cell is silent.
-        if (!result || result.applied.length === 0) return false;
-
-        const forward = result.applied.map(change => ({ ...change }));
-        const backward = result.inverse.map(change => ({ ...change }));
-        const count = result.applied.length;
-        if (!this.gameMap?.buildTransaction) {
-            this.parent.parent?.buildHistory?.push({
-                label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
-                undo: () => this.replayCellChanges(backward),
-                redo: () => this.replayCellChanges(forward)
-            });
-        }
-
-        this.playSound(SiteConfig.buildMode.sounds.paint);
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
-        return true;
-    }
-
-    replayCellChanges(changes) {
-        this.cancelDrag();
-        this.clearHover();
-        this.clearPerimeterGaps();
-        this.clearRoomTints();
-        this.clearHighlight();
-        const result = this.assignments?.applyChanges(
-            changes.map(change => ({ ...change })), { emit: false }
+        if (!this.gameMap?.buildTransaction || !cells?.length) return false;
+        const result = this.applyRoomCellChanges(
+            cells.map(cell => ({ ...cell, roomId })),
+            { label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)` }
         );
-        if (!result || result.applied.length === 0) return false;
-        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
-        this.gameMap?.core?.user?._scheduleSave?.();
+        if (!result?.applied.length) return false;
+        this.playSound(SiteConfig.buildMode.sounds.paint);
+        this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap.core?.user?._scheduleSave?.();
         return true;
     }
+
 
     /**
      * A room's name and type. The same edit the panel's own inputs make, through
@@ -1567,57 +1518,20 @@ class RoomPanel extends ModalWindow {
      * rooms should own their names.
      */
     commitRoom(roomId, patch, label) {
-        // A room with no floor yet is not in the region manager: its name and
-        // type live on the pending record until it has one, and settlePending
-        // writes them across. Nothing to undo — none of it is on the map yet.
         if (roomId === this.pending?.id) {
             this.pending = { ...this.pending, ...patch };
             return true;
         }
         const build = this.gameMap?.buildTransaction;
         const plan = build?.document?.level(build.levelId).rooms.get(roomId);
-        if (build && plan) {
-            const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
-            const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
-            return build.run(label, (_draft, level) => level.rooms.set(roomId, {
-                ...plan,
-                displayName: nextName ?? plan.authoredDisplayName ?? roomId,
-                roomType: nextType
-            })).committed;
-        }
-        const region = this.gameMap?.regionManager?.get('room', roomId);
-        if (!region) return false;
-        const previous = {
-            name: region.properties?.playerName ?? null,
-            type: region.properties?.roomType ?? SiteConfig.rooms.defaultType
-        };
-        const next = { ...previous, ...patch };
-        if (next.name === previous.name && next.type === previous.type) return false;
-
-        const apply = (state) => {
-            const target = this.gameMap?.regionManager?.get('room', roomId);
-            if (!target) return false;
-            target.properties = {
-                ...target.properties,
-                playerName: state.name,
-                roomType: state.type,
-                displayName: state.name
-                    ?? target.properties.authoredDisplayName
-                    ?? target.properties.displayName
-            };
-            this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
-            this.gameMap.core?.user?._scheduleSave?.();
-            this.syncRow(roomId);
-            return true;
-        };
-
-        if (!apply(next)) return false;
-        this.parent.parent?.buildHistory?.push({
-            label,
-            undo: () => apply(previous),
-            redo: () => apply(next)
-        });
-        return true;
+        if (!build || !plan) return false;
+        const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
+        const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
+        return build.run(label, (_draft, level) => level.rooms.set(roomId, {
+            ...plan,
+            displayName: nextName ?? plan.authoredDisplayName ?? roomId,
+            roomType: nextType
+        })).committed;
     }
 
     playSound(soundId, options = {}) {
