@@ -37,10 +37,24 @@ class WallBuildPanel extends CellDragBuildPanel {
             if (!this.parent?.changeToolMode(UIToolModes.ROOM)) return;
             if (roomId) this.parent?.roomPanel?.select?.(roomId);
         });
+        // The palette is a view of the inventory, so it follows it. Rendering it
+        // once when the tool opens meant a door you had just hung was still
+        // listed, at the count it had before you hung it.
+        this.unsubscribeInventory = this.parent?.parent?.eventManager?.on?.(
+            EVENTS.INVENTORY_CHANGED, () => {
+                if (this.parent?.isTool?.(this.toolMode)) this.renderOwnedOpenings();
+            }
+        ) || null;
     }
 
     getBuilder() {
         return this.gameMap?.wallBuilder || null;
+    }
+
+    dispose() {
+        this.unsubscribeInventory?.();
+        this.unsubscribeInventory = null;
+        super.dispose?.();
     }
 
     handleToolModeChanged(mode) {

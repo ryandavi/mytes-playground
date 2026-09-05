@@ -12,6 +12,7 @@ class BuildingPlanStore extends BuildRecordStore {
             id,
             displayName,
             authoredDisplayName: String(record.authoredDisplayName || displayName),
+            buildingType: record.buildingType ? String(record.buildingType) : null,
             exteriorFinishId: record.exteriorFinishId || null,
             properties: StoreDelta.clone(record.properties || {})
         };

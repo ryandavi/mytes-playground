@@ -25,6 +25,7 @@ class RoomTopology {
         }));
         const loopByBlock = RoomTopology.loopBlocks(enrichedComponents);
         const adjacency = RoomTopology.openingAdjacency(input.openings || [], grid);
+        const served = RoomTopology.openingsByRoom(input.openings || [], grid);
         const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, grid);
         const shellEdgesByBuilding = new Map([...roofableByBuilding].map(([buildingId, cells]) => [
             buildingId, Object.freeze(RoomTopology.boundaryEdges(cells))
@@ -35,6 +36,10 @@ class RoomTopology {
             openSpaces: Object.freeze(enrichedComponents.filter(component => !component.planIds.length)),
             planStates,
             adjacency: Object.freeze(adjacency),
+            // Which rooms an opening of each type reaches. Adjacency answers
+            // "are these two rooms connected", which says nothing about a door
+            // to the outside — and a front door is still a way in.
+            openingRooms: served,
             loopByBlock,
             roofableByBuilding,
             shellEdgesByBuilding,
@@ -135,21 +140,39 @@ class RoomTopology {
         return result;
     }
 
+    /** roomId → Set of opening types touching it ('door', 'window', …). */
+    static openingsByRoom(openings, grid) {
+        const byRoom = new Map();
+        if (!grid) return byRoom;
+        for (const opening of openings instanceof Map ? openings.values() : openings) {
+            const type = String(opening.type || 'opening');
+            for (const roomId of RoomTopology.roomsAtOpening(opening, grid)) {
+                if (!byRoom.has(roomId)) byRoom.set(roomId, new Set());
+                byRoom.get(roomId).add(type);
+            }
+        }
+        return byRoom;
+    }
+
+    static roomsAtOpening(opening, grid) {
+        const rooms = new Set();
+        for (const cell of opening.cells || []) {
+            const [x, y] = Array.isArray(cell) ? cell : [cell.x, cell.y];
+            const faces = opening.axis === 'vertical' ? ['west', 'east'] : ['north', 'south'];
+            for (const face of faces) for (const half of [0, 1]) {
+                const [bx, by] = BuildKeys.lookBlock(x, y, face, half);
+                const owner = grid.ownerAt(bx, by);
+                if (owner) rooms.add(owner);
+            }
+        }
+        return rooms;
+    }
+
     static openingAdjacency(openings, grid) {
         if (!grid) return [];
         const pairs = new Set();
-        for (const opening of openings instanceof Map ? opening.values() : openings) {
-            const rooms = new Set();
-            for (const cell of opening.cells || []) {
-                const [x, y] = Array.isArray(cell) ? cell : [cell.x, cell.y];
-                const faces = opening.axis === 'vertical' ? ['west', 'east'] : ['north', 'south'];
-                for (const face of faces) for (const half of [0, 1]) {
-                    const [bx, by] = BuildKeys.lookBlock(x, y, face, half);
-                    const owner = grid.ownerAt(bx, by);
-                    if (owner) rooms.add(owner);
-                }
-            }
-            const ids = [...rooms].sort();
+        for (const opening of openings instanceof Map ? openings.values() : openings) {
+            const ids = [...RoomTopology.roomsAtOpening(opening, grid)].sort();
             for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) pairs.add(`${ids[a]}\0${ids[b]}`);
         }
         return [...pairs].sort().map(pair => {

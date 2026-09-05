@@ -31,6 +31,19 @@ class RoomPanel extends ModalWindow {
     // Twelve hues a person can name, evenly spaced round the wheel.
     static HUES = Object.freeze([8, 32, 52, 84, 140, 168, 194, 218, 250, 280, 310, 336]);
 
+    // roomId → chosen hue index, mirrored from the room plans on every build
+    // commit. `roomColour` is static and called from the floor overlays, the
+    // rows and the ghost tiles; giving it a lookup keeps all of them agreeing
+    // without threading the document through each call.
+    static chosenColours = new Map();
+
+    static syncChosenColours(level) {
+        RoomPanel.chosenColours = new Map((level?.rooms?.values?.() || [])
+            .filter(plan => Number.isInteger(plan.colourIndex))
+            .map(plan => [plan.id, plan.colourIndex]));
+        return RoomPanel.chosenColours;
+    }
+
     constructor(parent) {
         super(parent, {
             id: 'room-panel',
@@ -56,7 +69,13 @@ class RoomPanel extends ModalWindow {
         this.boundPointerMove = this.handlePointerMove.bind(this);
         this.boundPointerUp = this.handlePointerUp.bind(this);
         this.boundPointerLeave = this.clearHover.bind(this);
-        this.boundRefresh = () => this.refresh();
+        // The colour mirror is kept in step whatever tool is open: the floor
+        // tints and the Inspector read it too, and `refresh` stands down when
+        // the Room tool is not the active one.
+        this.boundRefresh = () => {
+            RoomPanel.syncChosenColours(this.gameMap?.buildDocument?.level?.());
+            this.refresh();
+        };
         this.init();
         this.listElement = this.modalElement?.querySelector('.room-panel-list') || null;
         this.scrollContainer = this.listElement;
@@ -85,8 +104,10 @@ class RoomPanel extends ModalWindow {
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
         this._unsubscribers = [
-            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh)
+            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh),
+            this.parent?.parent?.eventManager?.on(EVENTS.MAP_CHANGED, this.boundRefresh)
         ].filter(Boolean);
+        RoomPanel.syncChosenColours(this.gameMap?.buildDocument?.level?.());
     }
 
     get gameMap() {
@@ -362,7 +383,7 @@ class RoomPanel extends ModalWindow {
         const rooms = this.rooms();
         this.syncOperationAvailability(rooms);
         this.listElement.replaceChildren(
-            ...(rooms.length ? rooms.map(entry => this.createRow(entry)) : [RoomPanel.emptyState()])
+            ...(rooms.length ? this.groupRows(rooms) : [RoomPanel.emptyState()])
         );
         this.markSelection({ reveal: false });
 
@@ -372,6 +393,42 @@ class RoomPanel extends ModalWindow {
                 ?.focus();
         }
         if (this.scrollContainer) this.scrollContainer.scrollTop = scroll;
+    }
+
+    /**
+     * Rows, under building headings once there is more than one building.
+     *
+     * A hierarchy over a single building is a row you have to read past to get
+     * to the list — the Navigator is the place for the shape of the site. What
+     * this list was missing is only *which* building a room is in, and that
+     * only becomes a question when there are two.
+     */
+    groupRows(rooms) {
+        const level = this.gameMap?.buildDocument?.level?.();
+        const buildings = this.gameMap?.buildDocument?.buildings;
+        const named = new Map((buildings?.values?.() || []).map(plan => [plan.id, plan.displayName || plan.id]));
+        if (named.size < 2) return rooms.map(entry => this.createRow(entry));
+
+        const groups = new Map();
+        for (const entry of rooms) {
+            const buildingId = level?.rooms.get(entry.room.id)?.buildingId ?? null;
+            if (!groups.has(buildingId)) groups.set(buildingId, []);
+            groups.get(buildingId).push(entry);
+        }
+        // Buildings in the document's own order, then the site's own rooms.
+        const order = [...named.keys()].filter(id => groups.has(id));
+        if (groups.has(null)) order.push(null);
+        return order.flatMap(buildingId => [
+            RoomPanel.groupHeading(buildingId ? named.get(buildingId) : 'Site'),
+            ...groups.get(buildingId).map(entry => this.createRow(entry))
+        ]);
+    }
+
+    static groupHeading(text) {
+        const heading = document.createElement('h4');
+        heading.className = 'room-panel-group';
+        heading.textContent = text;
+        return heading;
     }
 
     syncOperationAvailability(rooms = this.rooms()) {
@@ -517,6 +574,10 @@ class RoomPanel extends ModalWindow {
 
         const size = document.createElement('span');
         size.className = 'room-row__size';
+        const buildingId = this.gameMap?.buildDocument?.level?.().rooms.get(room.id)?.buildingId ?? null;
+        const buildingName = buildingId
+            ? this.gameMap?.buildDocument?.buildings.get(buildingId)?.displayName
+            : null;
         // Said on the row, because a room nothing encloses looks identical to
         // one that is walled in once it has a floor and a name — and it is not:
         // it takes no interior light, and standing in it you are still outside.
@@ -524,7 +585,7 @@ class RoomPanel extends ModalWindow {
         // its line with the type dropdown, and a row that swaps in a longer
         // phrase at zero squeezes the dropdown down to nothing. A room with no
         // floor says so by the row it is in — faded swatch, italic count.
-        size.textContent = `${cells} tiles`;
+        size.textContent = buildingName ? `${cells} tiles · ${buildingName}` : `${cells} tiles`;
 
         const perimeter = this.perimeterPlan(room);
         const status = document.createElement('span');
@@ -1061,9 +1122,36 @@ class RoomPanel extends ModalWindow {
         }
         this.markSelection();
         this.renderHighlight();
+        this.revealRoom(value);
         if (this.gameMap?.buildDocument?.level?.().rooms.has(value)) {
             this.parent.buildSelection?.set({ kind: 'room', id: value });
         }
+    }
+
+    /**
+     * Bring the room you just picked into view.
+     *
+     * Picking a room off a list is asking to look at it, and on a map bigger
+     * than the stage the row you clicked was often for a room nowhere on
+     * screen. Eased, like every other camera move; a room with no floor yet has
+     * nowhere to look, so nothing happens.
+     */
+    revealRoom(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const cells = room?.shape?.cells;
+        if (!cells?.size) return false;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+        const size = this.cellSize;
+        return this.parent?.parent?.camera?.focusOn?.({
+            posX: (minX * size) + (((maxX - minX + 1) * size) / 2),
+            posY: (minY * size) + (((maxY - minY + 1) * size) / 2),
+            size: { width: 0, height: 0 }
+        }) ?? false;
     }
 
     /**
@@ -1076,7 +1164,18 @@ class RoomPanel extends ModalWindow {
      * the same magenta. Telling rooms apart by colour is the entire interface
      * here, so the colours have to actually differ.
      */
-    static roomColour(roomId, alpha) {
+    /**
+     * A room's colour: the one it was given, or the one its id earns it.
+     *
+     * The automatic colour is stable and well spread, which is most of what
+     * this needs to do — but "most" is not "all", and two rooms that read alike
+     * on one map are worth being able to tell apart by hand.
+     */
+    static roomColour(roomId, alpha, colourIndex = RoomPanel.chosenColours.get(roomId) ?? null) {
+        if (Number.isInteger(colourIndex)) {
+            const hue = RoomPanel.HUES[((colourIndex % RoomPanel.HUES.length) + RoomPanel.HUES.length) % RoomPanel.HUES.length];
+            return `hsla(${hue}, 68%, 58%, ${alpha})`;
+        }
         if (!roomId) return `rgba(120, 120, 120, ${alpha})`;
         let hash = 0;
         for (let index = 0; index < roomId.length; index++) {

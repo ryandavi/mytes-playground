@@ -150,7 +150,14 @@ class WallStructure extends WallFixtures {
         );
         const move = options.contentMove;
         const inverseMove = WallBuilder.invertContentMove(move);
-        if (move) this.translateWallContents(move);
+        // What is standing on the floor the move covers, as opposed to fixed to
+        // its walls. Resolved before anything moves, because it is resolved by
+        // where things are.
+        const standing = move ? this.collectStandingObjects(move) : [];
+        if (move) {
+            this.translateWallContents(move);
+            this.carryStandingObjects(standing, move.dx, move.dy);
+        }
         try {
             transaction.run(options.label || 'Edit walls', (draft, level) => {
                 for (const building of options.buildingCopies || []) draft.buildings.set(building.id, building);
@@ -210,13 +217,76 @@ class WallStructure extends WallFixtures {
                 }
                 for (const roomId of options.deleteRoomIds || []) level.rooms.delete(roomId);
                 for (const buildingId of options.deleteBuildingIds || []) draft.buildings.delete(buildingId);
+            }, {
+                // The document holds the walls and their records; the sofa on
+                // the floor it just moved around is not in it, so undo is told
+                // about it here rather than losing track of it. A caller with
+                // its own out-of-document work — Duplicate, minting copies —
+                // adds to the same entry rather than pushing a second one.
+                sideEffects: WallStructure.composeSideEffects(
+                    standing.length && move ? {
+                        undo: () => this.carryStandingObjects(standing, -move.dx, -move.dy),
+                        redo: () => this.carryStandingObjects(standing, move.dx, move.dy)
+                    } : null,
+                    options.sideEffects
+                )
             });
         } catch (error) {
-            if (move) this.translateWallContents(inverseMove);
+            if (move) {
+                this.translateWallContents(inverseMove);
+                this.carryStandingObjects(standing, -move.dx, -move.dy);
+            }
             throw error;
         }
         if (travellingIds.length) this.rebindOpeningObjects(travellingIds);
         return { applied, rejected, inverse };
+    }
+
+    /**
+     * Everything standing on the ground the move covers: furniture, plants, a
+     * ball left on the floor. Openings, fixtures and attachments are excluded —
+     * they belong to the walls and travel as records, and moving them here too
+     * would move them twice.
+     */
+    collectStandingObjects(move) {
+        const cells = move?.objectCells;
+        if (!cells || cells.size === 0) return [];
+        const level = this.gameMap?.buildDocument?.level?.();
+        const bound = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level?.[name]?.values?.().map(record => String(record.id)) || []
+        ));
+        const size = this.cellSize;
+        return (this.gameMap?.objects || []).filter(object => {
+            if (object.active === false || bound.has(String(object.id))) return false;
+            const x = Math.floor((object.posX + ((object.size?.width || 0) / 2)) / size);
+            const y = Math.floor((object.posY + (object.size?.height || 0)) / size);
+            return cells.has(`${x},${y}`);
+        }).map(object => String(object.id));
+    }
+
+    static composeSideEffects(...effects) {
+        const present = effects.filter(Boolean);
+        if (present.length === 0) return null;
+        return {
+            undo: () => { for (const effect of present) effect.undo?.(); },
+            redo: () => { for (const effect of present) effect.redo?.(); }
+        };
+    }
+
+    carryStandingObjects(ids, dx, dy) {
+        if (!ids?.length || (!dx && !dy)) return 0;
+        let moved = 0;
+        for (const id of ids) {
+            const object = this.gameMap?.getObjectById?.(id);
+            if (!object) continue;
+            object.posX += dx * this.cellSize;
+            object.posY += dy * this.cellSize;
+            object.updatePosition?.();
+            object.syncRenderLayer?.();
+            object.handleMovedEvent?.();
+            moved++;
+        }
+        return moved;
     }
 
     /**
@@ -320,7 +390,10 @@ class WallStructure extends WallFixtures {
             const to = record.cells?.to || from;
             if (from && inside(from[0], from[1]) && inside(to[0], to[1])) ids.push(String(record.id));
         }
-        return ids;
+        // Furniture travelling with the building cannot also be in its way: a
+        // bed by the west wall stood in the destination of that same west wall
+        // and refused the whole move, atomically, with no way to see why.
+        return [...ids, ...this.collectStandingObjects(move)];
     }
 
     withTravellingRecords(ids, fn) {

@@ -1,6 +1,15 @@
 class RoomPlanStore extends BuildRecordStore {
     static ORIGINS = Object.freeze(['authored', 'detected', 'painted']);
 
+    // Room kinds briefly had ids of their own before they were folded into the
+    // zone vocabulary the AI reads. A save written in between holds one of
+    // these, which no dropdown offers and nothing acts on; it is the same room
+    // under both names, so it is renamed on the way in rather than kept as a
+    // "(custom)" value the player cannot pick again.
+    static LEGACY_TYPES = Object.freeze({
+        bedroom: 'rest', kitchen: 'food', living: 'social', playroom: 'play'
+    });
+
     keyOf(record) {
         if (!record?.id) throw new Error('Room plans require an id');
         return String(record.id);
@@ -16,7 +25,11 @@ class RoomPlanStore extends BuildRecordStore {
             buildingId: record.buildingId == null ? null : String(record.buildingId),
             displayName,
             authoredDisplayName: String(record.authoredDisplayName || displayName),
-            roomType: record.roomType || null,
+            roomType: RoomPlanStore.LEGACY_TYPES[record.roomType] || record.roomType || null,
+            // An index into the room-colour wheel, when the player has picked
+            // one. Null means the automatic colour derived from the id, which
+            // is what every room gets until someone disagrees with it.
+            colourIndex: Number.isInteger(record.colourIndex) ? record.colourIndex : null,
             origin,
             seedCells: RoomPlanStore.normalizeSeeds(record.seedCells),
             floorFinishId: record.floorFinishId || null,

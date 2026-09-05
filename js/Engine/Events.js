@@ -11,6 +11,7 @@ const EVENTS = Object.freeze({
     GAME_LOG: 'game:log',
     GAME_MODE_CHANGED: 'game:mode_changed',
     HIVE_HONEY: 'hive:honey',
+    INVENTORY_CHANGED: 'inventory:changed',
     MAP_CHANGED: 'map:changed',
     MYTE_ACTION_COMPLETED: 'myte:action_completed',
     MYTE_AI_DECISION_CHANGED: 'myte:ai_decision_changed',

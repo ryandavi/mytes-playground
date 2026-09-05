@@ -301,6 +301,26 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.setOverlay(this.selection, target);
     }
 
+    /**
+     * Open Surface on exactly this wall surface — what Select hands over — with
+     * the scope it was asked for already chosen, so "paint the room" arrives
+     * ready to paint the room rather than one stretch of it.
+     */
+    openWallSurface(surface, scope = 'stretch') {
+        const builder = this.gameMap?.wallBuilder;
+        if (!surface?.cell || !builder || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        this.setTarget({
+            surface: 'wall',
+            wallSurface: surface,
+            piece: builder.findPieceForCell(surface.cell.x, surface.cell.y)
+        });
+        this.renderPalette();
+        if (this.scope?.values?.includes(scope)) this.scope.select(scope);
+        this.redrawOverlays();
+        this.open();
+        return true;
+    }
+
     /** Open Surface with one of a room's surfaces already in hand. */
     openRoomSurface(roomId, surface = 'floor') {
         const room = this.gameMap?.regionManager?.get('room', roomId);

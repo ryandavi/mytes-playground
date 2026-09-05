@@ -46,7 +46,11 @@ class BuildTransaction {
             const forward = BuildTransaction.diffDocuments(before, after);
             if (BuildTransaction.deltaIsEmpty(forward)) return { committed: false, label };
             const inverse = BuildTransaction.diffDocuments(after, before);
-            return this.commit({ label, before, after, forward, inverse, derived, recordHistory: options.recordHistory !== false });
+            return this.commit({
+                label, before, after, forward, inverse, derived,
+                recordHistory: options.recordHistory !== false,
+                sideEffects: options.sideEffects || null
+            });
         } finally {
             this._active = false;
         }
@@ -224,16 +228,28 @@ class BuildTransaction {
         this._stats.transactions++;
         this.eventManager?.emit?.('build:committed', event);
         this.onCommit?.(event);
-        if (data.recordHistory) this.recordHistory(data.label, data.forward, data.inverse);
+        if (data.recordHistory) this.recordHistory(data.label, data.forward, data.inverse, data.sideEffects);
         return { committed: true, ...event };
     }
 
-    recordHistory(label, forward, inverse) {
+    /**
+     * `sideEffects` is for what the document does not hold. A wall's openings
+     * and fixtures are records, so replaying the delta puts them back; the sofa
+     * standing on the floor is not, and without this it would stay where the
+     * move left it while the walls travelled back around it.
+     */
+    recordHistory(label, forward, inverse, sideEffects = null) {
         const entry = { label, forward, inverse };
         const recorded = this.history?.push?.({
             label,
-            undo: () => this.replay(label, inverse, false),
-            redo: () => this.replay(label, forward, false)
+            undo: () => {
+                this.replay(label, inverse, false);
+                sideEffects?.undo?.();
+            },
+            redo: () => {
+                this.replay(label, forward, false);
+                sideEffects?.redo?.();
+            }
         });
         if (recorded) return;
         this.undoStack.push(entry);

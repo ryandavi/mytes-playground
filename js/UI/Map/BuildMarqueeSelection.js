@@ -38,14 +38,51 @@ class BuildMarqueeSelection extends UIComponent {
         if (!this.isActive() || event.button !== 0 || event.target?.closest?.(InputComponent.UI_SELECTOR)) return;
         if (this.container?.camera?._spacePanActive) return;
         if (event.target?.closest?.('.map-object, .myte-slot, .world-myte, .interactive-myte')) return;
-        const cell = this.pointerCell(event);
         const builder = this.container?.gameMap?.wallBuilder;
+        const cell = this.pointerCell(event);
+        // Armed by the Inspector's Move: anywhere inside the selection is a
+        // handle, including the floor between the walls.
+        if (cell && this.moveArmed && (this.interiorCells().has(`${cell.x},${cell.y}`) ||
+            this.selectedWallCells.some(entry => entry.x === cell.x && entry.y === cell.y))) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.structureDrag = {
+                pointerId: event.pointerId, start: cell, end: cell, moved: false,
+                cells: this.getSelectedWallCells()
+            };
+            this.moveArmed = false;
+            document.body.classList.remove('build-move-armed');
+            return;
+        }
+        // The base of a wall is the wall itself: the cell it stands on, where
+        // clicks widen from segment to run to building. Its face — the art
+        // standing up off that cell, which covers the ground behind it — is a
+        // surface, selected the way a floor selects its room, and painted from
+        // the Inspector. One tool, two questions, told apart by where you click.
+        if (cell && !builder?.baseCells.has(`${cell.x},${cell.y}`)) {
+            const face = this.wallSurfaceAt(event);
+            if (face) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.selectSurface(face);
+                this.swallowClick = true;
+                return;
+            }
+        }
         if (cell && builder?.baseCells.has(`${cell.x},${cell.y}`)) {
             event.preventDefault();
             event.stopPropagation();
             const selected = this.selectedWallCells.some(entry => entry.x === cell.x && entry.y === cell.y);
-            const scope = event.detail >= 2 ? 'run' : this.preferredScope;
-            if (!selected || event.shiftKey) this.selectWallAt(cell, scope, event.shiftKey, { remember: event.detail >= 2 });
+            // Each further click widens what is selected: segment, then the run
+            // it belongs to, then the building.
+            const clicks = this.countClick(cell);
+            const scope = clicks >= 2 ? this.widerScope() : this.preferredScope;
+            // A cell already in the selection is normally left alone, so that
+            // dragging a group does not reset it to the one cell you grabbed.
+            // A second click is not a grab, it is asking for more.
+            if (!selected || event.shiftKey || clicks >= 2) {
+                this.selectWallAt(cell, scope, event.shiftKey, { remember: clicks >= 2 });
+            }
             this.structureDrag = {
                 pointerId: event.pointerId,
                 start: cell,
@@ -289,6 +326,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.actionBar?.remove();
         this.actionBar = null;
         if (this.selectionKind === 'room') return this.renderRoomActionBar();
+        if (this.selectionKind === 'surface') return this.renderSurfaceActionBar();
         if (this.selectedWallCells.length === 0 || this.wallHighlights.length === 0) return;
         const bar = document.createElement('div');
         bar.className = 'stage-bar build-selection-actions ignore';
@@ -350,6 +388,57 @@ class BuildMarqueeSelection extends UIComponent {
         hint.className = 'build-selection-actions__hint';
         hint.textContent = 'Drag to move';
         controls.append(scopes, actions, hint);
+        bar.append(inspector, controls);
+        this.container?.element?.appendChild(bar);
+        this.actionBar = bar;
+    }
+
+    renderSurfaceActionBar() {
+        const surface = this.selectedSurface;
+        const map = this.container?.gameMap;
+        if (!surface) return;
+        const room = surface.roomId ? map?.regionManager?.get('room', surface.roomId) : null;
+        const bar = document.createElement('div');
+        bar.className = 'stage-bar build-selection-actions ignore';
+        bar.setAttribute('role', 'toolbar');
+        bar.setAttribute('aria-label', 'Wall surface');
+        const inspector = document.createElement('div');
+        inspector.className = 'build-selection-actions__inspector';
+        const title = document.createElement('strong');
+        title.textContent = room ? (room.properties?.displayName || room.id) : 'Outside';
+        const details = document.createElement('span');
+        details.textContent = `Wall surface · ${surface.face} face · ${surface.finishId || 'default'}`;
+        inspector.append(title, details);
+        const actions = document.createElement('div');
+        actions.className = 'stage-bar__group build-selection-actions__operations';
+        const ui = this.parent;
+        // The wider paint is whatever this face belongs to: a room's interior,
+        // or the outside of the room behind it and the building's whole shell.
+        // An exterior face used to be offered "Paint the room", disabled.
+        for (const [label, titleText, action] of [
+            ['Paint section', 'Paint this stretch of wall',
+                () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'stretch')],
+            ...(surface.roomId
+                ? [['Paint the room', 'Paint every wall facing this room',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'room')]]
+                : [['Paint outside', 'Paint the whole outside of the room behind this wall',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'roomExterior')],
+                ['Paint the building', 'Paint the whole outside of this building',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'exterior')]]),
+            ['Select structure', 'Select the wall itself, to move or demolish it',
+                () => this.selectWallAt(surface.cell, 'cell')]
+        ]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'stage-bar__action';
+            button.textContent = label;
+            button.title = titleText;
+            button.addEventListener('click', action);
+            actions.appendChild(button);
+        }
+        const controls = document.createElement('div');
+        controls.className = 'build-selection-actions__controls';
+        controls.append(actions);
         bar.append(inspector, controls);
         this.container?.element?.appendChild(bar);
         this.actionBar = bar;
@@ -492,13 +581,21 @@ class BuildMarqueeSelection extends UIComponent {
         return true;
     }
 
-    separateBuilding() {
-        const map = this.container?.gameMap;
-        const build = map?.buildTransaction;
-        const buildingId = this.selectedBuildingIds()[0];
-        const level = map?.buildDocument?.level?.();
-        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
-        if (!build || !level || !plan) return false;
+    /**
+     * The connected parts of one building's walls. One part is a building that
+     * hangs together; more than one is what Separate exists for, and what the
+     * Inspector asks before offering it.
+     */
+    /** Every cell the selected rooms own, for deciding what travels with them. */
+    interiorCells() {
+        const grid = this.container?.gameMap?.buildTransaction?.cache?.grid;
+        if (!grid || this.selectionRoomIds.length === 0) return new Set();
+        return new Set(this.selectionRoomIds.flatMap(roomId => grid.cellsOf?.(roomId) || []));
+    }
+
+    buildingComponents(buildingId) {
+        const level = this.container?.gameMap?.buildDocument?.level?.();
+        if (!level || !buildingId) return [];
         const remaining = new Set(level.walls.entries()
             .filter(([, wall]) => wall.buildingId === buildingId)
             .map(([key]) => key));
@@ -517,6 +614,17 @@ class BuildMarqueeSelection extends UIComponent {
             }
             components.push(cells.sort());
         }
+        return components;
+    }
+
+    separateBuilding() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedBuildingIds()[0];
+        const level = map?.buildDocument?.level?.();
+        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
+        if (!build || !level || !plan) return false;
+        const components = this.buildingComponents(buildingId);
         if (components.length < 2) {
             this.parent.showMessage?.('This building is already one connected structure.', 'info', 'Buildings');
             return false;
@@ -646,6 +754,168 @@ class BuildMarqueeSelection extends UIComponent {
         const cell = map.gridSystem.worldToGrid(world.x, world.y);
         return cell.x >= 0 && cell.y >= 0 && cell.x < map.gridSystem.gridWidth && cell.y < map.gridSystem.gridHeight
             ? cell : null;
+    }
+
+    /**
+     * Abandon a structure drag in flight, leaving the selection where it was.
+     * Escape's third layer, beside the wall, fence and room panels' own drags.
+     */
+    cancelDrag() {
+        if (!this.structureDrag) return false;
+        this.structureDrag = null;
+        this.moveArmed = false;
+        document.body.classList.remove('build-move-armed');
+        this.renderWallHighlights();
+        return true;
+    }
+
+    /**
+     * Move the selection by one cell. The keyboard's answer to dragging, and
+     * the only way to move something with no wall under the pointer to grab.
+     */
+    nudge(dx, dy) {
+        if (this.selectedWallCells.length === 0) return false;
+        return this.moveWallSelection(dx, dy);
+    }
+
+    /**
+     * Move, from the Inspector: the next press inside the selection starts the
+     * drag, wherever it lands — on the floor of the building as readily as on
+     * its walls. It was a message telling you to do something you could already
+     * do, which is not a command.
+     */
+    armMove() {
+        if (this.selectedWallCells.length === 0) return false;
+        this.moveArmed = true;
+        document.body.classList.add('build-move-armed');
+        this.parent.showMessage?.('Drag anywhere in the selection to move it, or nudge it with the arrow keys.',
+            'info', 'Move');
+        return true;
+    }
+
+    /**
+     * How many times this cell has been clicked in a row.
+     *
+     * Counted here rather than read off `event.detail`, which is the multi-click
+     * count for MOUSE events and zero for the pointer events this handler
+     * actually receives — which is why double-clicking a wall never widened
+     * anything, however many times you did it.
+     */
+    countClick(cell) {
+        const now = performance.now();
+        const previous = this._lastClick;
+        const same = previous && previous.x === cell.x && previous.y === cell.y &&
+            (now - previous.at) <= SiteConfig.interaction.gestures.doubleClickInterval;
+        this._lastClick = { x: cell.x, y: cell.y, at: now, count: same ? previous.count + 1 : 1 };
+        return this._lastClick.count;
+    }
+
+    /**
+     * Segment → run → building → segment. It cycles rather than stopping: at
+     * the top the only useful answer to "more" is to start again, and stopping
+     * dead reads as a click that did nothing.
+     */
+    widerScope() {
+        return { cell: 'run', run: 'building', building: 'cell' }[this.selectionKind] || 'run';
+    }
+
+    /**
+     * A wall's face under the pointer, with the surface it shows.
+     *
+     * Geometric, like every other wall hit test: the pointer's world position
+     * mapped into each piece's own box, tested against the regions the renderer
+     * published, frontmost first. The pieces stay `pointer-events: none`.
+     */
+    wallSurfaceAt(event) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        const world = this.container?.inputHandler?.screenToWorldCoordinates?.(event.clientX, event.clientY);
+        if (!builder || !Number.isFinite(world?.x)) return null;
+        const candidates = (builder.pieces || []).filter(piece => {
+            const element = piece.element;
+            if (!element || element.hidden) return false;
+            const x = world.x - element.offsetLeft;
+            const y = world.y - element.offsetTop;
+            return x >= 0 && y >= 0 && x < element.offsetWidth && y < element.offsetHeight;
+        }).sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+        for (const piece of candidates) {
+            const region = builder.hitTestPiece(piece,
+                world.x - piece.element.offsetLeft, world.y - piece.element.offsetTop);
+            if (region?.surface) return region.surface;
+        }
+        return null;
+    }
+
+    /** The wall cell whose art is under the pointer, if any. */
+    wallCellAt(event) {
+        const surface = this.wallSurfaceAt(event);
+        return surface?.cell ? { x: surface.cell.x, y: surface.cell.y } : null;
+    }
+
+    /**
+     * One face of one wall: what a click on the art selects. It is the paint
+     * unit, so the Inspector shows what it is wearing and where that comes
+     * from, and hands it to Paint whole.
+     */
+    /**
+     * One stretch of wall face: the same set Paint would colour with Section,
+     * outlined the same way. A half-cell atom is the unit paint is *stored* in,
+     * not the unit anyone points at — clicking a wall means "this piece of
+     * wall", and the piece runs as far as the surface does.
+     */
+    selectSurface(surface) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        if (!surface?.cell || !builder) return false;
+        this.clearVisuals();
+        this.selectedWallCells = [];
+        this.selectionKind = 'surface';
+        this.selectionRoomIds = surface.roomId ? [surface.roomId] : [];
+        this.selectionAnchor = { x: surface.cell.x, y: surface.cell.y };
+        this.selectedSurface = surface;
+        this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({
+            kind: 'atom',
+            id: BuildKeys.atom(surface.cell.x, surface.cell.y, surface.face, surface.half)
+        });
+        for (const rect of builder.getSurfaceRects(builder.getPaintStretchSurfaces(surface))) {
+            const element = document.createElement('div');
+            element.className = 'surface-paint-overlay paint-selection';
+            Object.assign(element.style, {
+                left: `${rect.left}px`, top: `${rect.top}px`,
+                width: `${rect.width}px`, height: `${rect.height}px`,
+                zIndex: String(rect.zIndex)
+            });
+            builder.layer.appendChild(element);
+            this.wallHighlights.push(element);
+        }
+        this.renderActionBar();
+        return true;
+    }
+
+    /**
+     * The wall cell whose art is under the pointer.
+     *
+     * Geometric, like every other wall hit test: the pointer's world position
+     * is mapped into each piece's own box and tested against the regions the
+     * renderer published, frontmost first. No pointer-events on the pieces —
+     * they stay inert so objects, floors and the marquee keep working.
+     */
+    wallCellAt(event) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        const world = this.container?.inputHandler?.screenToWorldCoordinates?.(event.clientX, event.clientY);
+        if (!builder || !Number.isFinite(world?.x)) return null;
+        const candidates = (builder.pieces || []).filter(piece => {
+            const element = piece.element;
+            if (!element || element.hidden) return false;
+            const x = world.x - element.offsetLeft;
+            const y = world.y - element.offsetTop;
+            return x >= 0 && y >= 0 && x < element.offsetWidth && y < element.offsetHeight;
+        }).sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+        for (const piece of candidates) {
+            const region = builder.hitTestPiece(piece,
+                world.x - piece.element.offsetLeft, world.y - piece.element.offsetTop);
+            if (region?.surface?.cell) return { x: region.surface.cell.x, y: region.surface.cell.y };
+        }
+        return null;
     }
 
     selectWallAt(cell, scope = this.preferredScope, additive = false, { remember = false } = {}) {
@@ -885,7 +1155,12 @@ class BuildMarqueeSelection extends UIComponent {
                 const source = this.selectedWallCells[targets.indexOf(cell)];
                 return { ...cell, data: Utility.deepClone(builder.baseCells.get(BuildKeys.cell(source.x, source.y)) || {}) };
             });
-        const contentMove = { cells: sourceKeys, dx, dy };
+        // A building travels with its contents. The walls carry their own
+        // openings and fixtures as records; the floor inside them carries
+        // whatever is standing on it, which is only a thing to do when the
+        // selection is a whole building or room — dragging one wall run should
+        // not take the furniture with it.
+        const contentMove = { cells: sourceKeys, dx, dy, objectCells: this.interiorCells() };
         const assignmentChanges = this.assignmentChangesForMove({ cells: this.roomSeedAssignments() }, dx, dy);
         const result = builder.applyWallCellChanges([...removals, ...additions], {
             atomic: true,
@@ -991,14 +1266,38 @@ class BuildMarqueeSelection extends UIComponent {
             atoms: level.atoms.atomsOfCell(cell.x, cell.y)
         }));
         const label = `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`;
+        // What is standing inside the rooms being copied, recorded before the
+        // copy exists. The copies themselves are minted after the walls land —
+        // they need somewhere to stand — and `created` is what undo removes and
+        // redo mints again, from the same entry as the walls.
+        const sources = builder.collectStandingObjects({ objectCells: this.interiorCells() });
+        const created = [];
+        const mintCopies = () => {
+            created.length = 0;
+            for (const id of sources) {
+                const source = map.getObjectById?.(id);
+                if (!source) continue;
+                const copy = map.addObject?.(source.type, source.variant,
+                    source.posX + (dx * builder.cellSize), source.posY + (dy * builder.cellSize), {});
+                if (copy) created.push(copy);
+            }
+            return created.length;
+        };
         const result = builder.applyWallCellChanges(additions, {
             atomic: true,
             buildingCopies,
             roomCopies,
             atomExtensions,
-            label
+            label,
+            sideEffects: sources.length ? {
+                undo: () => {
+                    for (const copy of created.splice(0)) copy.remove?.();
+                },
+                redo: () => mintCopies()
+            } : null
         });
         if (!result?.applied?.length) return false;
+        const copied = mintCopies();
         this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
         this.selectionRoomIds = [...roomIdMap.values()];
         if (this.selectionAnchor) this.selectionAnchor = {
@@ -1006,7 +1305,10 @@ class BuildMarqueeSelection extends UIComponent {
             y: this.selectionAnchor.y + dy
         };
         this.renderWallHighlights();
-        this.parent.showMessage?.('Placed a copy beside the selection. Wall-mounted objects stay with the original.', 'success', 'Duplicate');
+        this.parent.showMessage?.(copied
+            ? `Placed a copy beside the selection, with ${copied} item${copied === 1 ? '' : 's'}. Doors, windows and wall fixtures stay with the original.`
+            : 'Placed a copy beside the selection. Doors, windows and wall fixtures stay with the original.',
+        'success', 'Duplicate');
         return true;
     }
 
@@ -1103,6 +1405,9 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     clearSelection() {
+        this.selectedSurface = null;
+        this.moveArmed = false;
+        document.body.classList.remove('build-move-armed');
         this.selectedWallCells = [];
         this.selectionKind = null;
         this.selectionRoomIds = [];

@@ -179,6 +179,43 @@
     padding: 0.25rem 0.5rem;
 }
 
+// A short status word beside the thing it describes: "Open", "No entrance".
+// `pill-label` with the two rules a badge always wants and always forgot — it
+// is the width of its own text, and its text never breaks. A row of them wraps;
+// a badge does not.
+@mixin badge {
+    @include pill-label;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    align-self: center;
+    max-width: 100%;
+    padding: 0 var(--space-xs);
+    border: 1px solid var(--text-subtle);
+    border-radius: var(--radius-xs);
+    font-size: 0.8em;
+    line-height: 1.6;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+// The panel-inside-a-panel every list in the build tools sits in: sunken, its
+// own scrollbar, and a ceiling rather than a height so a short list stays
+// short. The window itself never scrolls.
+@mixin inset-scroll-box($max-height: 280px) {
+    @include surface-inset;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: $max-height;
+    @include scroll-area;
+    // One scrollbar, downward. Anything too wide for the box is clipped rather
+    // than pushing the panel sideways.
+    overflow-x: hidden;
+}
+
 
 @mixin layer-fill {
     position: absolute;

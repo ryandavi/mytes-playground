@@ -246,8 +246,16 @@ class WallRenderer {
             if (pieces.size) this.invalidateFlatTiles();
             return pieces.size;
         }
+        // Geometry changed: the walls are rebuilt from the document, and so is
+        // everything hanging on them. Undo of a move replays the records back
+        // to where they were, but a door is also a map object standing at a
+        // position of its own — without this the walls travelled home and left
+        // their doors, windows and paintings behind at the far end.
+        this.syncBuildDocumentRecords();
         this.reindexOpenings();
         this.rebuild();
+        this.rebindOpeningObjects(this.openings.map(opening => opening.id));
+        this.rebindFixtureObjects();
         return this.pieces.length;
     }
 

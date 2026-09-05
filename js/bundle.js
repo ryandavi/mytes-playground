@@ -126,17 +126,42 @@ const SiteConfig = Object.freeze({
         // rather than parsing display names. `id` is the stable key; `label` is
         // what the player picks from and what an unnamed room falls back to.
         defaultType: 'unset',
+        // One vocabulary, two readers. The `id` is the gameplay zone type a
+        // room emits — the same catalogue as `data/metadata/zones.json`, which
+        // is what the AI seeks out and what Tiled authors as `zoneType` — and
+        // the `label` is the kind of room a player calls it. They were two
+        // lists before: rooms authored as `rest`/`play`/`food` never matched a
+        // dropdown offering `bedroom`/`playroom`/`kitchen`, so every authored
+        // room showed a blank type. The kinds below with no zone counterpart
+        // (bathroom, study, hallway, storage) simply emit no zone.
+        //
+        // `requires` is what makes a room of this kind finished: object types
+        // (ItemRegistry `world.objectType`) that should be standing in it. The
+        // Inspector reports what is missing; nothing is enforced. Add one when
+        // the object exists — kitchen appliances are not built yet, so a
+        // kitchen asks for nothing beyond what every room asks for.
         types: Object.freeze([
             Object.freeze({ id: 'unset', label: 'Unassigned' }),
-            Object.freeze({ id: 'bedroom', label: 'Bedroom' }),
-            Object.freeze({ id: 'kitchen', label: 'Kitchen' }),
+            Object.freeze({ id: 'rest', label: 'Bedroom', requires: Object.freeze(['BED']) }),
+            Object.freeze({ id: 'food', label: 'Kitchen' }),
+            Object.freeze({ id: 'social', label: 'Living Room', requires: Object.freeze(['COUCH']) }),
+            Object.freeze({ id: 'play', label: 'Playroom', requires: Object.freeze(['BALL']) }),
             Object.freeze({ id: 'bathroom', label: 'Bathroom' }),
-            Object.freeze({ id: 'living', label: 'Living Room' }),
-            Object.freeze({ id: 'playroom', label: 'Playroom' }),
             Object.freeze({ id: 'study', label: 'Study' }),
             Object.freeze({ id: 'hallway', label: 'Hallway' }),
-            Object.freeze({ id: 'storage', label: 'Storage' }),
+            Object.freeze({ id: 'storage', label: 'Storage', requires: Object.freeze(['TREASURE_CHEST']) }),
         ]),
+        // Asked of every indoor room whatever its type, and of a hallway too:
+        // a corridor with no way in is as broken as a bedroom with no way in.
+        indoorRequires: Object.freeze(['LANTERN']),
+        // How a missing thing is named on the badge.
+        requirementLabels: Object.freeze({
+            BED: 'No bed',
+            COUCH: 'No seat',
+            BALL: 'No toy',
+            TREASURE_CHEST: 'No storage',
+            LANTERN: 'No light'
+        }),
     }),
 
     // Experimental semantic wall renderer. Turning this off restores the
@@ -490,6 +515,19 @@ const SiteConfig = Object.freeze({
     // map over to the player. Every value the mode switch and its tools read
     // lives here.
     buildMode: Object.freeze({
+        // What a building is, as opposed to what it is called. Nothing reads it
+        // yet; it is the same authored vocabulary the room types are, so that
+        // behaviour which wants it ("sleep at home", "stock the shed") has one.
+        defaultBuildingType: 'house',
+        buildingTypes: Object.freeze([
+            Object.freeze({ id: 'house', label: 'House' }),
+            Object.freeze({ id: 'storage', label: 'Storage' }),
+            Object.freeze({ id: 'workshop', label: 'Workshop' }),
+            Object.freeze({ id: 'shop', label: 'Shop' }),
+            Object.freeze({ id: 'greenhouse', label: 'Greenhouse' }),
+            Object.freeze({ id: 'barn', label: 'Barn' }),
+            Object.freeze({ id: 'outbuilding', label: 'Outbuilding' }),
+        ]),
         // Walls stand differently while building than while playing: cutaway
         // lets you see enclosed floors and still pick the walls themselves.
         defaultPresentation: 'cutaway',
@@ -1473,6 +1511,7 @@ const EVENTS = Object.freeze({
     GAME_LOG: 'game:log',
     GAME_MODE_CHANGED: 'game:mode_changed',
     HIVE_HONEY: 'hive:honey',
+    INVENTORY_CHANGED: 'inventory:changed',
     MAP_CHANGED: 'map:changed',
     MYTE_ACTION_COMPLETED: 'myte:action_completed',
     MYTE_AI_DECISION_CHANGED: 'myte:ai_decision_changed',
@@ -15610,6 +15649,11 @@ class Inventory {
         }
         // A slot added or removed changes what is reachable off the ends.
         this.updateOverflowState();
+        // Every add, remove and quantity change lands here, which makes it the
+        // one place a panel listing inventory contents can hear about them.
+        this.parent?.eventManager?.emit?.(EVENTS.INVENTORY_CHANGED, {
+            count: this.items.length
+        });
     }
 
     activateItemElement(itemElement) {
@@ -18176,6 +18220,19 @@ class ContainerInputManager {
         }
       }
 
+      // Nudging what is selected. One cell a press, and the same transaction a
+      // drag uses, so it undoes as one step and refuses the same moves.
+      if (isBuild && ui?.buildMarqueeSelection?.nudge) {
+        const nudges = {
+          arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1]
+        };
+        const nudge = nudges[event.key];
+        if (nudge && ui.buildMarqueeSelection.nudge(nudge[0], nudge[1])) {
+          event.originalEvent?.preventDefault();
+          return;
+        }
+      }
+
       switch (event.key) {
         case 'b':
           gameMode?.toggle();
@@ -18492,6 +18549,7 @@ class ContainerInputManager {
       return;
     }
 
+    if (ui?.buildMarqueeSelection?.cancelDrag?.() === true) return;
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.fenceBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.roomPanel?.cancelDrag?.() === true) return;
@@ -36437,6 +36495,7 @@ class BuildingPlanStore extends BuildRecordStore {
             id,
             displayName,
             authoredDisplayName: String(record.authoredDisplayName || displayName),
+            buildingType: record.buildingType ? String(record.buildingType) : null,
             exteriorFinishId: record.exteriorFinishId || null,
             properties: StoreDelta.clone(record.properties || {})
         };
@@ -36446,6 +36505,15 @@ class BuildingPlanStore extends BuildRecordStore {
 /* -- js/Map/Build/RoomPlanStore.js -- */
 class RoomPlanStore extends BuildRecordStore {
     static ORIGINS = Object.freeze(['authored', 'detected', 'painted']);
+
+    // Room kinds briefly had ids of their own before they were folded into the
+    // zone vocabulary the AI reads. A save written in between holds one of
+    // these, which no dropdown offers and nothing acts on; it is the same room
+    // under both names, so it is renamed on the way in rather than kept as a
+    // "(custom)" value the player cannot pick again.
+    static LEGACY_TYPES = Object.freeze({
+        bedroom: 'rest', kitchen: 'food', living: 'social', playroom: 'play'
+    });
 
     keyOf(record) {
         if (!record?.id) throw new Error('Room plans require an id');
@@ -36462,7 +36530,11 @@ class RoomPlanStore extends BuildRecordStore {
             buildingId: record.buildingId == null ? null : String(record.buildingId),
             displayName,
             authoredDisplayName: String(record.authoredDisplayName || displayName),
-            roomType: record.roomType || null,
+            roomType: RoomPlanStore.LEGACY_TYPES[record.roomType] || record.roomType || null,
+            // An index into the room-colour wheel, when the player has picked
+            // one. Null means the automatic colour derived from the id, which
+            // is what every room gets until someone disagrees with it.
+            colourIndex: Number.isInteger(record.colourIndex) ? record.colourIndex : null,
             origin,
             seedCells: RoomPlanStore.normalizeSeeds(record.seedCells),
             floorFinishId: record.floorFinishId || null,
@@ -37045,7 +37117,11 @@ class BuildTransaction {
             const forward = BuildTransaction.diffDocuments(before, after);
             if (BuildTransaction.deltaIsEmpty(forward)) return { committed: false, label };
             const inverse = BuildTransaction.diffDocuments(after, before);
-            return this.commit({ label, before, after, forward, inverse, derived, recordHistory: options.recordHistory !== false });
+            return this.commit({
+                label, before, after, forward, inverse, derived,
+                recordHistory: options.recordHistory !== false,
+                sideEffects: options.sideEffects || null
+            });
         } finally {
             this._active = false;
         }
@@ -37223,16 +37299,28 @@ class BuildTransaction {
         this._stats.transactions++;
         this.eventManager?.emit?.('build:committed', event);
         this.onCommit?.(event);
-        if (data.recordHistory) this.recordHistory(data.label, data.forward, data.inverse);
+        if (data.recordHistory) this.recordHistory(data.label, data.forward, data.inverse, data.sideEffects);
         return { committed: true, ...event };
     }
 
-    recordHistory(label, forward, inverse) {
+    /**
+     * `sideEffects` is for what the document does not hold. A wall's openings
+     * and fixtures are records, so replaying the delta puts them back; the sofa
+     * standing on the floor is not, and without this it would stay where the
+     * move left it while the walls travelled back around it.
+     */
+    recordHistory(label, forward, inverse, sideEffects = null) {
         const entry = { label, forward, inverse };
         const recorded = this.history?.push?.({
             label,
-            undo: () => this.replay(label, inverse, false),
-            redo: () => this.replay(label, forward, false)
+            undo: () => {
+                this.replay(label, inverse, false);
+                sideEffects?.undo?.();
+            },
+            redo: () => {
+                this.replay(label, forward, false);
+                sideEffects?.redo?.();
+            }
         });
         if (recorded) return;
         this.undoStack.push(entry);
@@ -37683,6 +37771,7 @@ class RoomTopology {
         }));
         const loopByBlock = RoomTopology.loopBlocks(enrichedComponents);
         const adjacency = RoomTopology.openingAdjacency(input.openings || [], grid);
+        const served = RoomTopology.openingsByRoom(input.openings || [], grid);
         const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, grid);
         const shellEdgesByBuilding = new Map([...roofableByBuilding].map(([buildingId, cells]) => [
             buildingId, Object.freeze(RoomTopology.boundaryEdges(cells))
@@ -37693,6 +37782,10 @@ class RoomTopology {
             openSpaces: Object.freeze(enrichedComponents.filter(component => !component.planIds.length)),
             planStates,
             adjacency: Object.freeze(adjacency),
+            // Which rooms an opening of each type reaches. Adjacency answers
+            // "are these two rooms connected", which says nothing about a door
+            // to the outside — and a front door is still a way in.
+            openingRooms: served,
             loopByBlock,
             roofableByBuilding,
             shellEdgesByBuilding,
@@ -37793,21 +37886,39 @@ class RoomTopology {
         return result;
     }
 
+    /** roomId → Set of opening types touching it ('door', 'window', …). */
+    static openingsByRoom(openings, grid) {
+        const byRoom = new Map();
+        if (!grid) return byRoom;
+        for (const opening of openings instanceof Map ? openings.values() : openings) {
+            const type = String(opening.type || 'opening');
+            for (const roomId of RoomTopology.roomsAtOpening(opening, grid)) {
+                if (!byRoom.has(roomId)) byRoom.set(roomId, new Set());
+                byRoom.get(roomId).add(type);
+            }
+        }
+        return byRoom;
+    }
+
+    static roomsAtOpening(opening, grid) {
+        const rooms = new Set();
+        for (const cell of opening.cells || []) {
+            const [x, y] = Array.isArray(cell) ? cell : [cell.x, cell.y];
+            const faces = opening.axis === 'vertical' ? ['west', 'east'] : ['north', 'south'];
+            for (const face of faces) for (const half of [0, 1]) {
+                const [bx, by] = BuildKeys.lookBlock(x, y, face, half);
+                const owner = grid.ownerAt(bx, by);
+                if (owner) rooms.add(owner);
+            }
+        }
+        return rooms;
+    }
+
     static openingAdjacency(openings, grid) {
         if (!grid) return [];
         const pairs = new Set();
-        for (const opening of openings instanceof Map ? opening.values() : openings) {
-            const rooms = new Set();
-            for (const cell of opening.cells || []) {
-                const [x, y] = Array.isArray(cell) ? cell : [cell.x, cell.y];
-                const faces = opening.axis === 'vertical' ? ['west', 'east'] : ['north', 'south'];
-                for (const face of faces) for (const half of [0, 1]) {
-                    const [bx, by] = BuildKeys.lookBlock(x, y, face, half);
-                    const owner = grid.ownerAt(bx, by);
-                    if (owner) rooms.add(owner);
-                }
-            }
-            const ids = [...rooms].sort();
+        for (const opening of openings instanceof Map ? openings.values() : openings) {
+            const ids = [...RoomTopology.roomsAtOpening(opening, grid)].sort();
             for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) pairs.add(`${ids[a]}\0${ids[b]}`);
         }
         return [...pairs].sort().map(pair => {
@@ -40244,8 +40355,16 @@ class WallRenderer {
             if (pieces.size) this.invalidateFlatTiles();
             return pieces.size;
         }
+        // Geometry changed: the walls are rebuilt from the document, and so is
+        // everything hanging on them. Undo of a move replays the records back
+        // to where they were, but a door is also a map object standing at a
+        // position of its own — without this the walls travelled home and left
+        // their doors, windows and paintings behind at the far end.
+        this.syncBuildDocumentRecords();
         this.reindexOpenings();
         this.rebuild();
+        this.rebindOpeningObjects(this.openings.map(opening => opening.id));
+        this.rebindFixtureObjects();
         return this.pieces.length;
     }
 
@@ -42469,7 +42588,14 @@ class WallStructure extends WallFixtures {
         );
         const move = options.contentMove;
         const inverseMove = WallBuilder.invertContentMove(move);
-        if (move) this.translateWallContents(move);
+        // What is standing on the floor the move covers, as opposed to fixed to
+        // its walls. Resolved before anything moves, because it is resolved by
+        // where things are.
+        const standing = move ? this.collectStandingObjects(move) : [];
+        if (move) {
+            this.translateWallContents(move);
+            this.carryStandingObjects(standing, move.dx, move.dy);
+        }
         try {
             transaction.run(options.label || 'Edit walls', (draft, level) => {
                 for (const building of options.buildingCopies || []) draft.buildings.set(building.id, building);
@@ -42529,13 +42655,76 @@ class WallStructure extends WallFixtures {
                 }
                 for (const roomId of options.deleteRoomIds || []) level.rooms.delete(roomId);
                 for (const buildingId of options.deleteBuildingIds || []) draft.buildings.delete(buildingId);
+            }, {
+                // The document holds the walls and their records; the sofa on
+                // the floor it just moved around is not in it, so undo is told
+                // about it here rather than losing track of it. A caller with
+                // its own out-of-document work — Duplicate, minting copies —
+                // adds to the same entry rather than pushing a second one.
+                sideEffects: WallStructure.composeSideEffects(
+                    standing.length && move ? {
+                        undo: () => this.carryStandingObjects(standing, -move.dx, -move.dy),
+                        redo: () => this.carryStandingObjects(standing, move.dx, move.dy)
+                    } : null,
+                    options.sideEffects
+                )
             });
         } catch (error) {
-            if (move) this.translateWallContents(inverseMove);
+            if (move) {
+                this.translateWallContents(inverseMove);
+                this.carryStandingObjects(standing, -move.dx, -move.dy);
+            }
             throw error;
         }
         if (travellingIds.length) this.rebindOpeningObjects(travellingIds);
         return { applied, rejected, inverse };
+    }
+
+    /**
+     * Everything standing on the ground the move covers: furniture, plants, a
+     * ball left on the floor. Openings, fixtures and attachments are excluded —
+     * they belong to the walls and travel as records, and moving them here too
+     * would move them twice.
+     */
+    collectStandingObjects(move) {
+        const cells = move?.objectCells;
+        if (!cells || cells.size === 0) return [];
+        const level = this.gameMap?.buildDocument?.level?.();
+        const bound = new Set(['openings', 'fixtures', 'attachments'].flatMap(name =>
+            level?.[name]?.values?.().map(record => String(record.id)) || []
+        ));
+        const size = this.cellSize;
+        return (this.gameMap?.objects || []).filter(object => {
+            if (object.active === false || bound.has(String(object.id))) return false;
+            const x = Math.floor((object.posX + ((object.size?.width || 0) / 2)) / size);
+            const y = Math.floor((object.posY + (object.size?.height || 0)) / size);
+            return cells.has(`${x},${y}`);
+        }).map(object => String(object.id));
+    }
+
+    static composeSideEffects(...effects) {
+        const present = effects.filter(Boolean);
+        if (present.length === 0) return null;
+        return {
+            undo: () => { for (const effect of present) effect.undo?.(); },
+            redo: () => { for (const effect of present) effect.redo?.(); }
+        };
+    }
+
+    carryStandingObjects(ids, dx, dy) {
+        if (!ids?.length || (!dx && !dy)) return 0;
+        let moved = 0;
+        for (const id of ids) {
+            const object = this.gameMap?.getObjectById?.(id);
+            if (!object) continue;
+            object.posX += dx * this.cellSize;
+            object.posY += dy * this.cellSize;
+            object.updatePosition?.();
+            object.syncRenderLayer?.();
+            object.handleMovedEvent?.();
+            moved++;
+        }
+        return moved;
     }
 
     /**
@@ -42639,7 +42828,10 @@ class WallStructure extends WallFixtures {
             const to = record.cells?.to || from;
             if (from && inside(from[0], from[1]) && inside(to[0], to[1])) ids.push(String(record.id));
         }
-        return ids;
+        // Furniture travelling with the building cannot also be in its way: a
+        // bed by the west wall stood in the destination of that same west wall
+        // and refused the whole move, atomically, with no way to see why.
+        return [...ids, ...this.collectStandingObjects(move)];
     }
 
     withTravellingRecords(ids, fn) {
@@ -72142,14 +72334,51 @@ class BuildMarqueeSelection extends UIComponent {
         if (!this.isActive() || event.button !== 0 || event.target?.closest?.(InputComponent.UI_SELECTOR)) return;
         if (this.container?.camera?._spacePanActive) return;
         if (event.target?.closest?.('.map-object, .myte-slot, .world-myte, .interactive-myte')) return;
-        const cell = this.pointerCell(event);
         const builder = this.container?.gameMap?.wallBuilder;
+        const cell = this.pointerCell(event);
+        // Armed by the Inspector's Move: anywhere inside the selection is a
+        // handle, including the floor between the walls.
+        if (cell && this.moveArmed && (this.interiorCells().has(`${cell.x},${cell.y}`) ||
+            this.selectedWallCells.some(entry => entry.x === cell.x && entry.y === cell.y))) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.structureDrag = {
+                pointerId: event.pointerId, start: cell, end: cell, moved: false,
+                cells: this.getSelectedWallCells()
+            };
+            this.moveArmed = false;
+            document.body.classList.remove('build-move-armed');
+            return;
+        }
+        // The base of a wall is the wall itself: the cell it stands on, where
+        // clicks widen from segment to run to building. Its face — the art
+        // standing up off that cell, which covers the ground behind it — is a
+        // surface, selected the way a floor selects its room, and painted from
+        // the Inspector. One tool, two questions, told apart by where you click.
+        if (cell && !builder?.baseCells.has(`${cell.x},${cell.y}`)) {
+            const face = this.wallSurfaceAt(event);
+            if (face) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.selectSurface(face);
+                this.swallowClick = true;
+                return;
+            }
+        }
         if (cell && builder?.baseCells.has(`${cell.x},${cell.y}`)) {
             event.preventDefault();
             event.stopPropagation();
             const selected = this.selectedWallCells.some(entry => entry.x === cell.x && entry.y === cell.y);
-            const scope = event.detail >= 2 ? 'run' : this.preferredScope;
-            if (!selected || event.shiftKey) this.selectWallAt(cell, scope, event.shiftKey, { remember: event.detail >= 2 });
+            // Each further click widens what is selected: segment, then the run
+            // it belongs to, then the building.
+            const clicks = this.countClick(cell);
+            const scope = clicks >= 2 ? this.widerScope() : this.preferredScope;
+            // A cell already in the selection is normally left alone, so that
+            // dragging a group does not reset it to the one cell you grabbed.
+            // A second click is not a grab, it is asking for more.
+            if (!selected || event.shiftKey || clicks >= 2) {
+                this.selectWallAt(cell, scope, event.shiftKey, { remember: clicks >= 2 });
+            }
             this.structureDrag = {
                 pointerId: event.pointerId,
                 start: cell,
@@ -72393,6 +72622,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.actionBar?.remove();
         this.actionBar = null;
         if (this.selectionKind === 'room') return this.renderRoomActionBar();
+        if (this.selectionKind === 'surface') return this.renderSurfaceActionBar();
         if (this.selectedWallCells.length === 0 || this.wallHighlights.length === 0) return;
         const bar = document.createElement('div');
         bar.className = 'stage-bar build-selection-actions ignore';
@@ -72454,6 +72684,57 @@ class BuildMarqueeSelection extends UIComponent {
         hint.className = 'build-selection-actions__hint';
         hint.textContent = 'Drag to move';
         controls.append(scopes, actions, hint);
+        bar.append(inspector, controls);
+        this.container?.element?.appendChild(bar);
+        this.actionBar = bar;
+    }
+
+    renderSurfaceActionBar() {
+        const surface = this.selectedSurface;
+        const map = this.container?.gameMap;
+        if (!surface) return;
+        const room = surface.roomId ? map?.regionManager?.get('room', surface.roomId) : null;
+        const bar = document.createElement('div');
+        bar.className = 'stage-bar build-selection-actions ignore';
+        bar.setAttribute('role', 'toolbar');
+        bar.setAttribute('aria-label', 'Wall surface');
+        const inspector = document.createElement('div');
+        inspector.className = 'build-selection-actions__inspector';
+        const title = document.createElement('strong');
+        title.textContent = room ? (room.properties?.displayName || room.id) : 'Outside';
+        const details = document.createElement('span');
+        details.textContent = `Wall surface · ${surface.face} face · ${surface.finishId || 'default'}`;
+        inspector.append(title, details);
+        const actions = document.createElement('div');
+        actions.className = 'stage-bar__group build-selection-actions__operations';
+        const ui = this.parent;
+        // The wider paint is whatever this face belongs to: a room's interior,
+        // or the outside of the room behind it and the building's whole shell.
+        // An exterior face used to be offered "Paint the room", disabled.
+        for (const [label, titleText, action] of [
+            ['Paint section', 'Paint this stretch of wall',
+                () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'stretch')],
+            ...(surface.roomId
+                ? [['Paint the room', 'Paint every wall facing this room',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'room')]]
+                : [['Paint outside', 'Paint the whole outside of the room behind this wall',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'roomExterior')],
+                ['Paint the building', 'Paint the whole outside of this building',
+                    () => ui.surfaceCustomizePanel?.openWallSurface(surface, 'exterior')]]),
+            ['Select structure', 'Select the wall itself, to move or demolish it',
+                () => this.selectWallAt(surface.cell, 'cell')]
+        ]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'stage-bar__action';
+            button.textContent = label;
+            button.title = titleText;
+            button.addEventListener('click', action);
+            actions.appendChild(button);
+        }
+        const controls = document.createElement('div');
+        controls.className = 'build-selection-actions__controls';
+        controls.append(actions);
         bar.append(inspector, controls);
         this.container?.element?.appendChild(bar);
         this.actionBar = bar;
@@ -72596,13 +72877,21 @@ class BuildMarqueeSelection extends UIComponent {
         return true;
     }
 
-    separateBuilding() {
-        const map = this.container?.gameMap;
-        const build = map?.buildTransaction;
-        const buildingId = this.selectedBuildingIds()[0];
-        const level = map?.buildDocument?.level?.();
-        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
-        if (!build || !level || !plan) return false;
+    /**
+     * The connected parts of one building's walls. One part is a building that
+     * hangs together; more than one is what Separate exists for, and what the
+     * Inspector asks before offering it.
+     */
+    /** Every cell the selected rooms own, for deciding what travels with them. */
+    interiorCells() {
+        const grid = this.container?.gameMap?.buildTransaction?.cache?.grid;
+        if (!grid || this.selectionRoomIds.length === 0) return new Set();
+        return new Set(this.selectionRoomIds.flatMap(roomId => grid.cellsOf?.(roomId) || []));
+    }
+
+    buildingComponents(buildingId) {
+        const level = this.container?.gameMap?.buildDocument?.level?.();
+        if (!level || !buildingId) return [];
         const remaining = new Set(level.walls.entries()
             .filter(([, wall]) => wall.buildingId === buildingId)
             .map(([key]) => key));
@@ -72621,6 +72910,17 @@ class BuildMarqueeSelection extends UIComponent {
             }
             components.push(cells.sort());
         }
+        return components;
+    }
+
+    separateBuilding() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedBuildingIds()[0];
+        const level = map?.buildDocument?.level?.();
+        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
+        if (!build || !level || !plan) return false;
+        const components = this.buildingComponents(buildingId);
         if (components.length < 2) {
             this.parent.showMessage?.('This building is already one connected structure.', 'info', 'Buildings');
             return false;
@@ -72750,6 +73050,168 @@ class BuildMarqueeSelection extends UIComponent {
         const cell = map.gridSystem.worldToGrid(world.x, world.y);
         return cell.x >= 0 && cell.y >= 0 && cell.x < map.gridSystem.gridWidth && cell.y < map.gridSystem.gridHeight
             ? cell : null;
+    }
+
+    /**
+     * Abandon a structure drag in flight, leaving the selection where it was.
+     * Escape's third layer, beside the wall, fence and room panels' own drags.
+     */
+    cancelDrag() {
+        if (!this.structureDrag) return false;
+        this.structureDrag = null;
+        this.moveArmed = false;
+        document.body.classList.remove('build-move-armed');
+        this.renderWallHighlights();
+        return true;
+    }
+
+    /**
+     * Move the selection by one cell. The keyboard's answer to dragging, and
+     * the only way to move something with no wall under the pointer to grab.
+     */
+    nudge(dx, dy) {
+        if (this.selectedWallCells.length === 0) return false;
+        return this.moveWallSelection(dx, dy);
+    }
+
+    /**
+     * Move, from the Inspector: the next press inside the selection starts the
+     * drag, wherever it lands — on the floor of the building as readily as on
+     * its walls. It was a message telling you to do something you could already
+     * do, which is not a command.
+     */
+    armMove() {
+        if (this.selectedWallCells.length === 0) return false;
+        this.moveArmed = true;
+        document.body.classList.add('build-move-armed');
+        this.parent.showMessage?.('Drag anywhere in the selection to move it, or nudge it with the arrow keys.',
+            'info', 'Move');
+        return true;
+    }
+
+    /**
+     * How many times this cell has been clicked in a row.
+     *
+     * Counted here rather than read off `event.detail`, which is the multi-click
+     * count for MOUSE events and zero for the pointer events this handler
+     * actually receives — which is why double-clicking a wall never widened
+     * anything, however many times you did it.
+     */
+    countClick(cell) {
+        const now = performance.now();
+        const previous = this._lastClick;
+        const same = previous && previous.x === cell.x && previous.y === cell.y &&
+            (now - previous.at) <= SiteConfig.interaction.gestures.doubleClickInterval;
+        this._lastClick = { x: cell.x, y: cell.y, at: now, count: same ? previous.count + 1 : 1 };
+        return this._lastClick.count;
+    }
+
+    /**
+     * Segment → run → building → segment. It cycles rather than stopping: at
+     * the top the only useful answer to "more" is to start again, and stopping
+     * dead reads as a click that did nothing.
+     */
+    widerScope() {
+        return { cell: 'run', run: 'building', building: 'cell' }[this.selectionKind] || 'run';
+    }
+
+    /**
+     * A wall's face under the pointer, with the surface it shows.
+     *
+     * Geometric, like every other wall hit test: the pointer's world position
+     * mapped into each piece's own box, tested against the regions the renderer
+     * published, frontmost first. The pieces stay `pointer-events: none`.
+     */
+    wallSurfaceAt(event) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        const world = this.container?.inputHandler?.screenToWorldCoordinates?.(event.clientX, event.clientY);
+        if (!builder || !Number.isFinite(world?.x)) return null;
+        const candidates = (builder.pieces || []).filter(piece => {
+            const element = piece.element;
+            if (!element || element.hidden) return false;
+            const x = world.x - element.offsetLeft;
+            const y = world.y - element.offsetTop;
+            return x >= 0 && y >= 0 && x < element.offsetWidth && y < element.offsetHeight;
+        }).sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+        for (const piece of candidates) {
+            const region = builder.hitTestPiece(piece,
+                world.x - piece.element.offsetLeft, world.y - piece.element.offsetTop);
+            if (region?.surface) return region.surface;
+        }
+        return null;
+    }
+
+    /** The wall cell whose art is under the pointer, if any. */
+    wallCellAt(event) {
+        const surface = this.wallSurfaceAt(event);
+        return surface?.cell ? { x: surface.cell.x, y: surface.cell.y } : null;
+    }
+
+    /**
+     * One face of one wall: what a click on the art selects. It is the paint
+     * unit, so the Inspector shows what it is wearing and where that comes
+     * from, and hands it to Paint whole.
+     */
+    /**
+     * One stretch of wall face: the same set Paint would colour with Section,
+     * outlined the same way. A half-cell atom is the unit paint is *stored* in,
+     * not the unit anyone points at — clicking a wall means "this piece of
+     * wall", and the piece runs as far as the surface does.
+     */
+    selectSurface(surface) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        if (!surface?.cell || !builder) return false;
+        this.clearVisuals();
+        this.selectedWallCells = [];
+        this.selectionKind = 'surface';
+        this.selectionRoomIds = surface.roomId ? [surface.roomId] : [];
+        this.selectionAnchor = { x: surface.cell.x, y: surface.cell.y };
+        this.selectedSurface = surface;
+        this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({
+            kind: 'atom',
+            id: BuildKeys.atom(surface.cell.x, surface.cell.y, surface.face, surface.half)
+        });
+        for (const rect of builder.getSurfaceRects(builder.getPaintStretchSurfaces(surface))) {
+            const element = document.createElement('div');
+            element.className = 'surface-paint-overlay paint-selection';
+            Object.assign(element.style, {
+                left: `${rect.left}px`, top: `${rect.top}px`,
+                width: `${rect.width}px`, height: `${rect.height}px`,
+                zIndex: String(rect.zIndex)
+            });
+            builder.layer.appendChild(element);
+            this.wallHighlights.push(element);
+        }
+        this.renderActionBar();
+        return true;
+    }
+
+    /**
+     * The wall cell whose art is under the pointer.
+     *
+     * Geometric, like every other wall hit test: the pointer's world position
+     * is mapped into each piece's own box and tested against the regions the
+     * renderer published, frontmost first. No pointer-events on the pieces —
+     * they stay inert so objects, floors and the marquee keep working.
+     */
+    wallCellAt(event) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        const world = this.container?.inputHandler?.screenToWorldCoordinates?.(event.clientX, event.clientY);
+        if (!builder || !Number.isFinite(world?.x)) return null;
+        const candidates = (builder.pieces || []).filter(piece => {
+            const element = piece.element;
+            if (!element || element.hidden) return false;
+            const x = world.x - element.offsetLeft;
+            const y = world.y - element.offsetTop;
+            return x >= 0 && y >= 0 && x < element.offsetWidth && y < element.offsetHeight;
+        }).sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+        for (const piece of candidates) {
+            const region = builder.hitTestPiece(piece,
+                world.x - piece.element.offsetLeft, world.y - piece.element.offsetTop);
+            if (region?.surface?.cell) return { x: region.surface.cell.x, y: region.surface.cell.y };
+        }
+        return null;
     }
 
     selectWallAt(cell, scope = this.preferredScope, additive = false, { remember = false } = {}) {
@@ -72989,7 +73451,12 @@ class BuildMarqueeSelection extends UIComponent {
                 const source = this.selectedWallCells[targets.indexOf(cell)];
                 return { ...cell, data: Utility.deepClone(builder.baseCells.get(BuildKeys.cell(source.x, source.y)) || {}) };
             });
-        const contentMove = { cells: sourceKeys, dx, dy };
+        // A building travels with its contents. The walls carry their own
+        // openings and fixtures as records; the floor inside them carries
+        // whatever is standing on it, which is only a thing to do when the
+        // selection is a whole building or room — dragging one wall run should
+        // not take the furniture with it.
+        const contentMove = { cells: sourceKeys, dx, dy, objectCells: this.interiorCells() };
         const assignmentChanges = this.assignmentChangesForMove({ cells: this.roomSeedAssignments() }, dx, dy);
         const result = builder.applyWallCellChanges([...removals, ...additions], {
             atomic: true,
@@ -73095,14 +73562,38 @@ class BuildMarqueeSelection extends UIComponent {
             atoms: level.atoms.atomsOfCell(cell.x, cell.y)
         }));
         const label = `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`;
+        // What is standing inside the rooms being copied, recorded before the
+        // copy exists. The copies themselves are minted after the walls land —
+        // they need somewhere to stand — and `created` is what undo removes and
+        // redo mints again, from the same entry as the walls.
+        const sources = builder.collectStandingObjects({ objectCells: this.interiorCells() });
+        const created = [];
+        const mintCopies = () => {
+            created.length = 0;
+            for (const id of sources) {
+                const source = map.getObjectById?.(id);
+                if (!source) continue;
+                const copy = map.addObject?.(source.type, source.variant,
+                    source.posX + (dx * builder.cellSize), source.posY + (dy * builder.cellSize), {});
+                if (copy) created.push(copy);
+            }
+            return created.length;
+        };
         const result = builder.applyWallCellChanges(additions, {
             atomic: true,
             buildingCopies,
             roomCopies,
             atomExtensions,
-            label
+            label,
+            sideEffects: sources.length ? {
+                undo: () => {
+                    for (const copy of created.splice(0)) copy.remove?.();
+                },
+                redo: () => mintCopies()
+            } : null
         });
         if (!result?.applied?.length) return false;
+        const copied = mintCopies();
         this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
         this.selectionRoomIds = [...roomIdMap.values()];
         if (this.selectionAnchor) this.selectionAnchor = {
@@ -73110,7 +73601,10 @@ class BuildMarqueeSelection extends UIComponent {
             y: this.selectionAnchor.y + dy
         };
         this.renderWallHighlights();
-        this.parent.showMessage?.('Placed a copy beside the selection. Wall-mounted objects stay with the original.', 'success', 'Duplicate');
+        this.parent.showMessage?.(copied
+            ? `Placed a copy beside the selection, with ${copied} item${copied === 1 ? '' : 's'}. Doors, windows and wall fixtures stay with the original.`
+            : 'Placed a copy beside the selection. Doors, windows and wall fixtures stay with the original.',
+        'success', 'Duplicate');
         return true;
     }
 
@@ -73207,6 +73701,9 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     clearSelection() {
+        this.selectedSurface = null;
+        this.moveArmed = false;
+        document.body.classList.remove('build-move-armed');
         this.selectedWallCells = [];
         this.selectionKind = null;
         this.selectionRoomIds = [];
@@ -77293,8 +77790,14 @@ class BuildInspector extends ModalWindow {
         for (const building of documentModel.buildings.values()) {
             const node = document.createElement('li');
             const button = this.nodeButton('building', building.id, `Building: ${building.displayName}`);
-            node.append(button);
             const rooms = level.rooms.values().filter(room => room.buildingId === building.id);
+            const walls = level.walls.values().filter(wall => wall.buildingId === building.id).length;
+            // What it is made of, at a glance: a building with no walls is a
+            // row you would otherwise have to click to understand.
+            button.append(BuildInspector.badge(
+                `${rooms.length} room${rooms.length === 1 ? '' : 's'} · ${walls} wall${walls === 1 ? '' : 's'}`
+            ));
+            node.append(button);
             if (rooms.length) {
                 const roomList = document.createElement('ul');
                 for (const room of rooms) {
@@ -77341,7 +77844,11 @@ class BuildInspector extends ModalWindow {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'build-navigator-button';
-        button.textContent = label;
+        button.title = label;
+        const text = document.createElement('span');
+        text.className = 'build-navigator-button__label';
+        text.textContent = label;
+        button.append(text);
         const current = this.parent.buildSelection.current;
         button.classList.toggle('is-selected', current?.kind === kind && current.id === id);
         button.addEventListener('click', () => this.select(kind, id));
@@ -77353,8 +77860,72 @@ class BuildInspector extends ModalWindow {
         const state = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.planStates?.get(room.id);
         if ((state?.componentIds?.length || 0) > 1) return 'Disconnected';
         if (!state?.indoor) return 'Open';
-        const adjacency = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.adjacency || [];
-        return adjacency.some(edge => edge.roomA === room.id || edge.roomB === room.id) ? null : 'No entrance';
+        return this.hasEntrance(room.id) ? null : 'No entrance';
+    }
+
+    /** The kinds of opening that reach this room: 'door', 'window', … */
+    openingTypes(roomId) {
+        const topology = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology;
+        return topology?.openingRooms?.get(roomId) || new Set();
+    }
+
+    /**
+     * A way in — a door of this room's own, or of any room it opens onto.
+     *
+     * Rooms sharing an enclosure have no wall between them, so the kitchen's
+     * front door is the way into the chatroom too. Counting only a room's own
+     * doors called half a house sealed, and a door to the outside did not count
+     * at all because adjacency records room-to-room pairs.
+     */
+    hasEntrance(roomId) {
+        const topology = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology;
+        const state = topology?.planStates?.get(roomId);
+        const shared = (topology?.components || [])
+            .filter(component => (state?.componentIds || []).includes(component.id))
+            .flatMap(component => component.planIds || []);
+        return [roomId, ...shared].some(id => this.openingTypes(id).has('door'));
+    }
+
+    /**
+     * What this room is missing to be the room it says it is.
+     *
+     * Structure first — a way in, a window — then whatever its type asks for
+     * (SiteConfig.rooms.types[].requires) and what every indoor room asks for.
+     * Reported, never enforced: a room with nothing in it is a room you have
+     * not finished, not a mistake. Objects are counted where they stand, so a
+     * bed carried out of a bedroom takes the badge back with it.
+     */
+    roomNeeds(room) {
+        const plan = this.parent?.parent?.gameMap?.buildDocument?.level?.().rooms.get(room.id);
+        const state = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.planStates?.get(room.id);
+        if (!plan || state?.indoor !== true) return [];
+        const openings = this.openingTypes(room.id);
+        const config = SiteConfig.rooms;
+        const type = config.types.find(entry => entry.id === (plan.roomType || config.defaultType));
+        const wanted = [...(type?.requires || []), ...config.indoorRequires];
+        const present = this.objectTypesIn(room);
+        return [
+            ...(this.hasEntrance(room.id) ? [] : ['No entrance']),
+            ...(openings.has('window') ? [] : ['No window']),
+            ...wanted.filter(objectType => !present.has(objectType))
+                .map(objectType => config.requirementLabels[objectType] || `No ${objectType.toLowerCase()}`)
+        ];
+    }
+
+    objectTypesIn(room) {
+        const map = this.parent?.parent?.gameMap;
+        const cellSize = map?.gridSystem?.config?.cellSize || 32;
+        const cells = room.shape?.cells;
+        const types = new Set();
+        for (const object of map?.objects || []) {
+            if (object.active === false) continue;
+            // Where it stands, not where its art starts: a bed is eight cells
+            // of headboard above the square it actually occupies.
+            const x = Math.floor((object.posX + ((object.size?.width || 0) / 2)) / cellSize);
+            const y = Math.floor((object.posY + (object.size?.height || 0)) / cellSize);
+            if (cells?.has?.(`${x},${y}`)) types.add(object.type);
+        }
+        return types;
     }
 
     select(kind, id) {
@@ -77390,14 +77961,22 @@ class BuildInspector extends ModalWindow {
         if (selection.kind === 'building') {
             const plan = map.buildDocument.buildings.get(selection.id);
             if (!plan) return root.append(BuildInspector.message('This building no longer exists.'));
+            const marquee = this.parent.buildMarqueeSelection;
             root.append(this.propertyHeading(plan.displayName, 'Building'));
-            root.append(this.nameEditor(plan.displayName, value => this.parent.buildMarqueeSelection.renameBuilding(value)));
+            root.append(this.nameEditor(plan.displayName, value => marquee.renameBuilding(value)));
+            root.append(this.buildingTypeEditor(plan));
+            // An action you cannot take reads better greyed out than as a
+            // button that answers with a message when you press it.
+            const parts = marquee.buildingComponents(selection.id).length;
+            const selectedBuildings = marquee.selectedBuildingIds().length;
             root.append(this.actionRow([
                 ['Move', () => this.beginBuildingMove()],
-                ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
-                ['Separate', () => this.parent.buildMarqueeSelection.separateBuilding()],
-                ['Merge', () => this.parent.buildMarqueeSelection.mergeSelectedBuildings()],
-                ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
+                ['Duplicate', () => marquee.duplicateSelection()],
+                ['Separate', () => marquee.separateBuilding(), null,
+                    parts > 1 ? null : 'This building is already one connected structure'],
+                ['Merge', () => marquee.mergeSelectedBuildings(), null,
+                    selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
+                ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
             ]));
             return;
         }
@@ -77408,7 +77987,11 @@ class BuildInspector extends ModalWindow {
             root.append(this.nameEditor(room.displayName, value => this.parent.roomPanel.commitRoom(
                 room.id, { name: value }, `Rename ${room.displayName}`
             )));
+            root.append(this.roomTypeEditor(room));
+            root.append(this.roomColourEditor(room));
             root.append(this.roomBuildingEditor(room));
+            const region = map.regionManager?.get('room', room.id);
+            if (region) root.append(this.needsRow(this.roomNeeds(region)));
             root.append(this.actionRow([
                 ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
                 ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
@@ -77427,12 +78010,55 @@ class BuildInspector extends ModalWindow {
                 this.assignWallsToBuilding(walls, buildingId)));
             return;
         }
+        if (selection.kind === 'wall') {
+            const cells = this.parent.buildMarqueeSelection.selectedWallCells
+                .filter(cell => level.walls.has(BuildKeys.cell(cell.x, cell.y)));
+            const wall = level.walls.get(selection.id) || (cells[0] &&
+                level.walls.get(BuildKeys.cell(cells[0].x, cells[0].y)));
+            if (!wall) return root.append(BuildInspector.message('This wall no longer exists.'));
+            const scope = cells.length > 1 ? `${cells.length} cells` : selection.id;
+            root.append(this.propertyHeading(scope, 'Wall'));
+            root.append(this.wallConstructionEditor(wall, cells));
+            root.append(this.detailsList({
+                // Read-only on purpose: the construction's own art decides how
+                // tall a wall stands (160px for plaster). `heightCells` only
+                // decides which cells merge into one run and one cutaway chain,
+                // so an editor for it would look like a height control and
+                // behave like a seam.
+                Height: `${wall.heightCells} cell${wall.heightCells === 1 ? '' : 's'}`,
+                'Connect group': wall.connectGroup,
+                Building: (wall.buildingId && map.buildDocument.buildings.get(wall.buildingId)?.displayName) || 'Unassigned',
+                Finish: map.wallBuilder?.resolveSurfaceFinishId({ ...wall }, 'south', null, 0) || '—'
+            }));
+            root.append(this.actionRow([
+                ['Paint', () => this.parent.changeToolMode(UIToolModes.SURFACE)],
+                ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
+                ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
+            ]));
+            return;
+        }
         if (selection.kind === 'atom') {
             const details = this.atomDetails(selection.id, map);
             if (!details) return root.append(BuildInspector.message('This wall surface no longer exists.'));
-            root.append(this.propertyHeading(details.Surface, 'Wall surface'));
+            // Named the way Paint names it: whose wall this is, then which face
+            // of it. "south half 2" is an address, and nobody points at an
+            // address.
+            root.append(this.propertyHeading(details.Where, details.Surface));
             delete details.Surface;
+            delete details.Where;
             root.append(this.detailsList(details));
+            const marquee = this.parent.buildMarqueeSelection;
+            const surface = marquee.selectedSurface;
+            const paint = this.parent.surfaceCustomizePanel;
+            const unavailable = surface ? null : 'Click a wall face to choose one';
+            // The same three answers the stage bar gives, in the same words.
+            root.append(this.actionRow([
+                ['Paint section', () => paint.openWallSurface(surface, 'stretch'), null, unavailable],
+                surface?.roomId
+                    ? ['Paint the room', () => paint.openWallSurface(surface, 'room'), null, unavailable]
+                    : ['Paint outside', () => paint.openWallSurface(surface, 'roomExterior'), null, unavailable],
+                ['Select structure', () => surface && marquee.selectWallAt(surface.cell, 'cell'), null, unavailable]
+            ]));
             return;
         }
         const details = document.createElement('dl');
@@ -77447,9 +78073,191 @@ class BuildInspector extends ModalWindow {
         root.append(details);
     }
 
+    /**
+     * What a building is for. Nothing reads it yet — like the room types it
+     * mirrors, it exists so behaviour that wants it ("myte sleeps at home",
+     * "stock goes to the shed") has one authored vocabulary rather than
+     * guessing from names.
+     */
+    buildingTypeEditor(plan) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Type';
+        const select = document.createElement('select');
+        select.replaceChildren(...SiteConfig.buildMode.buildingTypes.map(entry => {
+            const option = document.createElement('option');
+            option.value = entry.id;
+            option.textContent = entry.label;
+            return option;
+        }));
+        BuildInspector.selectValue(select, plan.buildingType || SiteConfig.buildMode.defaultBuildingType);
+        select.addEventListener('change', () => {
+            this.parent?.parent?.gameMap?.buildTransaction?.run(`Set ${plan.displayName} type`, draft => {
+                const current = draft.buildings.get(plan.id);
+                if (current) draft.buildings.set(plan.id, { ...current, buildingType: select.value });
+            });
+        });
+        label.append(title, select);
+        return label;
+    }
+
+    roomTypeEditor(room) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Type';
+        const select = document.createElement('select');
+        select.replaceChildren(...SiteConfig.rooms.types.map(entry => {
+            const option = document.createElement('option');
+            option.value = entry.id;
+            option.textContent = entry.label;
+            return option;
+        }));
+        BuildInspector.selectValue(select, room.roomType || SiteConfig.rooms.defaultType);
+        select.addEventListener('change', () => {
+            this.parent.roomPanel.commitRoom(room.id, { type: select.value }, `Change ${room.displayName} Type`);
+            this.render();
+        });
+        label.append(title, select);
+        return label;
+    }
+
+    /**
+     * The room's colour, by hand. Automatic is the default and stays available:
+     * the derived colour is stable per room id and well spread, and picking one
+     * is for the case where two rooms happen to read alike.
+     */
+    roomColourEditor(room) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'setting-item setting-item--stacked';
+        // Automatic is not a colour, it is the absence of a choice, so it sits
+        // on the label line as a mode rather than in the palette as a
+        // thirteenth swatch leaving one orphan on a second row.
+        const header = document.createElement('div');
+        header.className = 'build-inspector-colours__header';
+        const title = document.createElement('span');
+        title.textContent = 'Colour';
+        const row = document.createElement('div');
+        row.className = 'build-inspector-colours';
+        const choose = index => this.parent?.parent?.gameMap?.buildTransaction?.run(
+            `Colour ${room.displayName}`, (_draft, level) => {
+                const current = level.rooms.get(room.id);
+                if (current) level.rooms.set(room.id, { ...current, colourIndex: index });
+            }
+        );
+        const swatch = (index, label) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'build-inspector-colour';
+            button.title = label;
+            button.setAttribute('aria-label', label);
+            button.style.background = RoomPanel.roomColour(room.id, 0.95, index);
+            const chosen = (room.colourIndex ?? null) === index;
+            button.classList.toggle('is-selected', chosen);
+            button.setAttribute('aria-pressed', String(chosen));
+            button.addEventListener('click', () => {
+                choose(index);
+                this.render();
+            });
+            return button;
+        };
+        const auto = document.createElement('button');
+        auto.type = 'button';
+        auto.className = 'build-inspector-colour-auto';
+        auto.textContent = 'Automatic';
+        auto.title = 'Take the colour from the room id, as every room does until you choose';
+        const automatic = (room.colourIndex ?? null) === null;
+        auto.classList.toggle('is-selected', automatic);
+        auto.setAttribute('aria-pressed', String(automatic));
+        auto.addEventListener('click', () => {
+            choose(null);
+            this.render();
+        });
+        header.append(title, auto);
+        RoomPanel.HUES.forEach((hue, index) => row.append(swatch(index, `Colour ${index + 1}`)));
+        wrapper.append(header, row);
+        return wrapper;
+    }
+
+    /**
+     * What the selected wall is built of.
+     *
+     * Construction is the one wall property with real consequences — the art,
+     * the thickness, the height it stands to — and it had no control anywhere.
+     * Changing it rebuilds those cells' geometry, so it goes through the same
+     * transaction a build does and undoes in one step.
+     */
+    wallConstructionEditor(wall, cells) {
+        const registry = this.parent?.parent?.gameMap?.wallMaterialRegistry;
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Construction';
+        const select = document.createElement('select');
+        select.replaceChildren(...[...(registry?.constructions?.keys?.() || [])].map(id => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = id.replaceAll('_', ' ');
+            return option;
+        }));
+        BuildInspector.selectValue(select, wall.constructionId);
+        // One construction is all `wall-materials.json` defines today. The
+        // control stays, so it is obvious where a second one would appear, but
+        // a dropdown you cannot change anything with should say so.
+        if (select.options.length < 2) {
+            select.disabled = true;
+            select.title = 'This map has one wall construction. More are added in data/map-objects/wall-materials.json.';
+        }
+        select.addEventListener('change', () => {
+            this.editWallCells(cells, current => ({
+                ...current,
+                constructionId: select.value,
+                // The connect group follows the construction unless it was
+                // authored to something else: two walls join when their groups
+                // match, and silently keeping the old one is how a rebuilt wall
+                // stops connecting to itself.
+                connectGroup: current.connectGroup === current.constructionId ? select.value : current.connectGroup
+            }), 'Change wall construction');
+        });
+        label.append(title, select);
+        return label;
+    }
+
+    editWallCells(cells, edit, label) {
+        const map = this.parent?.parent?.gameMap;
+        const keys = cells.map(cell => BuildKeys.cell(cell.x, cell.y));
+        const committed = map?.buildTransaction?.run(label, (_draft, level) => {
+            for (const key of keys) {
+                const current = level.walls.get(key);
+                if (current) level.walls.set(key, edit(current));
+            }
+        });
+        // Geometry changed under the pieces the selection outlines.
+        this.parent.buildMarqueeSelection.renderWallHighlights();
+        this.render();
+        return committed;
+    }
+
+    needsRow(needs) {
+        // Not a `.setting-hint`: that is a two-column grid for an icon and a
+        // paragraph, and the second badge in the row was being stretched across
+        // the whole 1fr column by it.
+        const row = document.createElement('div');
+        row.className = 'build-inspector-needs';
+        if (needs.length === 0) {
+            const done = document.createElement('span');
+            done.className = 'build-inspector-needs__done';
+            done.textContent = 'Nothing missing.';
+            row.append(done);
+            return row;
+        }
+        for (const need of needs) row.append(BuildInspector.badge(need));
+        return row;
+    }
+
     beginBuildingMove() {
-        this.parent.showMessage?.('Drag the selected building on the map to move it.', 'info', 'Move Building');
-        return true;
+        return this.parent.buildMarqueeSelection.armMove();
     }
 
     roomBuildingEditor(room) {
@@ -77539,14 +78347,24 @@ class BuildInspector extends ModalWindow {
             : room?.wallFinishId ? 'Room default'
                 : buildingFinish ? 'Building default'
                     : 'Construction default';
+        const fronts = surface.roomId ? null : this.frontsRoom(surface);
         return {
-            Surface: `${face} half ${half + 1}`,
+            Where: room ? room.displayName : (fronts ? `Outside · ${fronts}` : 'Outside'),
+            Surface: SurfaceCustomizePanel.SURFACE_LABELS[face] || `${face} face`,
             Construction: wall.constructionId,
             Finish: finishId,
             Source: source,
             Building: building?.displayName || 'Unassigned',
-            'Adjacent room': room?.displayName || 'Exterior'
+            Side: room ? 'Interior' : 'Exterior'
         };
+    }
+
+    /** The room an exterior face fronts, for naming it the way Paint does. */
+    frontsRoom(surface) {
+        const panel = this.parent?.surfaceCustomizePanel;
+        const roomId = panel?.adjacentRoomId?.(surface);
+        const room = roomId ? this.parent?.parent?.gameMap?.regionManager?.get('room', roomId) : null;
+        return room?.properties?.displayName || room?.id || null;
     }
 
     detailsList(values) {
@@ -77601,12 +78419,19 @@ class BuildInspector extends ModalWindow {
     actionRow(actions) {
         const row = document.createElement('div');
         row.className = 'button-row build-inspector-actions';
-        for (const [label, action, className] of actions) {
+        for (const [label, action, className, disabledReason] of actions) {
             const button = document.createElement('button');
             button.type = 'button';
             button.textContent = label;
             if (className) button.classList.add(className);
-            button.addEventListener('click', action);
+            // A reason is what disables it: an action that cannot run should
+            // look like it, and say why on hover rather than on click.
+            if (disabledReason) {
+                button.disabled = true;
+                button.title = disabledReason;
+            } else {
+                button.addEventListener('click', action);
+            }
             row.append(button);
         }
         return row;
@@ -77615,6 +78440,22 @@ class BuildInspector extends ModalWindow {
     openTool(mode, roomId = null) {
         if (roomId) this.parent.roomPanel.selected = roomId;
         return this.parent.changeToolMode(mode);
+    }
+
+    /**
+     * Show what is stored even when the list has never heard of it. A dropdown
+     * silently blanking itself is how an authored value gets thrown away by the
+     * next person who touches any other field on the panel.
+     */
+    static selectValue(select, value) {
+        if (value && !select.querySelector(`option[value="${CSS.escape(String(value))}"]`)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = `${value} (custom)`;
+            select.append(option);
+        }
+        select.value = value;
+        return select;
     }
 
     static badge(text) {
@@ -82566,6 +83407,26 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.setOverlay(this.selection, target);
     }
 
+    /**
+     * Open Surface on exactly this wall surface — what Select hands over — with
+     * the scope it was asked for already chosen, so "paint the room" arrives
+     * ready to paint the room rather than one stretch of it.
+     */
+    openWallSurface(surface, scope = 'stretch') {
+        const builder = this.gameMap?.wallBuilder;
+        if (!surface?.cell || !builder || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        this.setTarget({
+            surface: 'wall',
+            wallSurface: surface,
+            piece: builder.findPieceForCell(surface.cell.x, surface.cell.y)
+        });
+        this.renderPalette();
+        if (this.scope?.values?.includes(scope)) this.scope.select(scope);
+        this.redrawOverlays();
+        this.open();
+        return true;
+    }
+
     /** Open Surface with one of a room's surfaces already in hand. */
     openRoomSurface(roomId, surface = 'floor') {
         const room = this.gameMap?.regionManager?.get('room', roomId);
@@ -84563,10 +85424,24 @@ class WallBuildPanel extends CellDragBuildPanel {
             if (!this.parent?.changeToolMode(UIToolModes.ROOM)) return;
             if (roomId) this.parent?.roomPanel?.select?.(roomId);
         });
+        // The palette is a view of the inventory, so it follows it. Rendering it
+        // once when the tool opens meant a door you had just hung was still
+        // listed, at the count it had before you hung it.
+        this.unsubscribeInventory = this.parent?.parent?.eventManager?.on?.(
+            EVENTS.INVENTORY_CHANGED, () => {
+                if (this.parent?.isTool?.(this.toolMode)) this.renderOwnedOpenings();
+            }
+        ) || null;
     }
 
     getBuilder() {
         return this.gameMap?.wallBuilder || null;
+    }
+
+    dispose() {
+        this.unsubscribeInventory?.();
+        this.unsubscribeInventory = null;
+        super.dispose?.();
     }
 
     handleToolModeChanged(mode) {
@@ -85403,6 +86278,19 @@ class RoomPanel extends ModalWindow {
     // Twelve hues a person can name, evenly spaced round the wheel.
     static HUES = Object.freeze([8, 32, 52, 84, 140, 168, 194, 218, 250, 280, 310, 336]);
 
+    // roomId → chosen hue index, mirrored from the room plans on every build
+    // commit. `roomColour` is static and called from the floor overlays, the
+    // rows and the ghost tiles; giving it a lookup keeps all of them agreeing
+    // without threading the document through each call.
+    static chosenColours = new Map();
+
+    static syncChosenColours(level) {
+        RoomPanel.chosenColours = new Map((level?.rooms?.values?.() || [])
+            .filter(plan => Number.isInteger(plan.colourIndex))
+            .map(plan => [plan.id, plan.colourIndex]));
+        return RoomPanel.chosenColours;
+    }
+
     constructor(parent) {
         super(parent, {
             id: 'room-panel',
@@ -85428,7 +86316,13 @@ class RoomPanel extends ModalWindow {
         this.boundPointerMove = this.handlePointerMove.bind(this);
         this.boundPointerUp = this.handlePointerUp.bind(this);
         this.boundPointerLeave = this.clearHover.bind(this);
-        this.boundRefresh = () => this.refresh();
+        // The colour mirror is kept in step whatever tool is open: the floor
+        // tints and the Inspector read it too, and `refresh` stands down when
+        // the Room tool is not the active one.
+        this.boundRefresh = () => {
+            RoomPanel.syncChosenColours(this.gameMap?.buildDocument?.level?.());
+            this.refresh();
+        };
         this.init();
         this.listElement = this.modalElement?.querySelector('.room-panel-list') || null;
         this.scrollContainer = this.listElement;
@@ -85457,8 +86351,10 @@ class RoomPanel extends ModalWindow {
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
         this._unsubscribers = [
-            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh)
+            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh),
+            this.parent?.parent?.eventManager?.on(EVENTS.MAP_CHANGED, this.boundRefresh)
         ].filter(Boolean);
+        RoomPanel.syncChosenColours(this.gameMap?.buildDocument?.level?.());
     }
 
     get gameMap() {
@@ -85734,7 +86630,7 @@ class RoomPanel extends ModalWindow {
         const rooms = this.rooms();
         this.syncOperationAvailability(rooms);
         this.listElement.replaceChildren(
-            ...(rooms.length ? rooms.map(entry => this.createRow(entry)) : [RoomPanel.emptyState()])
+            ...(rooms.length ? this.groupRows(rooms) : [RoomPanel.emptyState()])
         );
         this.markSelection({ reveal: false });
 
@@ -85744,6 +86640,42 @@ class RoomPanel extends ModalWindow {
                 ?.focus();
         }
         if (this.scrollContainer) this.scrollContainer.scrollTop = scroll;
+    }
+
+    /**
+     * Rows, under building headings once there is more than one building.
+     *
+     * A hierarchy over a single building is a row you have to read past to get
+     * to the list — the Navigator is the place for the shape of the site. What
+     * this list was missing is only *which* building a room is in, and that
+     * only becomes a question when there are two.
+     */
+    groupRows(rooms) {
+        const level = this.gameMap?.buildDocument?.level?.();
+        const buildings = this.gameMap?.buildDocument?.buildings;
+        const named = new Map((buildings?.values?.() || []).map(plan => [plan.id, plan.displayName || plan.id]));
+        if (named.size < 2) return rooms.map(entry => this.createRow(entry));
+
+        const groups = new Map();
+        for (const entry of rooms) {
+            const buildingId = level?.rooms.get(entry.room.id)?.buildingId ?? null;
+            if (!groups.has(buildingId)) groups.set(buildingId, []);
+            groups.get(buildingId).push(entry);
+        }
+        // Buildings in the document's own order, then the site's own rooms.
+        const order = [...named.keys()].filter(id => groups.has(id));
+        if (groups.has(null)) order.push(null);
+        return order.flatMap(buildingId => [
+            RoomPanel.groupHeading(buildingId ? named.get(buildingId) : 'Site'),
+            ...groups.get(buildingId).map(entry => this.createRow(entry))
+        ]);
+    }
+
+    static groupHeading(text) {
+        const heading = document.createElement('h4');
+        heading.className = 'room-panel-group';
+        heading.textContent = text;
+        return heading;
     }
 
     syncOperationAvailability(rooms = this.rooms()) {
@@ -85889,6 +86821,10 @@ class RoomPanel extends ModalWindow {
 
         const size = document.createElement('span');
         size.className = 'room-row__size';
+        const buildingId = this.gameMap?.buildDocument?.level?.().rooms.get(room.id)?.buildingId ?? null;
+        const buildingName = buildingId
+            ? this.gameMap?.buildDocument?.buildings.get(buildingId)?.displayName
+            : null;
         // Said on the row, because a room nothing encloses looks identical to
         // one that is walled in once it has a floor and a name — and it is not:
         // it takes no interior light, and standing in it you are still outside.
@@ -85896,7 +86832,7 @@ class RoomPanel extends ModalWindow {
         // its line with the type dropdown, and a row that swaps in a longer
         // phrase at zero squeezes the dropdown down to nothing. A room with no
         // floor says so by the row it is in — faded swatch, italic count.
-        size.textContent = `${cells} tiles`;
+        size.textContent = buildingName ? `${cells} tiles · ${buildingName}` : `${cells} tiles`;
 
         const perimeter = this.perimeterPlan(room);
         const status = document.createElement('span');
@@ -86433,9 +87369,36 @@ class RoomPanel extends ModalWindow {
         }
         this.markSelection();
         this.renderHighlight();
+        this.revealRoom(value);
         if (this.gameMap?.buildDocument?.level?.().rooms.has(value)) {
             this.parent.buildSelection?.set({ kind: 'room', id: value });
         }
+    }
+
+    /**
+     * Bring the room you just picked into view.
+     *
+     * Picking a room off a list is asking to look at it, and on a map bigger
+     * than the stage the row you clicked was often for a room nowhere on
+     * screen. Eased, like every other camera move; a room with no floor yet has
+     * nowhere to look, so nothing happens.
+     */
+    revealRoom(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const cells = room?.shape?.cells;
+        if (!cells?.size) return false;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+        const size = this.cellSize;
+        return this.parent?.parent?.camera?.focusOn?.({
+            posX: (minX * size) + (((maxX - minX + 1) * size) / 2),
+            posY: (minY * size) + (((maxY - minY + 1) * size) / 2),
+            size: { width: 0, height: 0 }
+        }) ?? false;
     }
 
     /**
@@ -86448,7 +87411,18 @@ class RoomPanel extends ModalWindow {
      * the same magenta. Telling rooms apart by colour is the entire interface
      * here, so the colours have to actually differ.
      */
-    static roomColour(roomId, alpha) {
+    /**
+     * A room's colour: the one it was given, or the one its id earns it.
+     *
+     * The automatic colour is stable and well spread, which is most of what
+     * this needs to do — but "most" is not "all", and two rooms that read alike
+     * on one map are worth being able to tell apart by hand.
+     */
+    static roomColour(roomId, alpha, colourIndex = RoomPanel.chosenColours.get(roomId) ?? null) {
+        if (Number.isInteger(colourIndex)) {
+            const hue = RoomPanel.HUES[((colourIndex % RoomPanel.HUES.length) + RoomPanel.HUES.length) % RoomPanel.HUES.length];
+            return `hsla(${hue}, 68%, 58%, ${alpha})`;
+        }
         if (!roomId) return `rgba(120, 120, 120, ${alpha})`;
         let hash = 0;
         for (let index = 0; index < roomId.length; index++) {

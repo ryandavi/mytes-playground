@@ -1059,22 +1059,35 @@ body[data-build-cursor="refused"] .app-stage {
 // their own padding and their own gap, so the same list read as two different
 // components depending on which tool you had open.
 // ─────────────────────────────────────────────────────────────────────────────
+// A ceiling, not a height: three rows should make a short panel, and twenty
+// should make this one scroll rather than the window. Shared with the build
+// Navigator and the Inspector's detail lists through `inset-scroll-box`.
 .panel-list {
-    @include surface-inset;
+    @include inset-scroll-box;
     display: flex;
     flex-direction: column;
     flex: 0 1 auto;
     gap: var(--space-xs);
     padding: var(--space-sm);
-    width: 100%;
-    // A ceiling, not a height: three rows should make a short panel, and twenty
-    // should make this one scroll rather than the window.
-    max-height: 280px;
-    @include scroll-area;
 }
 
 // A list nobody has put anything in yet. Centred and quiet: it is a prompt, not
 // an error, and it sits where the first row will appear.
+// A building's name over the rooms in it. Only drawn when a map has more than
+// one building; a heading over the only group there is says nothing.
+.room-panel-group {
+    margin: var(--space-xs) 0 0;
+    padding-inline: var(--space-2xs);
+    font-size: var(--text-size-meta);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+
+    &:first-child {
+        margin-top: 0;
+    }
+}
+
 .panel-list__empty {
     margin: 0;
     padding: var(--space-md) var(--space-sm);

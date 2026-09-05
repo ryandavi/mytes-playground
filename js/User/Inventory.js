@@ -447,6 +447,11 @@ class Inventory {
         }
         // A slot added or removed changes what is reachable off the ends.
         this.updateOverflowState();
+        // Every add, remove and quantity change lands here, which makes it the
+        // one place a panel listing inventory contents can hear about them.
+        this.parent?.eventManager?.emit?.(EVENTS.INVENTORY_CHANGED, {
+            count: this.items.length
+        });
     }
 
     activateItemElement(itemElement) {

@@ -2438,30 +2438,141 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
         grid-template-columns: repeat(3, 1fr);
     }
 
+    // The panel's editors are `<label class="setting-item setting-item--stacked">`
+    // — the row IS the label — so the settings rules keyed on `:has(> label)`
+    // never applied and the control sat flush against its name.
+    label.setting-item--stacked {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        gap: var(--space-2xs);
+        margin: 0;
+    }
+
     .build-inspector-view {
         min-height: 180px;
+        // Grid and flex children default to min-content, and a tree row's
+        // min-content is its longest unbreakable word plus its badge — which is
+        // what made the Navigator wider than the window it lives in.
+        min-width: 0;
+        max-width: 100%;
+        overflow-x: hidden;
     }
 
     .build-navigator-tree,
-    .build-navigator-tree ul {
+    .build-navigator-tree ul,
+    .build-navigator-tree li {
         display: grid;
         gap: var(--space-2xs);
         margin: 0;
         padding: 0;
+        min-width: 0;
         list-style: none;
     }
 
-    .build-navigator-tree ul {
-        padding-left: var(--space-md);
+    // The site's own children are the list: it is the part that grows with the
+    // map, so it is the part that scrolls, in the same inset box the room and
+    // ground lists use. The panel itself never scrolls or clips.
+    .build-navigator-node--site > ul {
+        @include inset-scroll-box;
+        gap: var(--space-xs);
+        padding: var(--space-sm);
+    }
+
+    // Enough of a step that the tree reads as a tree: at 8px the rooms looked
+    // flush with the building they hang off.
+    .build-navigator-tree ul ul {
+        padding-left: var(--space-lg);
+        border-left: 1px solid var(--surface-ui-line, rgb(0 0 0 / 12%));
+        margin-left: var(--space-2xs);
+    }
+
+    // A palette, in the sunken tray the rest of the panel's lists sit in. One
+    // row of twelve: colours are compared with each other, and a ragged second
+    // line makes that harder than it needs to be.
+    .build-inspector-colours {
+        @include surface-inset;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: var(--space-2xs);
+        padding: var(--space-xs);
+        border-radius: var(--radius-sm);
+
+        &__header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: var(--space-sm);
+        }
+    }
+
+    .build-inspector-colour-auto {
+        padding: 0 var(--space-xs);
+        font-size: var(--text-size-meta);
+
+        &.is-selected {
+            @include button-pressed;
+        }
+    }
+
+    // The swatch is the control: no label, no chrome of its own, just the
+    // colour with a hairline so a pale one still reads against the tray.
+    .build-inspector-colour {
+        @include button-base;
+        aspect-ratio: 1;
+        width: 100%;
+        min-width: 0;
+        padding: 0;
+
+        &:active {
+            @include surface-pressed;
+        }
+
+        // Chosen: the same sunken bevel every pressed control in the shell
+        // wears, keeping the colour rather than dithering over it.
+        &.is-selected {
+            @include surface-pressed;
+        }
+    }
+
+    // Badges wrap; a badge does not. Its own width, its own line only when the
+    // row runs out of room.
+    .build-inspector-needs {
+        @include surface-inset;
+        margin-top: var(--space-xs);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2xs);
+        padding: var(--space-xs);
+        border-radius: var(--radius-sm);
+
+        &__done {
+            padding-inline: var(--space-2xs);
+            color: var(--text-muted);
+            font-size: var(--text-size-meta);
+        }
     }
 
     .build-navigator-button {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: var(--space-xs);
         width: 100%;
+        min-width: 0;
         padding: var(--space-xs) var(--space-sm);
         text-align: left;
+
+        // One line. A long room name gives way to its badge rather than
+        // wrapping the row to two lines and breaking the rhythm of the tree.
+        &__label {
+            flex: 0 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
 
         &.is-selected {
             color: var(--text-on-accent);
@@ -2470,12 +2581,9 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
     }
 
     .build-navigator-badge {
-        padding: 0 var(--space-xs);
+        @include badge;
         color: var(--text-muted);
         background: var(--surface-ui-inset);
-        border: 1px solid var(--text-subtle);
-        border-radius: var(--radius-xs);
-        font-size: 0.8em;
     }
 
     .build-inspector-heading {
@@ -2491,9 +2599,12 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
     }
 
     .build-inspector-details {
+        @include inset-scroll-box(200px);
         display: grid;
         grid-template-columns: auto 1fr;
         gap: var(--space-xs) var(--space-sm);
+        padding: var(--space-sm);
+        margin: 0;
 
         dt,
         dd {

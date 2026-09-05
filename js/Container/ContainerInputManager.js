@@ -170,6 +170,19 @@ class ContainerInputManager {
         }
       }
 
+      // Nudging what is selected. One cell a press, and the same transaction a
+      // drag uses, so it undoes as one step and refuses the same moves.
+      if (isBuild && ui?.buildMarqueeSelection?.nudge) {
+        const nudges = {
+          arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1]
+        };
+        const nudge = nudges[event.key];
+        if (nudge && ui.buildMarqueeSelection.nudge(nudge[0], nudge[1])) {
+          event.originalEvent?.preventDefault();
+          return;
+        }
+      }
+
       switch (event.key) {
         case 'b':
           gameMode?.toggle();
@@ -486,6 +499,7 @@ class ContainerInputManager {
       return;
     }
 
+    if (ui?.buildMarqueeSelection?.cancelDrag?.() === true) return;
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.fenceBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.roomPanel?.cancelDrag?.() === true) return;

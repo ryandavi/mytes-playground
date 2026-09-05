@@ -35,17 +35,42 @@ const SiteConfig = Object.freeze({
         // rather than parsing display names. `id` is the stable key; `label` is
         // what the player picks from and what an unnamed room falls back to.
         defaultType: 'unset',
+        // One vocabulary, two readers. The `id` is the gameplay zone type a
+        // room emits — the same catalogue as `data/metadata/zones.json`, which
+        // is what the AI seeks out and what Tiled authors as `zoneType` — and
+        // the `label` is the kind of room a player calls it. They were two
+        // lists before: rooms authored as `rest`/`play`/`food` never matched a
+        // dropdown offering `bedroom`/`playroom`/`kitchen`, so every authored
+        // room showed a blank type. The kinds below with no zone counterpart
+        // (bathroom, study, hallway, storage) simply emit no zone.
+        //
+        // `requires` is what makes a room of this kind finished: object types
+        // (ItemRegistry `world.objectType`) that should be standing in it. The
+        // Inspector reports what is missing; nothing is enforced. Add one when
+        // the object exists — kitchen appliances are not built yet, so a
+        // kitchen asks for nothing beyond what every room asks for.
         types: Object.freeze([
             Object.freeze({ id: 'unset', label: 'Unassigned' }),
-            Object.freeze({ id: 'bedroom', label: 'Bedroom' }),
-            Object.freeze({ id: 'kitchen', label: 'Kitchen' }),
+            Object.freeze({ id: 'rest', label: 'Bedroom', requires: Object.freeze(['BED']) }),
+            Object.freeze({ id: 'food', label: 'Kitchen' }),
+            Object.freeze({ id: 'social', label: 'Living Room', requires: Object.freeze(['COUCH']) }),
+            Object.freeze({ id: 'play', label: 'Playroom', requires: Object.freeze(['BALL']) }),
             Object.freeze({ id: 'bathroom', label: 'Bathroom' }),
-            Object.freeze({ id: 'living', label: 'Living Room' }),
-            Object.freeze({ id: 'playroom', label: 'Playroom' }),
             Object.freeze({ id: 'study', label: 'Study' }),
             Object.freeze({ id: 'hallway', label: 'Hallway' }),
-            Object.freeze({ id: 'storage', label: 'Storage' }),
+            Object.freeze({ id: 'storage', label: 'Storage', requires: Object.freeze(['TREASURE_CHEST']) }),
         ]),
+        // Asked of every indoor room whatever its type, and of a hallway too:
+        // a corridor with no way in is as broken as a bedroom with no way in.
+        indoorRequires: Object.freeze(['LANTERN']),
+        // How a missing thing is named on the badge.
+        requirementLabels: Object.freeze({
+            BED: 'No bed',
+            COUCH: 'No seat',
+            BALL: 'No toy',
+            TREASURE_CHEST: 'No storage',
+            LANTERN: 'No light'
+        }),
     }),
 
     // Experimental semantic wall renderer. Turning this off restores the
@@ -399,6 +424,19 @@ const SiteConfig = Object.freeze({
     // map over to the player. Every value the mode switch and its tools read
     // lives here.
     buildMode: Object.freeze({
+        // What a building is, as opposed to what it is called. Nothing reads it
+        // yet; it is the same authored vocabulary the room types are, so that
+        // behaviour which wants it ("sleep at home", "stock the shed") has one.
+        defaultBuildingType: 'house',
+        buildingTypes: Object.freeze([
+            Object.freeze({ id: 'house', label: 'House' }),
+            Object.freeze({ id: 'storage', label: 'Storage' }),
+            Object.freeze({ id: 'workshop', label: 'Workshop' }),
+            Object.freeze({ id: 'shop', label: 'Shop' }),
+            Object.freeze({ id: 'greenhouse', label: 'Greenhouse' }),
+            Object.freeze({ id: 'barn', label: 'Barn' }),
+            Object.freeze({ id: 'outbuilding', label: 'Outbuilding' }),
+        ]),
         // Walls stand differently while building than while playing: cutaway
         // lets you see enclosed floors and still pick the walls themselves.
         defaultPresentation: 'cutaway',
