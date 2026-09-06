@@ -82,7 +82,7 @@ class BuildInspector extends ModalWindow {
                 for (const room of rooms) {
                     const roomNode = document.createElement('li');
                     const label = `Room: ${room.displayName}`;
-                    const roomButton = this.nodeButton('room', room.id, label);
+                    const roomButton = this.nodeButton('room', room.id, label, BuildInspector.roomSwatchColor(room.id));
                     roomNode.append(roomButton);
                     roomList.append(roomNode);
                 }
@@ -99,7 +99,7 @@ class BuildInspector extends ModalWindow {
             const list = document.createElement('ul');
             for (const room of outdoor) {
                 const node = document.createElement('li');
-                node.append(this.nodeButton('room', room.id, `Area: ${room.displayName}`));
+                node.append(this.nodeButton('room', room.id, `Area: ${room.displayName}`, BuildInspector.roomSwatchColor(room.id)));
                 list.append(node);
             }
             areas.append(list);
@@ -115,11 +115,23 @@ class BuildInspector extends ModalWindow {
         root.append(tree);
     }
 
-    nodeButton(kind, id, label) {
+    // The room's own colour - the one the floor tint and room list use, a
+    // hand-picked hue or the one its id earns it. Identity, not a finish.
+    static roomSwatchColor(roomId) {
+        return roomId ? RoomPanel.roomColour(roomId, 1) : null;
+    }
+
+    nodeButton(kind, id, label, swatchColor = null) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'build-navigator-button';
         button.title = label;
+        if (swatchColor) {
+            const swatch = document.createElement('span');
+            swatch.className = 'build-navigator-button__swatch';
+            swatch.style.background = swatchColor;
+            button.append(swatch);
+        }
         const text = document.createElement('span');
         text.className = 'build-navigator-button__label';
         text.textContent = label;

@@ -1,4 +1,9 @@
 class WallRenderer {
+    // Paint/selection outlines sit on one plane far above every wall piece so a
+    // taller wall drawn later cannot clip them. Kept below SurfaceDebug's own
+    // overlay (2_000_000).
+    static OVERLAY_Z_INDEX = 1_000_000;
+
     resolveFinishOverride(x, y, face, roomId = undefined, half = null) {
         const buildDocument = this.previewDocument || this.gameMap?.buildDocument;
         return buildDocument && (half === 0 || half === 1)
@@ -12,14 +17,18 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
+            const slice = { x: cell.x, y: cell.y, kind: span.kind, half: span.half };
             const { atom, classification } = WallFaceResolver.visibleSurface(
-                { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
-                cache.grid,
-                topology,
-                cache.geometry
+                slice, cache.grid, topology, cache.geometry
             );
             if (classification.kind === 'buried') return null;
-            const roomId = classification.kind === 'room' ? classification.roomId : null;
+            // Ownership follows the NEAR (camera) side, so a wall shared by two
+            // rooms is selected and repainted as the side you are looking into,
+            // not whichever the depth rule drew. A sliver whose near face is
+            // masonry keeps visibleSurface's answer so a returning corner does
+            // not go blank.
+            const owner = SurfaceRunGrouper.ownerClass(slice, cache.grid, topology, cache.geometry);
+            const roomId = owner.kind === 'room' ? owner.roomId : null;
             return {
                 ...span,
                 face: atom.face,
@@ -95,45 +104,81 @@ class WallRenderer {
         return covering[covering.length - 1] || null;
     }
 
-    getPaintStretchSurfaces(surface) {
-        if (!surface?.cell) return [];
-        const collected = new Map();
-        const take = cell => {
-            const matches = this.getCellSurfaces(cell).filter(entry => entry.roomId === surface.roomId);
-            // Keyed on the span, not the face: an exterior half follows the face
-            // opposite it, so one face can own both halves of a cell and keying
-            // on the name alone would drop one of them from the outline.
-            for (const match of matches) collected.set(`${cell.x},${cell.y},${match.from},${match.to}`, match);
-            return matches.length > 0;
-        };
-        if (!take(surface.cell)) return [];
-
-        for (const direction of [-1, 1]) {
-            // A cell the walk passes with nothing facing this room contributes
-            // nothing and still lets the walk through: that is the far side of
-            // a shared wall, or the stretch of run belonging to the room next
-            // door, and the wall carries on past it.
-            let cell = surface.cell;
-            for (;;) {
-                const next = this.stepAlongRun(cell, surface.axis, direction);
-                if (!next) break;
-                take(next);
-                cell = next;
-            }
-        }
-        return [...collected.values()];
+    /**
+     * The stretch of wall a click selects: one run, grouped by the near-side
+     * classification of the clicked span (see SurfaceRunGrouper). Returns
+     * `getCellSurfaces`-shaped entries tagged with a `runId` so the outline
+     * merges within a run and never across two that merely touch.
+     */
+    getPaintStretchSurfaces(surface, mode = 'run') {
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        if (!surface?.cell || !cache?.geometry) return [];
+        const spans = cache.geometry.paintSpans?.get(BuildKeys.cell(surface.cell.x, surface.cell.y)) || [];
+        const start = spans.find(span => span.from === surface.from && span.to === surface.to)
+            || spans.find(span => Number.isFinite(surface.from)
+                && surface.from >= span.from && surface.from < span.to);
+        if (!start) return [];
+        const run = SurfaceRunGrouper.group(
+            {
+                cell: { x: surface.cell.x, y: surface.cell.y },
+                kind: start.kind, half: start.half, from: start.from, to: start.to
+            },
+            { geometry: cache.geometry, grid: cache.grid, topology: { ...cache.topology, walls: cache.geometry } },
+            mode
+        );
+        if (!run) return [];
+        return this.spansToSurfaces(run.spans, run.id, run.kind === 'room' ? run.roomId : null, cache);
     }
 
-    stepAlongRun(cell, axis, direction) {
-        const horizontal = axis === 'horizontal';
-        const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
-        const forward = horizontal
-            ? (direction > 0 ? WallBuilder.MASK_EAST : WallBuilder.MASK_WEST)
-            : (direction > 0 ? WallBuilder.MASK_SOUTH : WallBuilder.MASK_NORTH);
-        if (!(mask & forward)) return null;
-        return this.cells.get(
-            `${cell.x + (horizontal ? direction : 0)},${cell.y + (horizontal ? 0 : direction)}`
-        ) || null;
+    /**
+     * Every exterior half on one loop, corners included — the unit "Whole
+     * building" paints. With `roomId`, narrowed to the length of that room's
+     * own outside wall (its returning corners follow the run).
+     */
+    getShellSurfaces(surface, { roomId = null } = {}) {
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        if (!surface?.cell || !cache?.geometry) return [];
+        const topology = { ...cache.topology, walls: cache.geometry };
+        const spans = cache.geometry.paintSpans?.get(BuildKeys.cell(surface.cell.x, surface.cell.y)) || [];
+        const start = spans.find(span => span.from === surface.from && span.to === surface.to)
+            || spans.find(span => Number.isFinite(surface.from)
+                && surface.from >= span.from && surface.from < span.to);
+        if (!start) return [];
+        const run = SurfaceRunGrouper.group(
+            { cell: { x: surface.cell.x, y: surface.cell.y }, kind: start.kind, half: start.half, from: start.from, to: start.to },
+            { geometry: cache.geometry, grid: cache.grid, topology }, 'shell'
+        );
+        if (!run || run.kind !== 'exterior') return [];
+        const kept = roomId == null ? run.spans : run.spans.filter(span =>
+            SurfaceRunGrouper.spanAdjacentRoom(span, cache.grid, topology, cache.geometry) === roomId);
+        return this.spansToSurfaces(kept, run.id, null, cache);
+    }
+
+    /** Grouper spans → `getCellSurfaces`-shaped entries tagged with `runId`. */
+    spansToSurfaces(spans, runId, roomId, cache) {
+        const collected = new Map();
+        for (const span of spans) {
+            const raw = this.cells.get(BuildKeys.cell(span.cell.x, span.cell.y));
+            if (!raw) continue;
+            const axis = span.kind === 'horizontal-band' ? 'horizontal' : 'vertical';
+            // Prefer the entry `visibleSurface` already resolved for this span
+            // so paint lands on the face that renders it; fall back to the
+            // near-side atom when the two disagree, rather than dropping the
+            // span from the outline.
+            const entry = this.getCellSurfaces(raw).find(candidate =>
+                candidate.axis === axis && candidate.from === span.from && candidate.to === span.to)
+                || (() => {
+                    const near = SurfaceRunGrouper.nearAtom(span);
+                    const mask = cache.geometry.masks?.get(BuildKeys.cell(span.cell.x, span.cell.y)) || 0;
+                    return {
+                        cell: { ...raw, mask }, face: near.face, half: near.half,
+                        from: span.from, to: span.to, axis, roomId,
+                        finishId: this.resolveSurfaceFinishId(raw, near.face, roomId, near.half)
+                    };
+                })();
+            collected.set(`${span.cell.x},${span.cell.y},${span.from},${span.to}`, { ...entry, runId });
+        }
+        return [...collected.values()];
     }
 
     getSurfaceRects(surfaces) {
@@ -150,7 +195,12 @@ class WallRenderer {
                 top: element.offsetTop,
                 width: surface.to - surface.from,
                 height: element.offsetHeight,
-                zIndex: (Number(element.style.zIndex) || 0) + 1
+                // One flat plane well above every wall piece: an outline reads
+                // out what a click selected, and a taller wall drawn later must
+                // not clip it. Grouped by run so two runs that only touch keep
+                // their own outlines.
+                zIndex: WallRenderer.OVERLAY_Z_INDEX,
+                group: surface.runId ?? 'surface'
             });
         }
         return WallBuilder.mergeRects(rects);
@@ -162,11 +212,14 @@ class WallRenderer {
             const bounds = {
                 left: rect.left, top: rect.top,
                 right: rect.left + rect.width, bottom: rect.top + rect.height,
-                zIndex: rect.zIndex
+                zIndex: rect.zIndex, group: rect.group ?? 'surface'
             };
             // Absorb every group this rectangle reaches, so two groups joined by
             // a late arrival end up as one and not as two overlapping outlines.
+            // Only within the same run, though: an interior stretch and the
+            // exterior one it meets at a corner touch but stay two outlines.
             for (let index = groups.length - 1; index >= 0; index--) {
+                if (groups[index].group !== bounds.group) continue;
                 if (!WallBuilder.rectsTouch(groups[index], bounds)) continue;
                 const [merged] = groups.splice(index, 1);
                 bounds.left = Math.min(bounds.left, merged.left);

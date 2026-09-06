@@ -40025,15 +40025,16 @@ class WallFaceResolver {
             const key = BuildKeys.atom(atom.x, atom.y, atom.face, atom.half);
             const spans = geometry.paintSpans?.get(BuildKeys.cell(atom.x, atom.y)) || [];
             for (const span of spans) {
-                const resolved = WallFaceResolver.visibleSurface(
-                    { x: atom.x, y: atom.y, kind: span.kind, half: span.half },
-                    grid,
-                    topology,
-                    geometry
-                );
+                const slice = { x: atom.x, y: atom.y, kind: span.kind, half: span.half };
+                const resolved = WallFaceResolver.visibleSurface(slice, grid, topology, geometry);
                 if (BuildKeys.atom(
                     resolved.atom.x, resolved.atom.y, resolved.atom.face, resolved.atom.half
-                ) === key) return resolved.classification;
+                ) === key) {
+                    // Ownership follows the near side, matching getPaintSpans, so
+                    // a "whole room" repaint clears the atoms that side names and
+                    // leaves the neighbour's shared-wall paint alone.
+                    return SurfaceRunGrouper.ownerClass(slice, grid, topology, geometry);
+                }
             }
         }
         return WallFaceResolver.classify(atom, grid, topology);
@@ -40126,6 +40127,257 @@ class WallFaceResolver {
         if (typeof topology.loopAtBlock === 'function') return topology.loopAtBlock(bx, by) ?? null;
         if (typeof topology.openSpaceAtBlock === 'function') return topology.openSpaceAtBlock(bx, by)?.loopId ?? null;
         return topology.loopByBlock?.get?.(BuildKeys.block(bx, by)) ?? null;
+    }
+}
+;
+/* -- js/Map/Walls/SurfaceRunGrouper.js -- */
+/**
+ * SurfaceRunGrouper — the stretch of wall a click selects, and the room or
+ * loop a wall half belongs to.
+ *
+ * The owner of a wall half is the owner of the block directly behind its NEAR
+ * face — the one the camera is on, `south` for a horizontal band and the open
+ * cheek for a post. Not `visibleSurface`'s depth-rule winner: on a wall shared
+ * by two rooms the camera sees one side, and that side is the one a click means
+ * and the one whose finish should show. `nearClass` is that lookup; a half
+ * whose near face is masonry answers `buried` and is nobody's to paint.
+ *
+ * A run is a straight stretch of wall along one axis. It never turns a corner —
+ * a corner is a new wall piece, a new run. Two grains:
+ *
+ *   'segment'  the clicked span out to the next junction each way (a cell where
+ *              another wall tees or crosses in). The piece between joints.
+ *   'run'      the clicked span end to end along its straight piece, through
+ *              every junction, until the wall turns, ends, or the near-side
+ *              owner changes. Openings never stop it.
+ *
+ * Wrapping a whole room's or building's walls is not a run; that is the room /
+ * building scope, which enumerates every half whose near side names it.
+ *
+ * Pure: geometry, the ownership grid and topology in; a list of spans out.
+ */
+class SurfaceRunGrouper {
+    static AXES = Object.freeze({
+        'horizontal-band': 'horizontal',
+        'post-west': 'vertical',
+        'post-east': 'vertical'
+    });
+
+    /** The face on the side the camera is on for this span kind. */
+    static nearFace(kind) {
+        if (kind === 'horizontal-band') return 'south';
+        return kind === 'post-west' ? 'west' : 'east';
+    }
+
+    /** A span carries its cell as `.cell` (grouper) or flat `.x/.y` (a slice). */
+    static cellOf(span) {
+        return span.cell ? span.cell : span;
+    }
+
+    /**
+     * The atom a near-side paint lands on. Bands split west/east by `half`;
+     * posts split north/south and the camera meets the south (`half: 1`) one.
+     */
+    static nearAtom(span) {
+        const cell = SurfaceRunGrouper.cellOf(span);
+        return {
+            x: cell.x,
+            y: cell.y,
+            face: SurfaceRunGrouper.nearFace(span.kind),
+            half: span.kind === 'horizontal-band' ? span.half : 1
+        };
+    }
+
+    /**
+     * The block behind this half's near (camera) face — `south` for a band, the
+     * open cheek for a post. `buried` when that face is masonry.
+     */
+    static nearClass(span, grid, topology) {
+        const cell = SurfaceRunGrouper.cellOf(span);
+        const face = SurfaceRunGrouper.nearFace(span.kind);
+        const halves = span.kind === 'horizontal-band' ? [span.half] : [1, 0];
+        let last = null;
+        for (const half of halves) {
+            last = WallFaceResolver.classify({ x: cell.x, y: cell.y, face, half }, grid, topology);
+            if (last.kind !== 'buried') return last;
+        }
+        return last;
+    }
+
+    /**
+     * Who a half belongs to: its near-side owner, or — when the near face is
+     * masonry (a returning-corner sliver, a covered post) — whatever run
+     * `visibleSurface` says it continues, so the corner does not go blank.
+     */
+    static ownerClass(span, grid, topology, geometry) {
+        const near = SurfaceRunGrouper.nearClass(span, grid, topology);
+        if (near.kind !== 'buried' || !geometry) return near;
+        const cell = SurfaceRunGrouper.cellOf(span);
+        return WallFaceResolver.visibleSurface(
+            { x: cell.x, y: cell.y, kind: span.kind, half: span.half }, grid, topology, geometry
+        ).classification;
+    }
+
+    static classKey(classification) {
+        if (!classification || classification.kind === 'buried') return 'buried';
+        return classification.kind === 'room'
+            ? `room:${classification.roomId}`
+            : `exterior:${classification.loopId ?? 'outside'}`;
+    }
+
+    static spanId(span) {
+        return span.kind === 'horizontal-band'
+            ? `${span.cell.x},${span.cell.y}/h/${span.half}`
+            : `${span.cell.x},${span.cell.y}/${span.kind}`;
+    }
+
+    static spansAt(geometry, x, y) {
+        const raw = geometry.paintSpans?.get(BuildKeys.cell(x, y)) || [];
+        return raw.map(span => ({
+            cell: { x, y }, kind: span.kind, half: span.half, from: span.from, to: span.to
+        }));
+    }
+
+    static maskAt(geometry, x, y) {
+        return geometry.masks?.get(BuildKeys.cell(x, y)) || 0;
+    }
+
+    /** A cell where a wall crosses the run's axis — a T, a cross, a corner. */
+    static isJunction(geometry, x, y, axis) {
+        const crossBits = axis === 'horizontal'
+            ? (WallGeometry.MASK_NORTH | WallGeometry.MASK_SOUTH)
+            : (WallGeometry.MASK_WEST | WallGeometry.MASK_EAST);
+        return (SurfaceRunGrouper.maskAt(geometry, x, y) & crossBits) !== 0;
+    }
+
+    /**
+     * @param {'segment'|'run'|'shell'} mode
+     *   'segment' the clicked span out to the next junction each way.
+     *   'run'     the whole straight piece, through junctions, until it turns.
+     *   'shell'   every half on the same loop/room, corners and all — the walk
+     *             follows masonry in both axes, so a returning-corner sliver is
+     *             not left behind.
+     * @returns {{ id, kind, roomId, loopId, spans }} or `null` when the click
+     * landed on a buried half — there is nothing selectable there.
+     */
+    static group(startSpan, { geometry, grid, topology }, mode = 'run') {
+        if (!startSpan?.cell || !geometry) return null;
+        const startClass = SurfaceRunGrouper.ownerClass(startSpan, grid, topology, geometry);
+        const wantKey = SurfaceRunGrouper.classKey(startClass);
+        if (wantKey === 'buried') return null;
+
+        const axis = SurfaceRunGrouper.AXES[startSpan.kind];
+        const matches = span => (mode === 'shell' || SurfaceRunGrouper.AXES[span.kind] === axis)
+            && SurfaceRunGrouper.classKey(SurfaceRunGrouper.ownerClass(span, grid, topology, geometry)) === wantKey;
+
+        const seen = new Set();
+        const members = [];
+        const consider = span => {
+            const id = SurfaceRunGrouper.spanId(span);
+            if (seen.has(id) || !matches(span)) return;
+            seen.add(id);
+            members.push(span);
+        };
+
+        if (mode === 'shell') {
+            // Flood the connected masonry in both axes; keep every half whose
+            // near side names the same loop or room.
+            const cellSeen = new Set([BuildKeys.cell(startSpan.cell.x, startSpan.cell.y)]);
+            const queue = [[startSpan.cell.x, startSpan.cell.y]];
+            while (queue.length) {
+                const [x, y] = queue.shift();
+                for (const span of SurfaceRunGrouper.spansAt(geometry, x, y)) consider(span);
+                const m = SurfaceRunGrouper.maskAt(geometry, x, y);
+                for (const [dx, dy, bit] of [
+                    [0, -1, WallGeometry.MASK_NORTH], [1, 0, WallGeometry.MASK_EAST],
+                    [0, 1, WallGeometry.MASK_SOUTH], [-1, 0, WallGeometry.MASK_WEST]
+                ]) {
+                    if (!(m & bit)) continue;
+                    const key = BuildKeys.cell(x + dx, y + dy);
+                    if (cellSeen.has(key)) continue;
+                    cellSeen.add(key);
+                    queue.push([x + dx, y + dy]);
+                }
+            }
+        } else {
+            // The clicked cell's own same-axis spans.
+            for (const span of SurfaceRunGrouper.spansAt(geometry, startSpan.cell.x, startSpan.cell.y)) consider(span);
+
+            // Straight along the axis each way. A cell with nothing matching —
+            // the far side of a shared wall — still passes the walk on; a
+            // masonry gap stops it, and in 'segment' grain so does the first
+            // junction.
+            const steps = axis === 'horizontal'
+                ? [[-1, 0, WallGeometry.MASK_WEST], [1, 0, WallGeometry.MASK_EAST]]
+                : [[0, -1, WallGeometry.MASK_NORTH], [0, 1, WallGeometry.MASK_SOUTH]];
+            for (const [dx, dy, bit] of steps) {
+                let x = startSpan.cell.x;
+                let y = startSpan.cell.y;
+                while (SurfaceRunGrouper.maskAt(geometry, x, y) & bit) {
+                    x += dx;
+                    y += dy;
+                    const here = SurfaceRunGrouper.spansAt(geometry, x, y);
+                    if (!here.length) break;
+                    for (const span of here) consider(span);
+                    if (mode === 'segment' && SurfaceRunGrouper.isJunction(geometry, x, y, axis)) break;
+                }
+            }
+        }
+
+        return {
+            id: `${wantKey}/${axis}/${SurfaceRunGrouper.spanId(startSpan)}`,
+            kind: startClass.kind,
+            roomId: startClass.kind === 'room' ? startClass.roomId : null,
+            loopId: startClass.kind === 'exterior' ? (startClass.loopId ?? 'outside') : null,
+            spans: members.length ? members : [startSpan]
+        };
+    }
+
+    /** The face opposite the near one — south↔north, west↔east. */
+    static farFace(kind) {
+        return { south: 'north', west: 'east', east: 'west' }[SurfaceRunGrouper.nearFace(kind)];
+    }
+
+    static farClassAt(x, y, kind, half, grid, topology) {
+        const halves = kind === 'horizontal-band' ? [half] : [1, 0];
+        let last = null;
+        for (const h of halves) {
+            last = WallFaceResolver.classify({ x, y, face: SurfaceRunGrouper.farFace(kind), half: h }, grid, topology);
+            if (last.kind !== 'buried') return last;
+        }
+        return last;
+    }
+
+    /**
+     * The room an exterior half fronts — the block behind its far face. A corner
+     * sliver's far face is masonry, so it takes the room its straight run
+     * fronts, read to the nearest half on either side that can say.
+     */
+    static spanAdjacentRoom(span, grid, topology, geometry) {
+        const cell = SurfaceRunGrouper.cellOf(span);
+        const own = SurfaceRunGrouper.farClassAt(cell.x, cell.y, span.kind, span.half, grid, topology);
+        if (own && own.kind === 'room') return own.roomId;
+        if (own && own.kind === 'exterior') return null;
+
+        const axis = SurfaceRunGrouper.AXES[span.kind];
+        const steps = axis === 'horizontal'
+            ? [[-1, 0, WallGeometry.MASK_WEST], [1, 0, WallGeometry.MASK_EAST]]
+            : [[0, -1, WallGeometry.MASK_NORTH], [0, 1, WallGeometry.MASK_SOUTH]];
+        for (const [dx, dy, bit] of steps) {
+            let x = cell.x;
+            let y = cell.y;
+            while (SurfaceRunGrouper.maskAt(geometry, x, y) & bit) {
+                x += dx;
+                y += dy;
+                for (const next of SurfaceRunGrouper.spansAt(geometry, x, y)) {
+                    if (SurfaceRunGrouper.AXES[next.kind] !== axis) continue;
+                    const c = SurfaceRunGrouper.farClassAt(x, y, next.kind, next.half, grid, topology);
+                    if (c && c.kind === 'room') return c.roomId;
+                    if (c && c.kind === 'exterior') return null;
+                }
+            }
+        }
+        return null;
     }
 }
 ;
@@ -40308,6 +40560,11 @@ class WallOpeningSlot {
 ;
 /* -- js/Map/Walls/WallRenderer.js -- */
 class WallRenderer {
+    // Paint/selection outlines sit on one plane far above every wall piece so a
+    // taller wall drawn later cannot clip them. Kept below SurfaceDebug's own
+    // overlay (2_000_000).
+    static OVERLAY_Z_INDEX = 1_000_000;
+
     resolveFinishOverride(x, y, face, roomId = undefined, half = null) {
         const buildDocument = this.previewDocument || this.gameMap?.buildDocument;
         return buildDocument && (half === 0 || half === 1)
@@ -40321,14 +40578,18 @@ class WallRenderer {
         const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
         if (!cache || !topology) return [];
         return spans.map(span => {
+            const slice = { x: cell.x, y: cell.y, kind: span.kind, half: span.half };
             const { atom, classification } = WallFaceResolver.visibleSurface(
-                { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
-                cache.grid,
-                topology,
-                cache.geometry
+                slice, cache.grid, topology, cache.geometry
             );
             if (classification.kind === 'buried') return null;
-            const roomId = classification.kind === 'room' ? classification.roomId : null;
+            // Ownership follows the NEAR (camera) side, so a wall shared by two
+            // rooms is selected and repainted as the side you are looking into,
+            // not whichever the depth rule drew. A sliver whose near face is
+            // masonry keeps visibleSurface's answer so a returning corner does
+            // not go blank.
+            const owner = SurfaceRunGrouper.ownerClass(slice, cache.grid, topology, cache.geometry);
+            const roomId = owner.kind === 'room' ? owner.roomId : null;
             return {
                 ...span,
                 face: atom.face,
@@ -40404,45 +40665,81 @@ class WallRenderer {
         return covering[covering.length - 1] || null;
     }
 
-    getPaintStretchSurfaces(surface) {
-        if (!surface?.cell) return [];
-        const collected = new Map();
-        const take = cell => {
-            const matches = this.getCellSurfaces(cell).filter(entry => entry.roomId === surface.roomId);
-            // Keyed on the span, not the face: an exterior half follows the face
-            // opposite it, so one face can own both halves of a cell and keying
-            // on the name alone would drop one of them from the outline.
-            for (const match of matches) collected.set(`${cell.x},${cell.y},${match.from},${match.to}`, match);
-            return matches.length > 0;
-        };
-        if (!take(surface.cell)) return [];
-
-        for (const direction of [-1, 1]) {
-            // A cell the walk passes with nothing facing this room contributes
-            // nothing and still lets the walk through: that is the far side of
-            // a shared wall, or the stretch of run belonging to the room next
-            // door, and the wall carries on past it.
-            let cell = surface.cell;
-            for (;;) {
-                const next = this.stepAlongRun(cell, surface.axis, direction);
-                if (!next) break;
-                take(next);
-                cell = next;
-            }
-        }
-        return [...collected.values()];
+    /**
+     * The stretch of wall a click selects: one run, grouped by the near-side
+     * classification of the clicked span (see SurfaceRunGrouper). Returns
+     * `getCellSurfaces`-shaped entries tagged with a `runId` so the outline
+     * merges within a run and never across two that merely touch.
+     */
+    getPaintStretchSurfaces(surface, mode = 'run') {
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        if (!surface?.cell || !cache?.geometry) return [];
+        const spans = cache.geometry.paintSpans?.get(BuildKeys.cell(surface.cell.x, surface.cell.y)) || [];
+        const start = spans.find(span => span.from === surface.from && span.to === surface.to)
+            || spans.find(span => Number.isFinite(surface.from)
+                && surface.from >= span.from && surface.from < span.to);
+        if (!start) return [];
+        const run = SurfaceRunGrouper.group(
+            {
+                cell: { x: surface.cell.x, y: surface.cell.y },
+                kind: start.kind, half: start.half, from: start.from, to: start.to
+            },
+            { geometry: cache.geometry, grid: cache.grid, topology: { ...cache.topology, walls: cache.geometry } },
+            mode
+        );
+        if (!run) return [];
+        return this.spansToSurfaces(run.spans, run.id, run.kind === 'room' ? run.roomId : null, cache);
     }
 
-    stepAlongRun(cell, axis, direction) {
-        const horizontal = axis === 'horizontal';
-        const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
-        const forward = horizontal
-            ? (direction > 0 ? WallBuilder.MASK_EAST : WallBuilder.MASK_WEST)
-            : (direction > 0 ? WallBuilder.MASK_SOUTH : WallBuilder.MASK_NORTH);
-        if (!(mask & forward)) return null;
-        return this.cells.get(
-            `${cell.x + (horizontal ? direction : 0)},${cell.y + (horizontal ? 0 : direction)}`
-        ) || null;
+    /**
+     * Every exterior half on one loop, corners included — the unit "Whole
+     * building" paints. With `roomId`, narrowed to the length of that room's
+     * own outside wall (its returning corners follow the run).
+     */
+    getShellSurfaces(surface, { roomId = null } = {}) {
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        if (!surface?.cell || !cache?.geometry) return [];
+        const topology = { ...cache.topology, walls: cache.geometry };
+        const spans = cache.geometry.paintSpans?.get(BuildKeys.cell(surface.cell.x, surface.cell.y)) || [];
+        const start = spans.find(span => span.from === surface.from && span.to === surface.to)
+            || spans.find(span => Number.isFinite(surface.from)
+                && surface.from >= span.from && surface.from < span.to);
+        if (!start) return [];
+        const run = SurfaceRunGrouper.group(
+            { cell: { x: surface.cell.x, y: surface.cell.y }, kind: start.kind, half: start.half, from: start.from, to: start.to },
+            { geometry: cache.geometry, grid: cache.grid, topology }, 'shell'
+        );
+        if (!run || run.kind !== 'exterior') return [];
+        const kept = roomId == null ? run.spans : run.spans.filter(span =>
+            SurfaceRunGrouper.spanAdjacentRoom(span, cache.grid, topology, cache.geometry) === roomId);
+        return this.spansToSurfaces(kept, run.id, null, cache);
+    }
+
+    /** Grouper spans → `getCellSurfaces`-shaped entries tagged with `runId`. */
+    spansToSurfaces(spans, runId, roomId, cache) {
+        const collected = new Map();
+        for (const span of spans) {
+            const raw = this.cells.get(BuildKeys.cell(span.cell.x, span.cell.y));
+            if (!raw) continue;
+            const axis = span.kind === 'horizontal-band' ? 'horizontal' : 'vertical';
+            // Prefer the entry `visibleSurface` already resolved for this span
+            // so paint lands on the face that renders it; fall back to the
+            // near-side atom when the two disagree, rather than dropping the
+            // span from the outline.
+            const entry = this.getCellSurfaces(raw).find(candidate =>
+                candidate.axis === axis && candidate.from === span.from && candidate.to === span.to)
+                || (() => {
+                    const near = SurfaceRunGrouper.nearAtom(span);
+                    const mask = cache.geometry.masks?.get(BuildKeys.cell(span.cell.x, span.cell.y)) || 0;
+                    return {
+                        cell: { ...raw, mask }, face: near.face, half: near.half,
+                        from: span.from, to: span.to, axis, roomId,
+                        finishId: this.resolveSurfaceFinishId(raw, near.face, roomId, near.half)
+                    };
+                })();
+            collected.set(`${span.cell.x},${span.cell.y},${span.from},${span.to}`, { ...entry, runId });
+        }
+        return [...collected.values()];
     }
 
     getSurfaceRects(surfaces) {
@@ -40459,7 +40756,12 @@ class WallRenderer {
                 top: element.offsetTop,
                 width: surface.to - surface.from,
                 height: element.offsetHeight,
-                zIndex: (Number(element.style.zIndex) || 0) + 1
+                // One flat plane well above every wall piece: an outline reads
+                // out what a click selected, and a taller wall drawn later must
+                // not clip it. Grouped by run so two runs that only touch keep
+                // their own outlines.
+                zIndex: WallRenderer.OVERLAY_Z_INDEX,
+                group: surface.runId ?? 'surface'
             });
         }
         return WallBuilder.mergeRects(rects);
@@ -40471,11 +40773,14 @@ class WallRenderer {
             const bounds = {
                 left: rect.left, top: rect.top,
                 right: rect.left + rect.width, bottom: rect.top + rect.height,
-                zIndex: rect.zIndex
+                zIndex: rect.zIndex, group: rect.group ?? 'surface'
             };
             // Absorb every group this rectangle reaches, so two groups joined by
             // a late arrival end up as one and not as two overlapping outlines.
+            // Only within the same run, though: an interior stretch and the
+            // exterior one it meets at a corner touch but stay two outlines.
             for (let index = groups.length - 1; index >= 0; index--) {
+                if (groups[index].group !== bounds.group) continue;
                 if (!WallBuilder.rectsTouch(groups[index], bounds)) continue;
                 const [merged] = groups.splice(index, 1);
                 bounds.left = Math.min(bounds.left, merged.left);
@@ -79032,7 +79337,7 @@ class BuildInspector extends ModalWindow {
                 for (const room of rooms) {
                     const roomNode = document.createElement('li');
                     const label = `Room: ${room.displayName}`;
-                    const roomButton = this.nodeButton('room', room.id, label);
+                    const roomButton = this.nodeButton('room', room.id, label, BuildInspector.roomSwatchColor(room.id));
                     roomNode.append(roomButton);
                     roomList.append(roomNode);
                 }
@@ -79049,7 +79354,7 @@ class BuildInspector extends ModalWindow {
             const list = document.createElement('ul');
             for (const room of outdoor) {
                 const node = document.createElement('li');
-                node.append(this.nodeButton('room', room.id, `Area: ${room.displayName}`));
+                node.append(this.nodeButton('room', room.id, `Area: ${room.displayName}`, BuildInspector.roomSwatchColor(room.id)));
                 list.append(node);
             }
             areas.append(list);
@@ -79065,11 +79370,23 @@ class BuildInspector extends ModalWindow {
         root.append(tree);
     }
 
-    nodeButton(kind, id, label) {
+    // The room's own colour - the one the floor tint and room list use, a
+    // hand-picked hue or the one its id earns it. Identity, not a finish.
+    static roomSwatchColor(roomId) {
+        return roomId ? RoomPanel.roomColour(roomId, 1) : null;
+    }
+
+    nodeButton(kind, id, label, swatchColor = null) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'build-navigator-button';
         button.title = label;
+        if (swatchColor) {
+            const swatch = document.createElement('span');
+            swatch.className = 'build-navigator-button__swatch';
+            swatch.style.background = swatchColor;
+            button.append(swatch);
+        }
         const text = document.createElement('span');
         text.className = 'build-navigator-button__label';
         text.textContent = label;
@@ -85305,59 +85622,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         return inner.kind === 'room' ? inner.roomId : null;
     }
 
-    /**
-     * Every outward atom of the walls that enclose one room, visible or not.
-     *
-     * Addressed as atoms rather than as surfaces because a room's back wall
-     * shows its inside: its exterior atom is real, and stored, but it is not a
-     * span anyone can click. Painting the outside of a room means all of it,
-     * not the half of it this camera happens to face.
-     */
-    roomExteriorAtoms(roomId) {
-        const builder = this.gameMap?.wallBuilder;
-        const cache = this.gameMap?.buildTransaction?.cache;
-        if (!builder || !cache || !roomId) return [];
-        const topology = { ...cache.topology, walls: cache.geometry };
-        const atoms = [];
-        for (const cell of builder.cells.values()) {
-            for (const face of ['north', 'south']) {
-                for (const half of [0, 1]) {
-                    const outward = { x: cell.x, y: cell.y, face, half };
-                    if (WallFaceResolver.classify(outward, cache.grid, topology).kind !== 'exterior') continue;
-                    const inner = WallFaceResolver.classify(
-                        { ...outward, face: WallBuilder.OPPOSITE_FACES[face] }, cache.grid, topology
-                    );
-                    if (inner.kind === 'room' && inner.roomId === roomId) atoms.push(outward);
-                }
-            }
-        }
-        return atoms;
-    }
-
-    /** The subset of those atoms this camera can actually show, for the outline. */
-    atomSurfaces(atoms) {
-        const builder = this.gameMap?.wallBuilder;
-        return atoms.map(atom => {
-            const cell = builder?.cells.get(BuildKeys.cell(atom.x, atom.y));
-            return builder?.getCellSurfaces(cell).find(entry =>
-                entry.face === atom.face && entry.half === atom.half
-            ) || null;
-        }).filter(Boolean);
-    }
-
-    exteriorSurfaces(buildingId, loopId) {
-        const builder = this.gameMap?.wallBuilder;
-        if (!builder || !buildingId) return [];
-        return [...builder.cells.values()].flatMap(cell => {
-            if (cell.buildingId !== buildingId) return [];
-            return builder.getCellSurfaces(cell).filter(surface => {
-                const classification = this.classifyWallSurface(surface);
-                return classification?.kind === 'exterior' && classification.loopId === loopId &&
-                    this.rules?.canPaintWallFace(surface.cell).allowed !== false;
-            });
-        });
-    }
-
     resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !surface) return [];
@@ -85371,16 +85635,12 @@ class SurfaceCustomizePanel extends ModalWindow {
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
         if (scope === 'roomExterior' && !surface.roomId) {
-            return this.atomSurfaces(this.roomExteriorAtoms(this.adjacentRoomId(surface)));
+            return builder.getShellSurfaces(surface, { roomId: this.adjacentRoomId(surface) });
         }
         if (scope === 'exterior' && !surface.roomId) {
-            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
-            const classification = this.classifyWallSurface(surface);
-            return classification?.kind === 'exterior'
-                ? this.exteriorSurfaces(buildingId, classification.loopId)
-                : [];
+            return builder.getShellSurfaces(surface);
         }
-        return builder.getPaintStretchSurfaces(surface);
+        return builder.getPaintStretchSurfaces(surface, scope === 'segment' ? 'segment' : 'run');
     }
 
     buildRequests(finishId, scopeOverride = null) {
@@ -85400,13 +85660,13 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const scope = scopeOverride || this.getWallScope();
         if (scope === 'roomExterior') {
-            return this.roomExteriorAtoms(this.adjacentRoomId(surface)).map(atom => ({
+            return builder.getShellSurfaces(surface, { roomId: this.adjacentRoomId(surface) }).map(entry => ({
                 surface: 'wall',
-                face: atom.face,
-                axis: 'horizontal',
-                cells: { from: [atom.x, atom.y], to: [atom.x, atom.y] },
+                face: entry.face,
+                axis: entry.axis,
+                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: null,
-                halves: [atom.half],
+                halves: [entry.half],
                 finishId
             }));
         }
@@ -85428,7 +85688,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             // test, same stopping rule. Deriving the painted set separately
             // from the previewed one is what let a click outline one wall and
             // repaint another.
-            return builder.getPaintStretchSurfaces(surface).map(entry => ({
+            return builder.getPaintStretchSurfaces(surface, scope === 'segment' ? 'segment' : 'run').map(entry => ({
                 surface: 'wall',
                 face: entry.face,
                 axis: entry.axis,
@@ -85584,8 +85844,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (roomExteriorButton) roomExteriorButton.hidden = !roomExteriorAvailable;
         if (exteriorButton) exteriorButton.hidden = !buildingAvailable;
         const allowed = wall?.roomId
-            ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
-            : ['stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
+            ? ['segment', 'stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
+            : ['segment', 'stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
                 ...(buildingAvailable ? ['exterior'] : [])];
         if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }

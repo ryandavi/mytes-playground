@@ -383,6 +383,9 @@
     "src": "js/Map/Walls/WallFaceResolver.js"
   },
   {
+    "src": "js/Map/Walls/SurfaceRunGrouper.js"
+  },
+  {
     "src": "js/Map/Walls/WallHitTest.js"
   },
   {

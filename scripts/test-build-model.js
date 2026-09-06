@@ -13,7 +13,8 @@ const sourceFiles = [
     'js/Map/Floors/FloorOwnershipResolver.js',
     'js/UI/Map/BuildFootprintOverlay.js',
     'js/Map/Walls/WallSurfaceRuns.js',
-    'js/Map/Walls/WallFaceResolver.js'
+    'js/Map/Walls/WallFaceResolver.js',
+    'js/Map/Walls/SurfaceRunGrouper.js'
 ];
 
 function loadCore() {
@@ -21,7 +22,7 @@ function loadCore() {
     for (const relative of sourceFiles) {
         vm.runInContext(fs.readFileSync(path.join(repoRoot, relative), 'utf8'), context, { filename: relative });
     }
-    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, BuildFootprintOverlay, WallFaceResolver, WallSurfaceRuns })', context);
+    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, BuildFootprintOverlay, WallFaceResolver, WallSurfaceRuns, SurfaceRunGrouper })', context);
 }
 
 function parseFixture(filePath) {
@@ -435,6 +436,70 @@ function runGeometryContracts(core) {
     return 17;
 }
 
+function runRunGrouperCases(core) {
+    const make = rows => {
+        const walls = new Map();
+        rows.forEach((row, y) => [...row].forEach((value, x) => {
+            if (value === '#') walls.set(core.BuildKeys.cell(x, y), { x, y, connectGroup: 'wall' });
+        }));
+        return core.WallGeometry.compute(walls, {
+            cellSize: 32,
+            constructions: { basic: { cellSize: 32, thickness: 14, height: 160 } },
+            defaultConstruction: { cellSize: 32, thickness: 14, height: 160 }
+        });
+    };
+    const band = (x, y, half) => ({ cell: { x, y }, kind: 'horizontal-band', half, from: half ? 16 : 0, to: half ? 32 : 16 });
+    const group = (geometry, grid, span, mode) =>
+        core.SurfaceRunGrouper.group(span, { geometry, grid, topology: { walls: geometry } }, mode);
+
+    // A straight wall shared by two rooms is one run end to end, grouped by the
+    // near (camera) side — not split where the far side changes rooms.
+    const straight = make(['####']);
+    const shared = group(straight, { ownerAt: (bx, by) => (by >= 2 ? 'A' : 'B') }, band(1, 0, 0), 'run');
+    assertEqual(shared.roomId, 'A', 'a shared wall groups by its near (south) side');
+    assertEqual(shared.spans.length, 8, 'a straight shared wall is one run for its whole length');
+
+    // The run stops where the near-side classification changes: room for the
+    // stretch that fronts it, exterior for the length past its end.
+    const halfOwned = { ownerAt: (bx, by) => (by >= 2 && bx < 4 ? 'A' : null) };
+    const roomRun = group(straight, halfOwned, band(0, 0, 0), 'run');
+    assertEqual(roomRun.spans.length, 4, 'the run covers only the cells the room fronts');
+    const outsideRun = group(straight, halfOwned, band(3, 0, 0), 'run');
+    assertEqual(outsideRun.kind, 'exterior', 'the wall past the room is its own exterior run');
+    assertEqual(outsideRun.spans.length, 4, 'and it stops where the room begins');
+
+    // An L does NOT turn the corner: a run is one straight piece. The horizontal
+    // top wall is its own run; the vertical leg is a different one.
+    const ell = make(['.###', '.#..', '.#..']);
+    const ellRoom = { ownerAt: (bx, by) => (bx >= 4 && bx <= 5 && by >= 2 && by <= 3 ? 'A' : null) };
+    const straightRun = group(ell, ellRoom, band(2, 0, 0), 'run');
+    assertEqual(straightRun.spans.every(span => span.kind === 'horizontal-band'), true,
+        'a run never leaves its own axis at a corner');
+
+    // 'segment' stops at the first junction; 'run' passes through it.
+    const tee = make(['#####', '..#..']);
+    const teeGrid = { ownerAt: (bx, by) => (by >= 2 ? 'A' : null) };
+    const seg = group(tee, teeGrid, band(0, 0, 0), 'segment');
+    const full = group(tee, teeGrid, band(0, 0, 0), 'run');
+    assertEqual(seg.spans.length < full.spans.length, true, 'segment stops at the junction, run does not');
+    assertEqual(full.spans.length, 10, 'the run spans the whole top wall through the tee');
+
+    // 'shell' floods the whole loop, corners and vertical walls included, and a
+    // returning-corner sliver reports the room its run fronts.
+    const box = make(['###', '#.#', '###']);
+    const boxGrid = { ownerAt: (bx, by) => (bx >= 2 && bx <= 3 && by >= 2 && by <= 3 ? 'A' : null) };
+    const ctx = { geometry: box, grid: boxGrid, topology: { walls: box } };
+    const shell = core.SurfaceRunGrouper.group(band(1, 2, 0), ctx, 'shell');
+    assertEqual(shell.kind, 'exterior', 'shell of an outside wall is an exterior loop');
+    assertEqual(shell.spans.some(s => s.kind.startsWith('post-')), true,
+        'the shell reaches the vertical side walls, not just the axis the click was on');
+    const cornerBand = shell.spans.find(s => s.kind === 'horizontal-band' && (s.cell.x === 0 || s.cell.x === 2));
+    assertEqual(core.SurfaceRunGrouper.spanAdjacentRoom(cornerBand, boxGrid, { walls: box }, box), 'A',
+        'a corner sliver belongs to the room its run fronts');
+
+    return 8;
+}
+
 function main() {
     const core = loadCore();
     const files = fs.readdirSync(fixtureRoot).filter(name => name.endsWith('.fixture')).sort();
@@ -452,7 +517,8 @@ function main() {
     }
     const geometryContracts = runGeometryContracts(core);
     const propertyCases = runPropertyCases(core);
-    console.log(`Build-model tests passed: ${files.length} fixtures, ${runs} orientations, ${geometryContracts} geometry contracts, ${propertyCases} property cases.`);
+    const runGrouperCases = runRunGrouperCases(core);
+    console.log(`Build-model tests passed: ${files.length} fixtures, ${runs} orientations, ${geometryContracts} geometry contracts, ${propertyCases} property cases, ${runGrouperCases} run-grouper/shell cases.`);
 }
 
 main();

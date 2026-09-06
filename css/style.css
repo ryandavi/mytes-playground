@@ -2793,13 +2793,6 @@ body.debug .map-object > .interactive-hitbox {
 .terrain-paint-panel > .window-panel__content > .settings-group[hidden] {
   display: none;
 }
-.surface-customize-panel > .window-panel__content > .structure-kind-segment + .settings-group,
-.wall-build-panel > .window-panel__content > .structure-kind-segment + .settings-group,
-.fence-build-panel > .window-panel__content > .structure-kind-segment + .settings-group,
-.room-panel > .window-panel__content > .structure-kind-segment + .settings-group,
-.terrain-paint-panel > .window-panel__content > .structure-kind-segment + .settings-group {
-  margin-top: var(--space-xs);
-}
 
 body.customize-mode .app-shell > .app-stage > .canvas > .layer:not(.background) {
   pointer-events: none;
@@ -2812,6 +2805,7 @@ body.customize-mode .wall-piece {
 .surface-paint-overlay {
   position: absolute;
   pointer-events: none;
+  z-index: 1000000;
 }
 .surface-paint-overlaycanvas {
   image-rendering: pixelated;
@@ -4451,6 +4445,13 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   min-width: 0;
   padding: var(--space-xs) var(--space-sm);
   text-align: left;
+}
+.build-inspector-panel .build-navigator-button__swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: var(--radius-xs) solid var(--button-dark);
+  box-shadow: inset 0 0 0 1px var(--button-light);
 }
 .build-inspector-panel .build-navigator-button__label {
   flex: 1 1 auto;

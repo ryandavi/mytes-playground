@@ -686,10 +686,6 @@
         >.settings-group[hidden] {
             display: none;
         }
-
-        >.structure-kind-segment + .settings-group {
-            margin-top: var(--space-xs);
-        }
     }
 }
 
@@ -726,6 +722,12 @@ body.customize-mode {
 .surface-paint-overlay {
     position: absolute;
     pointer-events: none;
+
+    // One flat plane far above every wall piece. An outline is a read-out of
+    // what a click selected; a taller wall drawn later must not clip it. The
+    // renderer writes the same value inline (WallRenderer.OVERLAY_Z_INDEX); this
+    // is the floor if that write is ever dropped.
+    z-index: 1000000;
 
     // The floor overlay is a canvas masked to the room's shape, so its colour
     // is painted in rather than declared here; only the wall boxes take a
@@ -2597,6 +2599,14 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
         min-width: 0;
         padding: var(--space-xs) var(--space-sm);
         text-align: left;
+
+        &__swatch {
+            flex: 0 0 auto;
+            width: 10px;
+            height: 10px;
+            border: var(--radius-xs) solid var(--button-dark);
+            box-shadow: inset 0 0 0 1px var(--button-light);
+        }
 
         &__label {
             flex: 1 1 auto;

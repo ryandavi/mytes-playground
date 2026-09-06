@@ -121,15 +121,16 @@ class WallFaceResolver {
             const key = BuildKeys.atom(atom.x, atom.y, atom.face, atom.half);
             const spans = geometry.paintSpans?.get(BuildKeys.cell(atom.x, atom.y)) || [];
             for (const span of spans) {
-                const resolved = WallFaceResolver.visibleSurface(
-                    { x: atom.x, y: atom.y, kind: span.kind, half: span.half },
-                    grid,
-                    topology,
-                    geometry
-                );
+                const slice = { x: atom.x, y: atom.y, kind: span.kind, half: span.half };
+                const resolved = WallFaceResolver.visibleSurface(slice, grid, topology, geometry);
                 if (BuildKeys.atom(
                     resolved.atom.x, resolved.atom.y, resolved.atom.face, resolved.atom.half
-                ) === key) return resolved.classification;
+                ) === key) {
+                    // Ownership follows the near side, matching getPaintSpans, so
+                    // a "whole room" repaint clears the atoms that side names and
+                    // leaves the neighbour's shared-wall paint alone.
+                    return SurfaceRunGrouper.ownerClass(slice, grid, topology, geometry);
+                }
             }
         }
         return WallFaceResolver.classify(atom, grid, topology);

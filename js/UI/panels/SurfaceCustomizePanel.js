@@ -742,59 +742,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         return inner.kind === 'room' ? inner.roomId : null;
     }
 
-    /**
-     * Every outward atom of the walls that enclose one room, visible or not.
-     *
-     * Addressed as atoms rather than as surfaces because a room's back wall
-     * shows its inside: its exterior atom is real, and stored, but it is not a
-     * span anyone can click. Painting the outside of a room means all of it,
-     * not the half of it this camera happens to face.
-     */
-    roomExteriorAtoms(roomId) {
-        const builder = this.gameMap?.wallBuilder;
-        const cache = this.gameMap?.buildTransaction?.cache;
-        if (!builder || !cache || !roomId) return [];
-        const topology = { ...cache.topology, walls: cache.geometry };
-        const atoms = [];
-        for (const cell of builder.cells.values()) {
-            for (const face of ['north', 'south']) {
-                for (const half of [0, 1]) {
-                    const outward = { x: cell.x, y: cell.y, face, half };
-                    if (WallFaceResolver.classify(outward, cache.grid, topology).kind !== 'exterior') continue;
-                    const inner = WallFaceResolver.classify(
-                        { ...outward, face: WallBuilder.OPPOSITE_FACES[face] }, cache.grid, topology
-                    );
-                    if (inner.kind === 'room' && inner.roomId === roomId) atoms.push(outward);
-                }
-            }
-        }
-        return atoms;
-    }
-
-    /** The subset of those atoms this camera can actually show, for the outline. */
-    atomSurfaces(atoms) {
-        const builder = this.gameMap?.wallBuilder;
-        return atoms.map(atom => {
-            const cell = builder?.cells.get(BuildKeys.cell(atom.x, atom.y));
-            return builder?.getCellSurfaces(cell).find(entry =>
-                entry.face === atom.face && entry.half === atom.half
-            ) || null;
-        }).filter(Boolean);
-    }
-
-    exteriorSurfaces(buildingId, loopId) {
-        const builder = this.gameMap?.wallBuilder;
-        if (!builder || !buildingId) return [];
-        return [...builder.cells.values()].flatMap(cell => {
-            if (cell.buildingId !== buildingId) return [];
-            return builder.getCellSurfaces(cell).filter(surface => {
-                const classification = this.classifyWallSurface(surface);
-                return classification?.kind === 'exterior' && classification.loopId === loopId &&
-                    this.rules?.canPaintWallFace(surface.cell).allowed !== false;
-            });
-        });
-    }
-
     resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !surface) return [];
@@ -808,16 +755,12 @@ class SurfaceCustomizePanel extends ModalWindow {
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
         if (scope === 'roomExterior' && !surface.roomId) {
-            return this.atomSurfaces(this.roomExteriorAtoms(this.adjacentRoomId(surface)));
+            return builder.getShellSurfaces(surface, { roomId: this.adjacentRoomId(surface) });
         }
         if (scope === 'exterior' && !surface.roomId) {
-            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
-            const classification = this.classifyWallSurface(surface);
-            return classification?.kind === 'exterior'
-                ? this.exteriorSurfaces(buildingId, classification.loopId)
-                : [];
+            return builder.getShellSurfaces(surface);
         }
-        return builder.getPaintStretchSurfaces(surface);
+        return builder.getPaintStretchSurfaces(surface, scope === 'segment' ? 'segment' : 'run');
     }
 
     buildRequests(finishId, scopeOverride = null) {
@@ -837,13 +780,13 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const scope = scopeOverride || this.getWallScope();
         if (scope === 'roomExterior') {
-            return this.roomExteriorAtoms(this.adjacentRoomId(surface)).map(atom => ({
+            return builder.getShellSurfaces(surface, { roomId: this.adjacentRoomId(surface) }).map(entry => ({
                 surface: 'wall',
-                face: atom.face,
-                axis: 'horizontal',
-                cells: { from: [atom.x, atom.y], to: [atom.x, atom.y] },
+                face: entry.face,
+                axis: entry.axis,
+                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: null,
-                halves: [atom.half],
+                halves: [entry.half],
                 finishId
             }));
         }
@@ -865,7 +808,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             // test, same stopping rule. Deriving the painted set separately
             // from the previewed one is what let a click outline one wall and
             // repaint another.
-            return builder.getPaintStretchSurfaces(surface).map(entry => ({
+            return builder.getPaintStretchSurfaces(surface, scope === 'segment' ? 'segment' : 'run').map(entry => ({
                 surface: 'wall',
                 face: entry.face,
                 axis: entry.axis,
@@ -1021,8 +964,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (roomExteriorButton) roomExteriorButton.hidden = !roomExteriorAvailable;
         if (exteriorButton) exteriorButton.hidden = !buildingAvailable;
         const allowed = wall?.roomId
-            ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
-            : ['stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
+            ? ['segment', 'stretch', 'room', ...(spaceAvailable ? ['space'] : [])]
+            : ['segment', 'stretch', ...(roomExteriorAvailable ? ['roomExterior'] : []),
                 ...(buildingAvailable ? ['exterior'] : [])];
         if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }
