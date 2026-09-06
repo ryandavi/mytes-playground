@@ -1,6 +1,6 @@
 # Roofing Plan — September 2026
 
-**Status:** proposed 2026-09-03
+**Status:** implemented and verified 2026-09-05
 **Depends on:** `BUILD_SURFACE_MODEL_REFACTOR_PLAN_2026-09.md` — `BuildingPlan`, `RoomTopology` shell loops and roofable footprints, level-scoped stores, `BuildTransaction`, the `WallGeometry` distance/fence helpers. Roof work cannot start before that plan's WP3 lands; the pure geometry (§4) can be prototyped against fixtures after WP1.
 **Carries forward:** `BUILD_MODE_UX_AND_ROOFING_PLAN_2026-08.md` §9 — a roof derives from the real footprint including projections, recesses, concave outlines and courtyards; composable semantic sprite parts; never one triangle over a bounding box.
 
@@ -179,7 +179,31 @@ Indoors is already defined by `RoomTopology`; the roof does not redefine it. Wea
 
 R0 needs only `WallGeometry` and a topology stub, so it can run right after the surface plan's WP1. R1 onward waits for WP3 (topology and transactions) and WP7 (Inspector).
 
-## 12. Non-goals
+## 12. Implementation record — 2026-09-05
+
+All five work packages shipped on the build-surface model this plan depends on.
+
+- **R0 — geometry:** `RoofGeometry` remains a pure 281-line module. Fifteen ASCII fixtures cover rectangles, L/T/U shapes, courtyards, projections, recesses, detached sections, exclusions, both overhangs, mixed heights, both gable axes, odd/even ridges, and valleys at thin concave corners. The harness also checks eight orientations, deterministic ordering, one part per covered cell, foreign-building overhang blocking, exclusion-after-dilation, and 100 generated connected footprints.
+- **R1 — plans and transactions:** level documents now contain a typed `RoofPlanStore`; authored room/loader roof properties and explicit roof-plan data normalize into it; v8 store deltas round-trip byte-for-byte. Building creation/removal, wall-footprint edits, previews, undo and redo all update roof plans and dirty building IDs within the same `BuildTransaction`. `WallTiledExporter` writes the complete authored roof intent onto the building's first room assignment.
+- **R2/R3 — render and styles:** generated 16×13, 32 px atlases provide asphalt shingle, clay tile and standing-seam metal. `RoofRenderer` owns one static canvas per connected section, retains sections whose signatures did not change, depth-sorts at the south baseline, and blits one pattern plus one semantic overlay per cell; gable-end triangles use the nearest wall construction's cap colour. Flat, hip and gable roofs were rendered over House at native zoom. Wall-down and build-session visibility, delayed cutaway hiding/showing, and the build-only Roofs toggle were exercised headlessly without console errors.
+- **R4 — colour and tools:** geometric `RoofHitTest` selects only visible covered cells. Paint exposes three materials, each material's three named swatches, custom hex colour, previews/revert, and material-plus-colour eyedropper state. The Inspector exposes style, ridge axis, material, colour, overhang, visibility, paint, removal and un-roof actions plus both required warnings. A real canvas click produced `{ kind: 'roof', buildingId }`; a pointer stroke excluded two cells consistently; restoration, undo and redo were also verified.
+- **R5 — consumers and persistence:** shelter queries use topology plus `RoofPlan.excludedCells`, independent of render visibility. Weather emitters are suppressed under cover and remain active through a hole. Room lighting diagnostics publish finite roof coverage without changing lighting results. A gable/custom-colour/overhang/visibility/exclusion edit survived a House transition and reload byte-for-byte with one renderer section.
+
+Verification commands:
+
+```text
+npm run test:build
+npm run validate:content
+node scripts/build-manifest.js
+npx sass css/style.scss css/style.css --no-source-map
+git -c core.whitespace=cr-at-eol diff --check
+```
+
+The build suite reports 24 wall fixtures in 192 orientations, 15 roof fixtures in eight orientations, 100 randomized roof cases, transaction/document round-trips, and geometric wall and roof hit tests. Content validation checks the roof schema, palette slots, templates, swatches, exact atlas dimensions, and every Tiled roof style/material reference. All commands above pass. House legitimately produces a 900-cell roof: its perimeter walls enclose the complete 30×30 map, so 734 enclosed open cells plus 166 wall cells are the topology-owned cover.
+
+Module budgets are met: `RoofGeometry` 281/300 lines, `RoofPlanStore` 55/200, `RoofMaterialRegistry` 75/200, and `RoofRenderer` 259/400.
+
+## 13. Non-goals
 
 - No perspective slopes, no lighting on roof planes, no shadows cast by roofs.
 - No stepped roofs over mixed wall heights, no multi-level roofs, no roof over a second storey.

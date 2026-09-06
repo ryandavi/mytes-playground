@@ -336,14 +336,24 @@ class GridSystem {
                         ctx.fillRect(px, py, s, s);
                     }
                 }
-
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(px + 0.5, py + 0.5, s, s);
             }
         }
 
         this._debugDirty = false;
+    }
+
+    // The grid lines themselves are drawn by the shared overlay (see
+    // GridLineOverlay) so Build mode's own grid and this one are never both
+    // on screen at once. This canvas keeps only what is debug-specific:
+    // walkability/terrain fills and the render-padding hatch above.
+    _syncGridLineOverlay() {
+        const overlay = this.parent?.gridLineOverlay;
+        if (!overlay) return;
+        if (this.debugMode && this.overlayFlags.grid) {
+            overlay.show('debug', { color: 'rgba(255, 255, 255, 0.3)', lineWidth: 1 });
+        } else {
+            overlay.hide('debug');
+        }
     }
 
     updateGridDebug(camera) {
@@ -625,6 +635,7 @@ class GridSystem {
             }
         }
 
+        this._syncGridLineOverlay();
         return this.debugMode;
     }
 
@@ -655,6 +666,7 @@ class GridSystem {
                     this.drawDebugGrid();
                 }
             }
+            this._syncGridLineOverlay();
         } else if (key === 'cursorTile') {
             if (this.debugElements.cursorTile) {
                 if (!enabled) {
@@ -1741,6 +1753,8 @@ class GridSystem {
         this._debugCtx = null;
         this._debugDirty = false;
         this.debugInitialized = false;
+
+        this.parent?.gridLineOverlay?.hide('debug');
 
         // Remove any event listeners
         if (this.parent && this.parent.parent && this.parent.parent.element && this.boundMouseMoveHandler) {

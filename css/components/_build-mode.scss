@@ -698,21 +698,6 @@ body.debug .stage-bar__debug-only {
     }
 }
 
-// ── Build grid overlay ────────────────────────────────────────────────────────
-//
-// One repeating-gradient layer sized from the grid, never per-cell DOM.
-
-.canvas.show-build-grid::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: var(--z-overlay);
-    pointer-events: none;
-    background-image:
-        repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)),
-        repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));
-}
-
 // ── Build feedback ────────────────────────────────────────────────────────────
 
 // The run under the grip: what a drag would take hold of. Drawn on the floor

@@ -770,11 +770,11 @@ Playtesting after the cutover. Each entry is the rule, not the diff; the code ca
 35. **A surface is named, not addressed.** `south half 2` is an address. The Inspector heads it the way Paint's target line reads — `Outside · Playroom` over `South wall` — with Interior/Exterior as a detail, and the Inspector's actions are the bar's actions in the same words.
 36. **Chrome:** stacked editors in the Inspector are the `<label>` themselves, so the settings rules keyed on `:has(> label)` never reached them and every control sat flush against its name; the needs row had no air above it; and the colour swatches were flat web rectangles in a shell built out of bevels — they wear `button-base` now, and the pressed bevel when chosen.
 
-**Not done, and not a cheap win:** roofs. `RoofGeometry` computes cover from the topology, but there is no roof art and no renderer, so an Inspector control for it would be a control that does nothing. That is the roofing plan's R0, and it should start there rather than as a field on the building plan.
+**Follow-on completed 2026-09-05:** roofs were deliberately outside this refactor's original scope, then implemented on its extension seams in `ROOFING_PLAN_2026-09.md`. `RoofPlanStore`, derived `RoofGeometry`, generated art, `RoofRenderer`, paint/Inspector tools, persistence, weather shelter and daylight diagnostics now consume the topology and transaction model described here; no roof state was folded back into `BuildingPlan`.
 
 **Module map.** The inheritance walks moved out of `WallFaceResolver` into `WallSurfaceRuns` (§6): with three of them the resolver had grown to 356 lines against a 250 budget. Both are pure, and only the walks moved — `classify`, `visibleAtom`, `visibleSurface`, `classifyPaintAtom` and `sections` stay where callers expect them.
 
-**Suite:** 24 fixtures in 192 orientations, 14 geometry contracts, 100 randomized ownership cases, 40 randomized transaction edits. New: `fixtures/front-wall-exterior`, and contracts for the arm's sides, the junction post, and the run between two returning walls. Revised: `terminal-half`, which asserted that a wall continuing past a room's corner stayed in the room's section — written when exterior faces could be neither seen nor painted. The room's section stops where the room does.
+**Suite:** 24 fixtures in 192 orientations, 15 geometry contracts, 100 randomized ownership cases, 40 randomized transaction edits. New: `fixtures/front-wall-exterior`, and contracts for the arm's sides, the junction post, and the run between two returning walls. Revised: `terminal-half`, which asserted that a wall continuing past a room's corner stayed in the room's section — written when exterior faces could be neither seen nor painted. The room's section stops where the room does.
 
 ## 14. Questions closed 2026-09-03
 
@@ -794,7 +794,7 @@ Nothing remains open. WP0 and WP1 can start.
 - No ECS. Stores are plain keyed maps; entities stay classes.
 - No persistent render-piece IDs.
 - No building-per-connected-component. Connectivity is a diagnostic.
-- No roof art, roof generation, ceilings, stories, stairs, foundations or level selector.
+- No roof art or roof generation in this refactor itself; those shipped as the completed follow-on in `ROOFING_PLAN_2026-09.md`. Ceilings, stories, stairs, foundations and a level selector remain out of scope.
 - No disabled placeholder Roof/Level controls in the shipping UI.
 - No second production ownership or paint engine at any point after WP3 and WP4 respectively. No legacy copy of the old engines is kept for any purpose.
 - No save migration. Old build deltas are dropped (§10.2).

@@ -44025,6 +44025,10 @@ class RoofGeometry {
         }));
         const lower = neighbours.filter(neighbour => neighbour.value < own);
         const higher = neighbours.filter(neighbour => neighbour.value > own);
+        const insideCorner = RoofGeometry.insideCorner(x, y, cells, neighbours);
+        if (lower.length === 0 && insideCorner) {
+            return RoofGeometry.part('valley', RoofGeometry.corner(insideCorner), own);
+        }
         if (lower.length === 1) return RoofGeometry.part('slope', lower[0].name, own);
         if (lower.length === 2 && RoofGeometry.adjacent(lower)) {
             return RoofGeometry.part('hip', RoofGeometry.corner(lower), own);
@@ -44045,6 +44049,15 @@ class RoofGeometry {
         }
         const nearest = RoofGeometry.nearestEdge(x, y, cells);
         return RoofGeometry.part('slope', nearest, own);
+    }
+
+    static insideCorner(x, y, cells, neighbours) {
+        for (let left = 0; left < neighbours.length; left++) for (let right = left + 1; right < neighbours.length; right++) {
+            const pair = [neighbours[left], neighbours[right]];
+            if (!RoofGeometry.adjacent(pair) || pair.some(neighbour => neighbour.value === 0)) continue;
+            if (!cells.has(BuildKeys.cell(x + pair[0].dx + pair[1].dx, y + pair[0].dy + pair[1].dy))) return pair;
+        }
+        return null;
     }
 
     static part(part, facing, height) {
@@ -44342,6 +44355,9 @@ class RoofRenderer {
             const dx = (x - geometry.bounds.left) * this.cellSize;
             const dy = (y - geometry.bounds.top) * this.cellSize;
             this.blit(context, atlas, RoofRenderer.SHADE_ROWS[part.shade] ?? 1, 0, dx, dy);
+            if (part.part === 'gable-end') {
+                this.drawGableEnd(context, dx, dy, part.facing, this.gableColorFor(key, part.facing));
+            }
             const row = RoofRenderer.PART_ROWS[part.part];
             const column = part.part === 'flat' ? part.edgeMask : RoofRenderer.FACING_COLUMNS[part.facing] ?? 0;
             this.blit(context, atlas, row, column, dx, dy);
@@ -44360,6 +44376,43 @@ class RoofRenderer {
     blit(context, atlas, row, column, x, y) {
         context.drawImage(atlas, column * this.cellSize, row * this.cellSize,
             this.cellSize, this.cellSize, x, y, this.cellSize, this.cellSize);
+    }
+
+    gableColorFor(key, facing) {
+        const walls = this.gameMap.wallBuilder;
+        const inward = {
+            north: { dx: 0, dy: 1 }, east: { dx: -1, dy: 0 },
+            south: { dx: 0, dy: -1 }, west: { dx: 1, dy: 0 }
+        }[facing];
+        const start = BuildKeys.parseCell(key);
+        const limit = Math.max(this.gameMap.gridSystem?.gridWidth || 0, this.gameMap.gridSystem?.gridHeight || 0);
+        let cell = walls?.baseCells?.get(key);
+        for (let distance = 1; !cell && inward && distance <= limit; distance++) {
+            cell = walls?.baseCells?.get(BuildKeys.cell(
+                start.x + inward.dx * distance,
+                start.y + inward.dy * distance
+            ));
+        }
+        const constructionId = cell?.constructionId || walls?.wallData?.defaults?.constructionId;
+        return this.gameMap.wallMaterialRegistry?.getConstruction(constructionId)?.capColor || null;
+    }
+
+    drawGableEnd(context, x, y, facing, color) {
+        const last = this.cellSize - 1;
+        const middle = this.cellSize / 2;
+        const vertices = {
+            north: [[0, last], [middle, 0], [last, last]],
+            east: [[0, 0], [last, middle], [0, last]],
+            south: [[0, 0], [last, 0], [middle, last]],
+            west: [[last, 0], [0, middle], [last, last]]
+        }[facing];
+        if (!vertices || !color) return;
+        context.fillStyle = color;
+        context.beginPath();
+        context.moveTo(x + vertices[0][0], y + vertices[0][1]);
+        for (const [vx, vy] of vertices.slice(1)) context.lineTo(x + vx, y + vy);
+        context.closePath();
+        context.fill();
     }
 
     isPresentationVisible() {
@@ -46409,6 +46462,7 @@ class GameMap {
         // Systems
         this.zoneManager = null;
         this.gridSystem = null;
+        this.gridLineOverlay = null;
         this.particleSystem = null;
         this.environmentManager = null;
         this.buildDocument = null;
@@ -46889,6 +46943,7 @@ class GameMap {
 		this.properties = { ...(mapData.properties || {}) };
 
 		this.gridSystem = new GridSystem(this);
+		this.gridLineOverlay = new GridLineOverlay(this);
 		// One geometry store for every area concept: zones, authored rooms, and
 		// runtime wall enclosures. Must exist before ZoneManager, which registers
 		// each zone's geometry into it.
@@ -67713,14 +67768,24 @@ class GridSystem {
                         ctx.fillRect(px, py, s, s);
                     }
                 }
-
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(px + 0.5, py + 0.5, s, s);
             }
         }
 
         this._debugDirty = false;
+    }
+
+    // The grid lines themselves are drawn by the shared overlay (see
+    // GridLineOverlay) so Build mode's own grid and this one are never both
+    // on screen at once. This canvas keeps only what is debug-specific:
+    // walkability/terrain fills and the render-padding hatch above.
+    _syncGridLineOverlay() {
+        const overlay = this.parent?.gridLineOverlay;
+        if (!overlay) return;
+        if (this.debugMode && this.overlayFlags.grid) {
+            overlay.show('debug', { color: 'rgba(255, 255, 255, 0.3)', lineWidth: 1 });
+        } else {
+            overlay.hide('debug');
+        }
     }
 
     updateGridDebug(camera) {
@@ -68002,6 +68067,7 @@ class GridSystem {
             }
         }
 
+        this._syncGridLineOverlay();
         return this.debugMode;
     }
 
@@ -68032,6 +68098,7 @@ class GridSystem {
                     this.drawDebugGrid();
                 }
             }
+            this._syncGridLineOverlay();
         } else if (key === 'cursorTile') {
             if (this.debugElements.cursorTile) {
                 if (!enabled) {
@@ -69119,6 +69186,8 @@ class GridSystem {
         this._debugDirty = false;
         this.debugInitialized = false;
 
+        this.parent?.gridLineOverlay?.hide('debug');
+
         // Remove any event listeners
         if (this.parent && this.parent.parent && this.parent.parent.element && this.boundMouseMoveHandler) {
             this.parent.parent.element.removeEventListener('mousemove', this.boundMouseMoveHandler);
@@ -69138,6 +69207,123 @@ class GridSystem {
         this.parent = null;
 
         Utility.logDebug("[GridSystem] Grid system disposed successfully");
+    }
+}
+;
+/* -- js/Map/Grid/GridLineOverlay.js -- */
+/**
+ * The tile grid drawn over the map — shared by Build mode's "Show grid" and
+ * the debug overlay's own grid flag, so there is exactly one grid on screen
+ * no matter which of them (or both) asked for it.
+ *
+ * Drawn on a real canvas rather than a CSS repeating-gradient: a gradient is
+ * resampled as a raster image under the camera's CSS zoom, which moires badly
+ * at non-integer scales. Full-length strokes (one pass per grid line, not a
+ * strokeRect per cell) avoid doubling up alpha on shared cell edges too.
+ *
+ * Multiple callers can want the grid visible at once with different styling
+ * (debug's faint white vs. build's own color) — `show`/`hide` take a caller id
+ * so the last one to (re)show wins the style, and the canvas only disappears
+ * once every caller has released it.
+ */
+class GridLineOverlay {
+    constructor(gameMap) {
+        this.gameMap = gameMap;
+        this.canvas = null;
+        this.requests = new Map(); // id -> { color, lineWidth }
+    }
+
+    get cellSize() {
+        return this.gameMap?.gridSystem?.config?.cellSize || 32;
+    }
+
+    show(id, { color = 'rgba(255, 255, 255, 0.3)', lineWidth = 1 } = {}) {
+        this.requests.delete(id);
+        this.requests.set(id, { color, lineWidth });
+        this.render();
+    }
+
+    hide(id) {
+        if (!this.requests.has(id)) return;
+        this.requests.delete(id);
+        if (this.requests.size === 0) {
+            this.canvas?.remove();
+            this.canvas = null;
+        } else {
+            this.render();
+        }
+    }
+
+    // Most recently shown/re-shown request wins — Map preserves insertion
+    // order, and show() re-inserts on repeat calls to keep itself "latest".
+    get activeStyle() {
+        let last = null;
+        for (const style of this.requests.values()) last = style;
+        return last;
+    }
+
+    // Mounted on the `.canvas` root itself, at inset 0 (its own top-left is the
+    // gameplay origin, same as the old CSS grid's `inset: 0` on `.canvas::after`)
+    // — not on one of the `.layer` children, which stack below floor/objects
+    // and would bury the grid under opaque floor art. z-index matches that old
+    // rule's `--z-overlay` (1200) so the grid still sits above everything,
+    // debug's own annotations (z-index 1000) included.
+    ensureCanvas() {
+        const root = this.gameMap?.parent?.canvas;
+        if (!root) return null;
+        if (this.canvas?.isConnected) return this.canvas;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'grid-line-overlay ignore';
+        canvas.setAttribute('aria-hidden', 'true');
+        Object.assign(canvas.style, {
+            position: 'absolute', left: '0', top: '0', zIndex: '1200', pointerEvents: 'none'
+        });
+        root.appendChild(canvas);
+        this.canvas = canvas;
+        return canvas;
+    }
+
+    render() {
+        const style = this.activeStyle;
+        if (!style) return;
+        const canvas = this.ensureCanvas();
+        if (!canvas) return;
+
+        const cell = this.cellSize;
+        const width = this.gameMap.gridSystem?.gridWidth || 0;
+        const height = this.gameMap.gridSystem?.gridHeight || 0;
+        const pxWidth = width * cell;
+        const pxHeight = height * cell;
+        if (canvas.width !== pxWidth || canvas.height !== pxHeight) {
+            canvas.width = pxWidth;
+            canvas.height = pxHeight;
+            canvas.style.width = `${pxWidth}px`;
+            canvas.style.height = `${pxHeight}px`;
+        }
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, pxWidth, pxHeight);
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = style.lineWidth;
+
+        ctx.beginPath();
+        for (let x = 0; x <= width; x++) {
+            const px = x * cell + 0.5;
+            ctx.moveTo(px, 0);
+            ctx.lineTo(px, pxHeight);
+        }
+        for (let y = 0; y <= height; y++) {
+            const py = y * cell + 0.5;
+            ctx.moveTo(0, py);
+            ctx.lineTo(pxWidth, py);
+        }
+        ctx.stroke();
+    }
+
+    dispose() {
+        this.canvas?.remove();
+        this.canvas = null;
+        this.requests.clear();
     }
 }
 ;
@@ -72080,8 +72266,10 @@ class BuildModeUI extends UIComponent {
     }
 
     /**
-     * A faint tile grid over the map while building. One repeating-gradient
-     * layer sized from the grid, never per-cell DOM.
+     * A faint tile grid over the map while building, drawn by the same
+     * GridLineOverlay canvas the debug overlay's grid flag uses — see there
+     * for why a canvas beats a CSS repeating-gradient here, and how the two
+     * callers share one grid instead of drawing on top of each other.
      *
      * The grid used to be tied to the Walls tool, which was a fine default
      * before there was a setting for it — but once there is a "Show grid"
@@ -72090,11 +72278,13 @@ class BuildModeUI extends UIComponent {
      * the grid regardless, since that is what it is snapping to.
      */
     setGridOverlay(visible) {
-        const canvas = this.container?.canvas;
-        if (!canvas) return;
-        const cellSize = this.container?.gameMap?.gridSystem?.config?.cellSize;
-        if (cellSize) canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
-        canvas.classList.toggle('show-build-grid', visible === true);
+        const overlay = this.container?.gameMap?.gridLineOverlay;
+        if (!overlay) return;
+        if (visible) {
+            overlay.show('build', { color: 'rgba(25, 24, 20, 0.14)', lineWidth: 1 });
+        } else {
+            overlay.hide('build');
+        }
     }
 
     // Owned-cell outlines. Build mode only, and only when asked for: see

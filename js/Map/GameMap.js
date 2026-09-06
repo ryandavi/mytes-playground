@@ -25,6 +25,7 @@ class GameMap {
         // Systems
         this.zoneManager = null;
         this.gridSystem = null;
+        this.gridLineOverlay = null;
         this.particleSystem = null;
         this.environmentManager = null;
         this.buildDocument = null;
@@ -505,6 +506,7 @@ class GameMap {
 		this.properties = { ...(mapData.properties || {}) };
 
 		this.gridSystem = new GridSystem(this);
+		this.gridLineOverlay = new GridLineOverlay(this);
 		// One geometry store for every area concept: zones, authored rooms, and
 		// runtime wall enclosures. Must exist before ZoneManager, which registers
 		// each zone's geometry into it.

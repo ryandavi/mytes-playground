@@ -119,6 +119,9 @@ class RoofRenderer {
             const dx = (x - geometry.bounds.left) * this.cellSize;
             const dy = (y - geometry.bounds.top) * this.cellSize;
             this.blit(context, atlas, RoofRenderer.SHADE_ROWS[part.shade] ?? 1, 0, dx, dy);
+            if (part.part === 'gable-end') {
+                this.drawGableEnd(context, dx, dy, part.facing, this.gableColorFor(key, part.facing));
+            }
             const row = RoofRenderer.PART_ROWS[part.part];
             const column = part.part === 'flat' ? part.edgeMask : RoofRenderer.FACING_COLUMNS[part.facing] ?? 0;
             this.blit(context, atlas, row, column, dx, dy);
@@ -137,6 +140,43 @@ class RoofRenderer {
     blit(context, atlas, row, column, x, y) {
         context.drawImage(atlas, column * this.cellSize, row * this.cellSize,
             this.cellSize, this.cellSize, x, y, this.cellSize, this.cellSize);
+    }
+
+    gableColorFor(key, facing) {
+        const walls = this.gameMap.wallBuilder;
+        const inward = {
+            north: { dx: 0, dy: 1 }, east: { dx: -1, dy: 0 },
+            south: { dx: 0, dy: -1 }, west: { dx: 1, dy: 0 }
+        }[facing];
+        const start = BuildKeys.parseCell(key);
+        const limit = Math.max(this.gameMap.gridSystem?.gridWidth || 0, this.gameMap.gridSystem?.gridHeight || 0);
+        let cell = walls?.baseCells?.get(key);
+        for (let distance = 1; !cell && inward && distance <= limit; distance++) {
+            cell = walls?.baseCells?.get(BuildKeys.cell(
+                start.x + inward.dx * distance,
+                start.y + inward.dy * distance
+            ));
+        }
+        const constructionId = cell?.constructionId || walls?.wallData?.defaults?.constructionId;
+        return this.gameMap.wallMaterialRegistry?.getConstruction(constructionId)?.capColor || null;
+    }
+
+    drawGableEnd(context, x, y, facing, color) {
+        const last = this.cellSize - 1;
+        const middle = this.cellSize / 2;
+        const vertices = {
+            north: [[0, last], [middle, 0], [last, last]],
+            east: [[0, 0], [last, middle], [0, last]],
+            south: [[0, 0], [last, 0], [middle, last]],
+            west: [[last, 0], [0, middle], [last, last]]
+        }[facing];
+        if (!vertices || !color) return;
+        context.fillStyle = color;
+        context.beginPath();
+        context.moveTo(x + vertices[0][0], y + vertices[0][1]);
+        for (const [vx, vy] of vertices.slice(1)) context.lineTo(x + vx, y + vy);
+        context.closePath();
+        context.fill();
     }
 
     isPresentationVisible() {

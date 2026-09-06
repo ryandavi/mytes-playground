@@ -603,6 +603,9 @@
     "commentLine": "<!-- MAP GRID -->"
   },
   {
+    "src": "js/Map/Grid/GridLineOverlay.js"
+  },
+  {
     "src": "js/Map/Grid/AStarPathfinder.js"
   },
   {

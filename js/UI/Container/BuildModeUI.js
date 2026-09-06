@@ -88,8 +88,10 @@ class BuildModeUI extends UIComponent {
     }
 
     /**
-     * A faint tile grid over the map while building. One repeating-gradient
-     * layer sized from the grid, never per-cell DOM.
+     * A faint tile grid over the map while building, drawn by the same
+     * GridLineOverlay canvas the debug overlay's grid flag uses — see there
+     * for why a canvas beats a CSS repeating-gradient here, and how the two
+     * callers share one grid instead of drawing on top of each other.
      *
      * The grid used to be tied to the Walls tool, which was a fine default
      * before there was a setting for it — but once there is a "Show grid"
@@ -98,11 +100,13 @@ class BuildModeUI extends UIComponent {
      * the grid regardless, since that is what it is snapping to.
      */
     setGridOverlay(visible) {
-        const canvas = this.container?.canvas;
-        if (!canvas) return;
-        const cellSize = this.container?.gameMap?.gridSystem?.config?.cellSize;
-        if (cellSize) canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
-        canvas.classList.toggle('show-build-grid', visible === true);
+        const overlay = this.container?.gameMap?.gridLineOverlay;
+        if (!overlay) return;
+        if (visible) {
+            overlay.show('build', { color: 'rgba(25, 24, 20, 0.14)', lineWidth: 1 });
+        } else {
+            overlay.hide('build');
+        }
     }
 
     // Owned-cell outlines. Build mode only, and only when asked for: see

@@ -177,6 +177,10 @@ class RoofGeometry {
         }));
         const lower = neighbours.filter(neighbour => neighbour.value < own);
         const higher = neighbours.filter(neighbour => neighbour.value > own);
+        const insideCorner = RoofGeometry.insideCorner(x, y, cells, neighbours);
+        if (lower.length === 0 && insideCorner) {
+            return RoofGeometry.part('valley', RoofGeometry.corner(insideCorner), own);
+        }
         if (lower.length === 1) return RoofGeometry.part('slope', lower[0].name, own);
         if (lower.length === 2 && RoofGeometry.adjacent(lower)) {
             return RoofGeometry.part('hip', RoofGeometry.corner(lower), own);
@@ -197,6 +201,15 @@ class RoofGeometry {
         }
         const nearest = RoofGeometry.nearestEdge(x, y, cells);
         return RoofGeometry.part('slope', nearest, own);
+    }
+
+    static insideCorner(x, y, cells, neighbours) {
+        for (let left = 0; left < neighbours.length; left++) for (let right = left + 1; right < neighbours.length; right++) {
+            const pair = [neighbours[left], neighbours[right]];
+            if (!RoofGeometry.adjacent(pair) || pair.some(neighbour => neighbour.value === 0)) continue;
+            if (!cells.has(BuildKeys.cell(x + pair[0].dx + pair[1].dx, y + pair[0].dy + pair[1].dy))) return pair;
+        }
+        return null;
     }
 
     static part(part, facing, height) {
