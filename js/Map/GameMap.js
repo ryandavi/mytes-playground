@@ -26,6 +26,8 @@ class GameMap {
         this.zoneManager = null;
         this.gridSystem = null;
         this.gridLineOverlay = null;
+        this.objectHighlightOverlay = null;
+        this._frontLayer = null;
         this.particleSystem = null;
         this.environmentManager = null;
         this.buildDocument = null;
@@ -115,6 +117,41 @@ class GameMap {
 
     getRenderOffset() {
         return { x: this.renderInsets.left, y: this.renderInsets.top };
+    }
+
+    /**
+     * The shared home for anything that must draw on top of every map layer:
+     * the grid, room outlines, wall-selection cells, the selected object's
+     * highlight box. A sibling of `.layer.*` at the `.canvas` root rather than
+     * a child of one of them — each `.layer` is its own stacking context
+     * (`position` + `z-index`), so a high z-index on a child can never rise
+     * above a *different* layer, only its own siblings. This one lives above
+     * all of them instead of inside any of them.
+     *
+     * Positioned like every `.layer` (`> .layer` in features/_map.scss): offset
+     * by the render insets, sized to the gameplay rect. Children can then use
+     * the same raw cell/world-pixel math the art layers use, with no extra
+     * offset arithmetic of their own.
+     */
+    get frontLayer() {
+        if (this._frontLayer?.isConnected) return this._frontLayer;
+        const root = this.parent?.canvas;
+        if (!root) return null;
+        const el = document.createElement('div');
+        el.className = 'map-front-layer ignore';
+        el.setAttribute('aria-hidden', 'true');
+        Object.assign(el.style, {
+            position: 'absolute',
+            top: 'var(--map-render-inset-top, 0px)',
+            left: 'var(--map-render-inset-left, 0px)',
+            width: `${this.dimensions.width}px`,
+            height: `${this.dimensions.height}px`,
+            zIndex: 'var(--z-overlay)',
+            pointerEvents: 'none'
+        });
+        root.appendChild(el);
+        this._frontLayer = el;
+        return el;
     }
 
     /**
@@ -507,6 +544,7 @@ class GameMap {
 
 		this.gridSystem = new GridSystem(this);
 		this.gridLineOverlay = new GridLineOverlay(this);
+		this.objectHighlightOverlay = new ObjectHighlightOverlay(this);
 		// One geometry store for every area concept: zones, authored rooms, and
 		// runtime wall enclosures. Must exist before ZoneManager, which registers
 		// each zone's geometry into it.
@@ -1461,6 +1499,19 @@ class GameMap {
             }
             this.gridSystem = null;
         }
+
+        // The front layer and everything mounted in it are children of the
+        // shared `.canvas` root, which outlives any one GameMap — left
+        // undisposed, they would linger and show the old map's grid/room
+        // outlines/highlights over the new one.
+        this.gridLineOverlay?.dispose();
+        this.gridLineOverlay = null;
+        this.objectHighlightOverlay?.dispose();
+        this.objectHighlightOverlay = null;
+        this.footprintOverlay?.dispose();
+        this.footprintOverlay = null;
+        this._frontLayer?.remove();
+        this._frontLayer = null;
 
         if (this.layers && this.layers.debug) {
             // Clear all debug elements

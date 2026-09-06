@@ -49,23 +49,22 @@ class GridLineOverlay {
         return last;
     }
 
-    // Mounted on the `.canvas` root itself, at inset 0 (its own top-left is the
-    // gameplay origin, same as the old CSS grid's `inset: 0` on `.canvas::after`)
-    // — not on one of the `.layer` children, which stack below floor/objects
-    // and would bury the grid under opaque floor art. z-index matches that old
-    // rule's `--z-overlay` (1200) so the grid still sits above everything,
-    // debug's own annotations (z-index 1000) included.
+    // Mounted in the map's shared front layer (see GameMap#frontLayer), not on
+    // one of the `.layer` children — those stack below floor/objects and would
+    // bury the grid under opaque floor art. The front layer already carries
+    // the render-inset offset and the on-top z-index, so this canvas is just
+    // `top: 0; left: 0` within it.
     ensureCanvas() {
-        const root = this.gameMap?.parent?.canvas;
-        if (!root) return null;
+        const layer = this.gameMap?.frontLayer;
+        if (!layer) return null;
         if (this.canvas?.isConnected) return this.canvas;
         const canvas = document.createElement('canvas');
         canvas.className = 'grid-line-overlay ignore';
         canvas.setAttribute('aria-hidden', 'true');
         Object.assign(canvas.style, {
-            position: 'absolute', left: '0', top: '0', zIndex: '1200', pointerEvents: 'none'
+            position: 'absolute', left: '0', top: '0', pointerEvents: 'none'
         });
-        root.appendChild(canvas);
+        layer.appendChild(canvas);
         this.canvas = canvas;
         return canvas;
     }

@@ -36534,10 +36534,38 @@ class RoomPlanStore extends BuildRecordStore {
         return String(record.id);
     }
 
+    // The id is a stable internal key (`room_painted_3`, `room_7`) that has to
+    // stay unique and never rename itself out from under a save file — but it
+    // was also the only thing a room without an authored name ever showed a
+    // player, whether that room came from the paint tool's "New Room" brush,
+    // splitting an island, or an imported map with no `displayName` property.
+    // "Room 3" is the same number without the internal id showing through;
+    // anything that doesn't match the minted-id shape (a custom or authored
+    // id like `zone_kitchen`) is left as-is rather than guessed at.
+    //
+    // Two independent counters (`room_N` for auto-detected rooms, `room_
+    // painted_N` for painted ones) can mint the same N, so the id's own
+    // number is only a starting point — this still has to check for a
+    // "Room N" already in use and count up past it.
+    defaultDisplayName(id) {
+        const match = /^room(?:_painted)?_(\d+)$/.exec(id || '');
+        if (!match) return id || 'Room';
+        const taken = new Set(this.values().map(room => room.displayName));
+        let number = Number(match[1]);
+        while (taken.has(`Room ${number}`)) number++;
+        return `Room ${number}`;
+    }
+
     normalize(record, key) {
         const id = String(record?.id || key || '');
         if (!id) throw new Error('Room plans require an id');
-        const displayName = String(record.displayName || record.authoredDisplayName || id);
+        // A displayName that is literally the id string is the same "nobody
+        // named this" case as a missing one — it's what every one of these
+        // paths wrote before there was a nicer default, not a name a player
+        // ever typed — so it gets the same treatment rather than needing
+        // each room renamed by hand to pick up the fix.
+        const rawName = record.displayName || record.authoredDisplayName;
+        const displayName = String((rawName && rawName !== id) ? rawName : this.defaultDisplayName(id));
         const origin = RoomPlanStore.ORIGINS.includes(record.origin) ? record.origin : 'authored';
         return {
             id,
@@ -46463,6 +46491,8 @@ class GameMap {
         this.zoneManager = null;
         this.gridSystem = null;
         this.gridLineOverlay = null;
+        this.objectHighlightOverlay = null;
+        this._frontLayer = null;
         this.particleSystem = null;
         this.environmentManager = null;
         this.buildDocument = null;
@@ -46552,6 +46582,41 @@ class GameMap {
 
     getRenderOffset() {
         return { x: this.renderInsets.left, y: this.renderInsets.top };
+    }
+
+    /**
+     * The shared home for anything that must draw on top of every map layer:
+     * the grid, room outlines, wall-selection cells, the selected object's
+     * highlight box. A sibling of `.layer.*` at the `.canvas` root rather than
+     * a child of one of them — each `.layer` is its own stacking context
+     * (`position` + `z-index`), so a high z-index on a child can never rise
+     * above a *different* layer, only its own siblings. This one lives above
+     * all of them instead of inside any of them.
+     *
+     * Positioned like every `.layer` (`> .layer` in features/_map.scss): offset
+     * by the render insets, sized to the gameplay rect. Children can then use
+     * the same raw cell/world-pixel math the art layers use, with no extra
+     * offset arithmetic of their own.
+     */
+    get frontLayer() {
+        if (this._frontLayer?.isConnected) return this._frontLayer;
+        const root = this.parent?.canvas;
+        if (!root) return null;
+        const el = document.createElement('div');
+        el.className = 'map-front-layer ignore';
+        el.setAttribute('aria-hidden', 'true');
+        Object.assign(el.style, {
+            position: 'absolute',
+            top: 'var(--map-render-inset-top, 0px)',
+            left: 'var(--map-render-inset-left, 0px)',
+            width: `${this.dimensions.width}px`,
+            height: `${this.dimensions.height}px`,
+            zIndex: 'var(--z-overlay)',
+            pointerEvents: 'none'
+        });
+        root.appendChild(el);
+        this._frontLayer = el;
+        return el;
     }
 
     /**
@@ -46944,6 +47009,7 @@ class GameMap {
 
 		this.gridSystem = new GridSystem(this);
 		this.gridLineOverlay = new GridLineOverlay(this);
+		this.objectHighlightOverlay = new ObjectHighlightOverlay(this);
 		// One geometry store for every area concept: zones, authored rooms, and
 		// runtime wall enclosures. Must exist before ZoneManager, which registers
 		// each zone's geometry into it.
@@ -47898,6 +47964,19 @@ class GameMap {
             }
             this.gridSystem = null;
         }
+
+        // The front layer and everything mounted in it are children of the
+        // shared `.canvas` root, which outlives any one GameMap — left
+        // undisposed, they would linger and show the old map's grid/room
+        // outlines/highlights over the new one.
+        this.gridLineOverlay?.dispose();
+        this.gridLineOverlay = null;
+        this.objectHighlightOverlay?.dispose();
+        this.objectHighlightOverlay = null;
+        this.footprintOverlay?.dispose();
+        this.footprintOverlay = null;
+        this._frontLayer?.remove();
+        this._frontLayer = null;
 
         if (this.layers && this.layers.debug) {
             // Clear all debug elements
@@ -69262,23 +69341,22 @@ class GridLineOverlay {
         return last;
     }
 
-    // Mounted on the `.canvas` root itself, at inset 0 (its own top-left is the
-    // gameplay origin, same as the old CSS grid's `inset: 0` on `.canvas::after`)
-    // — not on one of the `.layer` children, which stack below floor/objects
-    // and would bury the grid under opaque floor art. z-index matches that old
-    // rule's `--z-overlay` (1200) so the grid still sits above everything,
-    // debug's own annotations (z-index 1000) included.
+    // Mounted in the map's shared front layer (see GameMap#frontLayer), not on
+    // one of the `.layer` children — those stack below floor/objects and would
+    // bury the grid under opaque floor art. The front layer already carries
+    // the render-inset offset and the on-top z-index, so this canvas is just
+    // `top: 0; left: 0` within it.
     ensureCanvas() {
-        const root = this.gameMap?.parent?.canvas;
-        if (!root) return null;
+        const layer = this.gameMap?.frontLayer;
+        if (!layer) return null;
         if (this.canvas?.isConnected) return this.canvas;
         const canvas = document.createElement('canvas');
         canvas.className = 'grid-line-overlay ignore';
         canvas.setAttribute('aria-hidden', 'true');
         Object.assign(canvas.style, {
-            position: 'absolute', left: '0', top: '0', zIndex: '1200', pointerEvents: 'none'
+            position: 'absolute', left: '0', top: '0', pointerEvents: 'none'
         });
-        root.appendChild(canvas);
+        layer.appendChild(canvas);
         this.canvas = canvas;
         return canvas;
     }
@@ -72303,6 +72381,9 @@ class BuildModeUI extends UIComponent {
             (this.container?.settings?.buildGrid !== false ||
                 this.container?.inputHandler?.isSnapModifierHeld?.() === true)
         );
+        // Keeps the selected object's highlight box glued to it through a
+        // drag — see ObjectHighlightOverlay. A no-op with nothing selected.
+        this.container?.gameMap?.objectHighlightOverlay?.sync();
     }
 
     dispose() {
@@ -72907,6 +72988,13 @@ class SelectionManager extends UIComponent {
         this.selectedObjects.forEach(select);
         this.selectedObject = next.length === 1 ? next[0] : null;
 
+        // A second, always-on-top outline for furniture/buildings — see
+        // ObjectHighlightOverlay. Myte and raw Elements keep only the
+        // in-place `is-selected` outline handled above.
+        const highlightable = (this.selectedObject instanceof MapObject || this.selectedObject instanceof DroppedMapItem)
+            ? this.selectedObject : null;
+        this.container?.gameMap?.objectHighlightOverlay?.set(highlightable);
+
         // Notify parent UI of selection change
         this.parent.onSelectionChanged(this.selectedObject);
     }
@@ -72983,16 +73071,48 @@ class BuildSelection {
  *
  * Cell ownership, not blocks: the question is which cells belong to the room,
  * and `grid.ownerOfCell` is the majority answer the rest of the build tools use.
+ *
+ * Every room draws only its own edge, inset a few pixels into its own cells
+ * rather than sitting exactly on the shared cell boundary — the boundary is
+ * also where the neighbouring room's edge sits, and two independent colours
+ * stroking the same pixels is what used to make corners where three or four
+ * rooms meet look misshapen (and, mid-stroke, briefly black). Insetting means
+ * a shared wall shows two thin lines with daylight between them instead of
+ * one contested one, and it needs no special case for "shared" vs. "outer" —
+ * every edge a cell has facing a different owner (a neighbour, or nothing
+ * built yet) is drawn the same way, in that room's own colour.
+ *
+ * Traced as one closed contour per room, not drawn edge-by-edge: earlier
+ * versions resolved and stroked each boundary edge independently, which is
+ * fine for a plain rectangle but breaks at any corner or T-junction — two
+ * edges meeting at a point each keep their own uncropped endpoint instead of
+ * sharing one, so the corner either falls short or runs past it, and a
+ * concave notch throws in a short perpendicular whisker where its two sides
+ * don't quite meet. `traceLoops` walks the cell boundary into an ordered ring
+ * of unit edges first (so it is a graph-connected path, not a pile of
+ * independent segments), then `insetLoop` merges consecutive same-direction
+ * edges into straight runs, resolves each run's wall-centred position once,
+ * and places each polygon vertex at the intersection of its two neighbouring
+ * runs' lines — the rectilinear-offset equivalent of mitering a corner. Every
+ * vertex is shared by construction, so nothing can overshoot or dangle.
+ *
+ * Mounted in GameMap#frontLayer, not `layers.background` — that sits below
+ * furniture and wall art, which buried this outline exactly when it mattered
+ * most (rooms with things in them). The front layer draws on top of
+ * everything, and shares its coordinate space, so cell math here needs no
+ * offset beyond the raw `x * cellSize`.
  */
 class BuildFootprintOverlay {
-    static COLOURS = Object.freeze([
-        'rgba(66, 133, 244, 0.85)', 'rgba(219, 68, 55, 0.85)', 'rgba(15, 157, 88, 0.85)',
-        'rgba(244, 160, 0, 0.85)', 'rgba(171, 71, 188, 0.85)', 'rgba(0, 172, 193, 0.85)'
-    ]);
+    // How far each edge draws inward from the true cell boundary. Small
+    // enough to still read as "this cell's border", large enough that two
+    // rooms sharing a wall never touch, whatever the line width.
+    static INSET = 3;
 
     constructor(gameMap) {
         this.gameMap = gameMap;
         this.canvas = null;
+        this.labelContainer = null;
+        this.labelButtons = new Map(); // roomId -> button
         this.visible = false;
         this.renders = 0;
     }
@@ -73006,27 +73126,40 @@ class BuildFootprintOverlay {
         if (!this.visible) {
             this.canvas?.remove();
             this.canvas = null;
+            this.labelContainer?.remove();
+            this.labelContainer = null;
+            this.labelButtons.clear();
             return;
         }
         this.render();
     }
 
-    // The background layer is already the gameplay rect — the render padding
-    // sits outside it — so a canvas at inset 0 here is cell-aligned with no
-    // offset arithmetic, the same contract the floor chunks rely on.
     ensureCanvas() {
-        const layer = this.gameMap?.layers?.background;
+        const layer = this.gameMap?.frontLayer;
         if (!layer) return null;
-        if (this.canvas?.isConnected) return this.canvas;
-        const canvas = document.createElement('canvas');
-        canvas.className = 'build-footprint-overlay ignore';
-        canvas.setAttribute('aria-hidden', 'true');
-        Object.assign(canvas.style, {
-            position: 'absolute', left: '0', top: '0', pointerEvents: 'none'
-        });
-        layer.appendChild(canvas);
-        this.canvas = canvas;
-        return canvas;
+        if (!this.canvas?.isConnected) {
+            const canvas = document.createElement('canvas');
+            canvas.className = 'build-footprint-overlay ignore';
+            canvas.setAttribute('aria-hidden', 'true');
+            Object.assign(canvas.style, {
+                position: 'absolute', left: '0', top: '0', pointerEvents: 'none'
+            });
+            layer.appendChild(canvas);
+            this.canvas = canvas;
+        }
+        if (!this.labelContainer?.isConnected) {
+            const container = document.createElement('div');
+            container.className = 'build-room-labels ignore';
+            container.setAttribute('aria-hidden', 'true');
+            Object.assign(container.style, {
+                position: 'absolute', left: '0', top: '0', width: '100%', height: '100%',
+                pointerEvents: 'none'
+            });
+            layer.appendChild(container);
+            this.labelContainer = container;
+            this.labelButtons.clear();
+        }
+        return this.canvas;
     }
 
     render() {
@@ -73047,41 +73180,281 @@ class BuildFootprintOverlay {
         context.clearRect(0, 0, canvas.width, canvas.height);
 
         const owners = new Map();
+        const ownerGrid = new Array(width * height).fill(null);
         for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
             const id = grid.ownerOfCell(x, y);
             if (id === null) continue;
+            ownerGrid[y * width + x] = id;
             if (!owners.has(id)) owners.set(id, []);
             owners.get(id).push([x, y]);
         }
-        // Only the edges of each footprint are stroked. Outlining every cell
-        // would redraw the grid in six colours and say nothing extra: the seam
-        // between two rooms is the whole point, and interior lines bury it.
-        const index = new Map([...owners.keys()].sort().map((id, order) => [id, order]));
+        const ownerAt = (x, y) => (x < 0 || y < 0 || x >= width || y >= height) ? null : ownerGrid[y * width + x];
+
+        // A wall record's cell is a full cellSize×cellSize footprint, and the
+        // wall itself — whatever its rendered thickness — sits centred inside
+        // it (see WallGeometry: a piece's baseline is `(row + 0.5) * cellSize
+        // + thickness / 2`, i.e. thickness straddles the row's own centre).
+        // So the wall's true centreline, regardless of thickness, is simply
+        // the centre of whichever cell holds it — not the cell's edge, which
+        // is what this drew before and is why it hugged the outside of the
+        // wall instead of running through it.
+        const walls = this.gameMap?.buildDocument?.level?.()?.walls;
+        const hasWall = (x, y) => (x < 0 || y < 0 || x >= width || y >= height)
+            ? false : !!walls?.get?.(BuildKeys.cell(x, y));
+
+        const inset = BuildFootprintOverlay.INSET;
         context.lineWidth = 2;
-        context.lineCap = 'square';
+        context.lineJoin = 'miter';
         for (const [id, cells] of owners) {
-            const owned = new Set(cells.map(([x, y]) => `${x},${y}`));
-            context.strokeStyle = BuildFootprintOverlay.COLOURS[
-                index.get(id) % BuildFootprintOverlay.COLOURS.length
-            ];
+            context.strokeStyle = RoomPanel.roomColour(id, 0.85);
+            const ownedSet = new Set(cells.map(([x, y]) => `${x},${y}`));
+            const loops = BuildFootprintOverlay.traceLoops(ownedSet);
             context.beginPath();
-            for (const [x, y] of cells) {
-                const left = x * cell;
-                const top = y * cell;
-                if (!owned.has(`${x - 1},${y}`)) { context.moveTo(left, top); context.lineTo(left, top + cell); }
-                if (!owned.has(`${x + 1},${y}`)) { context.moveTo(left + cell, top); context.lineTo(left + cell, top + cell); }
-                if (!owned.has(`${x},${y - 1}`)) { context.moveTo(left, top); context.lineTo(left + cell, top); }
-                if (!owned.has(`${x},${y + 1}`)) { context.moveTo(left, top + cell); context.lineTo(left + cell, top + cell); }
+            for (const loop of loops) {
+                const polygon = BuildFootprintOverlay.insetLoop(loop, cell, inset, hasWall);
+                if (polygon.length < 2) continue;
+                context.moveTo(polygon[0][0], polygon[0][1]);
+                for (let i = 1; i < polygon.length; i++) context.lineTo(polygon[i][0], polygon[i][1]);
+                context.closePath();
             }
             context.stroke();
         }
+
+        this.renderLabels(owners, cell);
+
         this.renders++;
         return owners.size;
+    }
+
+    // Walks a room's owned cells into one or more closed rings of unit
+    // boundary edges (grid-vertex coordinates, not yet inset or wall-aware).
+    // Standard raster-to-polygon boundary tracing: every owned cell
+    // contributes one directed unit edge per side that faces a non-owned
+    // neighbour, oriented so each edge's end vertex is exactly one other
+    // edge's start vertex — following that chain from any edge always
+    // returns to its own start, which is what turns "a pile of independent
+    // edges" into "a path that closes." Multiple loops (a room in two
+    // pieces, or one with a hole) just means more than one ring comes out.
+    static traceLoops(ownedSet) {
+        const isOwned = (x, y) => ownedSet.has(`${x},${y}`);
+        const edges = [];
+        for (const key of ownedSet) {
+            const [x, y] = key.split(',').map(Number);
+            if (!isOwned(x - 1, y)) edges.push({ from: [x, y + 1], to: [x, y], side: 'L', cx: x, cy: y });
+            if (!isOwned(x + 1, y)) edges.push({ from: [x + 1, y], to: [x + 1, y + 1], side: 'R', cx: x, cy: y });
+            if (!isOwned(x, y - 1)) edges.push({ from: [x, y], to: [x + 1, y], side: 'T', cx: x, cy: y });
+            if (!isOwned(x, y + 1)) edges.push({ from: [x + 1, y + 1], to: [x, y + 1], side: 'B', cx: x, cy: y });
+        }
+        const byStart = new Map();
+        for (const edge of edges) {
+            const k = `${edge.from[0]},${edge.from[1]}`;
+            if (!byStart.has(k)) byStart.set(k, []);
+            byStart.get(k).push(edge);
+        }
+        const remaining = new Set(edges);
+        const loops = [];
+        for (const start of edges) {
+            if (!remaining.has(start)) continue;
+            const loop = [];
+            let current = start;
+            while (current) {
+                loop.push(current);
+                remaining.delete(current);
+                if (current.to[0] === start.from[0] && current.to[1] === start.from[1]) break;
+                const candidates = byStart.get(`${current.to[0]},${current.to[1]}`) || [];
+                current = candidates.find(edge => remaining.has(edge)) || null;
+            }
+            loops.push(loop);
+        }
+        return loops;
+    }
+
+    // Merges a traced loop's unit edges into straight runs, resolves each
+    // run's wall-centred, inward-inset line once (see the class docs — a
+    // wall's true centreline is the centre of whichever cell holds it, found
+    // by checking every cell along the run rather than each one alone so a
+    // T-junction's uneven wall-record coverage can't split one straight wall
+    // into two different answers), then places one polygon vertex per run at
+    // the intersection of it and the run after it. Consecutive runs in a
+    // rectilinear ring always alternate horizontal/vertical, so that
+    // intersection is just combining each run's own fixed coordinate — the
+    // rectilinear-offset equivalent of mitering, and why every corner meets
+    // at exactly one shared point instead of two independent endpoints.
+    static insetLoop(loop, cell, inset, hasWall) {
+        if (!loop.length) return [];
+        const runs = [];
+        for (const edge of loop) {
+            const last = runs[runs.length - 1];
+            if (last && last.side === edge.side) {
+                last.cells.push([edge.cx, edge.cy]);
+            } else {
+                runs.push({ side: edge.side, cells: [[edge.cx, edge.cy]] });
+            }
+        }
+        if (runs.length > 1 && runs[0].side === runs[runs.length - 1].side) {
+            const last = runs.pop();
+            runs[0].cells = [...last.cells, ...runs[0].cells];
+        }
+
+        for (const run of runs) {
+            const horizontal = run.side === 'T' || run.side === 'B';
+            const sign = (run.side === 'T' || run.side === 'L') ? 1 : -1;
+            if (horizontal) {
+                const y = run.cells[0][1];
+                const neighborY = run.side === 'T' ? y - 1 : y + 1;
+                const xs = run.cells.map(c => c[0]);
+                const minX = Math.min(...xs), maxX = Math.max(...xs);
+                const anyWallAt = (coordY) => {
+                    for (let x = minX; x <= maxX; x++) if (hasWall(x, coordY)) return true;
+                    return false;
+                };
+                const wallY = anyWallAt(y) ? y : anyWallAt(neighborY) ? neighborY : null;
+                const base = wallY !== null ? (wallY + 0.5) * cell : (run.side === 'T' ? y : y + 1) * cell;
+                run.axis = 'y';
+                run.value = base + sign * inset;
+            } else {
+                const x = run.cells[0][0];
+                const neighborX = run.side === 'L' ? x - 1 : x + 1;
+                const ys = run.cells.map(c => c[1]);
+                const minY = Math.min(...ys), maxY = Math.max(...ys);
+                const anyWallAt = (coordX) => {
+                    for (let y = minY; y <= maxY; y++) if (hasWall(coordX, y)) return true;
+                    return false;
+                };
+                const wallX = anyWallAt(x) ? x : anyWallAt(neighborX) ? neighborX : null;
+                const base = wallX !== null ? (wallX + 0.5) * cell : (run.side === 'L' ? x : x + 1) * cell;
+                run.axis = 'x';
+                run.value = base + sign * inset;
+            }
+        }
+
+        const polygon = [];
+        for (let i = 0; i < runs.length; i++) {
+            const current = runs[i];
+            const next = runs[(i + 1) % runs.length];
+            polygon.push(current.axis === 'y' ? [next.value, current.value] : [current.value, next.value]);
+        }
+        return polygon;
+    }
+
+    // One clickable name per room, centred on the cells it owns — opens the
+    // same Room panel the Build Inspector's Navigator entry does.
+    renderLabels(owners, cell) {
+        if (!this.labelContainer) return;
+        const level = this.gameMap?.buildDocument?.level?.();
+        const seen = new Set();
+        for (const [id, cells] of owners) {
+            seen.add(id);
+            let button = this.labelButtons.get(id);
+            if (!button) {
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'build-room-label';
+                button.addEventListener('click', event => {
+                    event.stopPropagation();
+                    this.openRoom(id);
+                });
+                this.labelContainer.appendChild(button);
+                this.labelButtons.set(id, button);
+            }
+            const room = level?.rooms?.get?.(id);
+            button.textContent = room?.displayName || id;
+            let sumX = 0, sumY = 0;
+            for (const [x, y] of cells) { sumX += x; sumY += y; }
+            const centreX = (sumX / cells.length + 0.5) * cell;
+            const centreY = (sumY / cells.length + 0.5) * cell;
+            button.style.left = `${centreX}px`;
+            button.style.top = `${centreY}px`;
+        }
+        for (const [id, button] of this.labelButtons) {
+            if (!seen.has(id)) {
+                button.remove();
+                this.labelButtons.delete(id);
+            }
+        }
+    }
+
+    openRoom(id) {
+        const ui = this.gameMap?.parent?.ui;
+        const inspector = ui?.buildInspector;
+        if (!inspector) return;
+        inspector.open?.();
+        inspector.select?.('room', id);
     }
 
     dispose() {
         this.canvas?.remove();
         this.canvas = null;
+        this.labelContainer?.remove();
+        this.labelContainer = null;
+        this.labelButtons.clear();
+        this.gameMap = null;
+    }
+}
+;
+/* -- js/UI/Map/ObjectHighlightOverlay.js -- */
+/**
+ * The selection outline for the one map object actually selected in Build
+ * mode — a piece of furniture, a fence post, a dropped item.
+ *
+ * `SelectionManager` also toggles an `is-selected` class straight onto the
+ * object's own element, which is enough when nothing else in its art layer
+ * happens to paint over it, but nothing stops another object's sprite from
+ * doing exactly that (see GameMap#frontLayer). This draws a second, reliable
+ * outline in the front layer instead of replacing that one — belt and
+ * suspenders, and zero risk to whatever else `is-selected` hooks into.
+ *
+ * Positioned from the object's own posX/posY/size — the same numbers its own
+ * element is placed with — rather than measuring the DOM, so a drag in
+ * progress keeps the box glued to the object for free: `sync()` just re-reads
+ * those fields, no camera/zoom math involved since this lives in the same
+ * map-pixel coordinate space the object's own element does.
+ */
+class ObjectHighlightOverlay {
+    constructor(gameMap) {
+        this.gameMap = gameMap;
+        this.element = null;
+        this.target = null;
+    }
+
+    set(object) {
+        if (this.target === object) return;
+        this.target = object || null;
+        if (!this.target) {
+            this.element?.remove();
+            this.element = null;
+            return;
+        }
+        const layer = this.gameMap?.frontLayer;
+        if (!layer) return;
+        if (!this.element?.isConnected) {
+            const el = document.createElement('div');
+            el.className = 'build-object-highlight ignore';
+            el.setAttribute('aria-hidden', 'true');
+            el.style.position = 'absolute';
+            layer.appendChild(el);
+            this.element = el;
+        }
+        this.sync();
+    }
+
+    // Cheap enough to call every Build-mode tick (see BuildModeUI#update):
+    // one element, no measurement, just copying the object's own numbers.
+    sync() {
+        if (!this.target || !this.element) return;
+        const size = this.target.size || {};
+        Object.assign(this.element.style, {
+            left: `${this.target.posX ?? 0}px`,
+            top: `${this.target.posY ?? 0}px`,
+            width: `${size.width || 0}px`,
+            height: `${size.height || 0}px`
+        });
+    }
+
+    dispose() {
+        this.element?.remove();
+        this.element = null;
+        this.target = null;
         this.gameMap = null;
     }
 }
@@ -73394,7 +73767,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.wallHighlights.forEach(element => element.remove());
         this.wallHighlights = [];
         const builder = this.container?.gameMap?.wallBuilder;
-        const layer = this.container?.gameMap?.layers?.objects;
+        const layer = this.container?.gameMap?.frontLayer;
         if (!builder || !layer) return;
         for (const cell of this.selectedWallCells) {
             const element = document.createElement('div');
@@ -78566,7 +78939,34 @@ class BuildInspector extends ModalWindow {
             tab.setAttribute('aria-selected', String(selected));
         }
         for (const view of this.views) view.hidden = view.dataset.buildInspectorView !== name;
+        this.updateFooterVisibility();
         return true;
+    }
+
+    get footer() {
+        return this.modalElement?.querySelector('[data-build-inspector-footer]') || null;
+    }
+
+    /**
+     * The one action row that answers "what can I do with this selection" —
+     * pinned below the scrolling properties list instead of living inside it,
+     * so it never scrolls out of reach the way it used to when a selection
+     * had a long property list above it. Secondary, contextual action rows
+     * (the Roof editor's own "Paint roof" row, say) stay inline: this is only
+     * for the one row that speaks for the whole selection.
+     */
+    setFooterActions(actions) {
+        const footer = this.footer;
+        if (!footer) return;
+        this._footerHasActions = Array.isArray(actions) && actions.length > 0;
+        footer.replaceChildren(...(this._footerHasActions ? [this.actionRow(actions)] : []));
+        this.updateFooterVisibility();
+    }
+
+    updateFooterVisibility() {
+        const footer = this.footer;
+        if (!footer) return;
+        footer.hidden = !this._footerHasActions || this.activeTab !== 'properties';
     }
 
     render() {
@@ -78758,6 +79158,7 @@ class BuildInspector extends ModalWindow {
         const root = this.modalElement?.querySelector('[data-build-inspector-view="properties"]');
         if (!root) return;
         root.replaceChildren();
+        this.setFooterActions(null);
         const selection = this.parent.buildSelection.current;
         if (!selection) {
             root.append(BuildInspector.message('Select a building, room, wall, surface, or object.'));
@@ -78777,7 +79178,7 @@ class BuildInspector extends ModalWindow {
             // button that answers with a message when you press it.
             const parts = marquee.buildingComponents(selection.id).length;
             const selectedBuildings = marquee.selectedBuildingIds().length;
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Move', () => this.beginBuildingMove()],
                 ['Duplicate', () => marquee.duplicateSelection()],
                 ['Separate', () => marquee.separateBuilding(), null,
@@ -78785,7 +79186,7 @@ class BuildInspector extends ModalWindow {
                 ['Merge', () => marquee.mergeSelectedBuildings(), null,
                     selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
                 ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'roof') {
@@ -78808,11 +79209,11 @@ class BuildInspector extends ModalWindow {
             root.append(this.roomBuildingEditor(room));
             const region = map.regionManager?.get('room', room.id);
             if (region) root.append(this.needsRow(this.roomNeeds(region)));
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
                 ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
                 ['Paint walls', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'wall')]
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'wall' && selection.id === 'unassigned') {
@@ -78846,11 +79247,11 @@ class BuildInspector extends ModalWindow {
                 Building: (wall.buildingId && map.buildDocument.buildings.get(wall.buildingId)?.displayName) || 'Unassigned',
                 Finish: map.wallBuilder?.resolveSurfaceFinishId({ ...wall }, 'south', null, 0) || '—'
             }));
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Paint', () => this.parent.changeToolMode(UIToolModes.SURFACE)],
                 ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
                 ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'atom') {
@@ -78868,13 +79269,13 @@ class BuildInspector extends ModalWindow {
             const paint = this.parent.surfaceCustomizePanel;
             const unavailable = surface ? null : 'Click a wall face to choose one';
             // The same three answers the stage bar gives, in the same words.
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Paint section', () => paint.openWallSurface(surface, 'stretch'), null, unavailable],
                 surface?.roomId
                     ? ['Paint the room', () => paint.openWallSurface(surface, 'room'), null, unavailable]
                     : ['Paint outside', () => paint.openWallSurface(surface, 'roomExterior'), null, unavailable],
                 ['Select structure', () => surface && marquee.selectWallAt(surface.cell, 'cell'), null, unavailable]
-            ]));
+            ]);
             return;
         }
         const details = document.createElement('dl');

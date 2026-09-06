@@ -38,6 +38,38 @@ canvas.build-selection-room {
     image-rendering: pixelated;
 }
 
+// ── Front layer overlays ──────────────────────────────────────────────────────
+//
+// Everything mounted in GameMap#frontLayer: the grid, room outlines and their
+// name buttons, and the selected object's highlight box. The layer itself is
+// pointer-events: none (set inline, since it also carries the render-inset
+// offset in JS) — only the room name buttons opt back into being clickable.
+
+.build-room-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    cursor: pointer;
+    padding: var(--space-2xs) var(--space-xs);
+    border: 1px solid var(--black);
+    border-radius: 3px;
+    background: var(--surface-tooltip);
+    color: var(--text-default);
+    font: inherit;
+    font-size: var(--text-size-meta);
+    white-space: nowrap;
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+
+    &:hover {
+        background: var(--surface-ui-pressed);
+    }
+}
+
+.build-object-highlight {
+    @include is-selected;
+    box-sizing: border-box;
+}
+
 .build-selection-actions {
     position: absolute;
     left: 50%;

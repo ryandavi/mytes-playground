@@ -125,6 +125,9 @@ class BuildModeUI extends UIComponent {
             (this.container?.settings?.buildGrid !== false ||
                 this.container?.inputHandler?.isSnapModifierHeld?.() === true)
         );
+        // Keeps the selected object's highlight box glued to it through a
+        // drag — see ObjectHighlightOverlay. A no-op with nothing selected.
+        this.container?.gameMap?.objectHighlightOverlay?.sync();
     }
 
     dispose() {

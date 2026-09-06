@@ -4325,6 +4325,36 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   max-width: 100%;
   overflow-x: hidden;
 }
+.build-inspector-panel .build-inspector-properties {
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.build-inspector-panel .build-inspector-properties::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.build-inspector-panel .build-inspector-properties::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.build-inspector-panel .build-inspector-properties::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.build-inspector-panel .build-inspector-properties {
+  overflow-x: hidden;
+  padding: var(--space-sm);
+}
 .build-inspector-panel .build-navigator-tree,
 .build-inspector-panel .build-navigator-tree ul,
 .build-inspector-panel .build-navigator-tree li {
@@ -4576,6 +4606,32 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
 
 canvas.build-selection-room {
   image-rendering: pixelated;
+}
+
+.build-room-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--black);
+  border-radius: 3px;
+  background: var(--surface-tooltip);
+  color: var(--text-default);
+  font: inherit;
+  font-size: var(--text-size-meta);
+  white-space: nowrap;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+.build-room-label:hover {
+  background: var(--surface-ui-pressed);
+}
+
+.build-object-highlight {
+  outline: 2px dashed green;
+  border-radius: 5px;
+  outline-offset: 4px;
+  box-sizing: border-box;
 }
 
 .build-selection-actions {

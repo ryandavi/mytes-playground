@@ -49,6 +49,13 @@ class SelectionManager extends UIComponent {
         this.selectedObjects.forEach(select);
         this.selectedObject = next.length === 1 ? next[0] : null;
 
+        // A second, always-on-top outline for furniture/buildings — see
+        // ObjectHighlightOverlay. Myte and raw Elements keep only the
+        // in-place `is-selected` outline handled above.
+        const highlightable = (this.selectedObject instanceof MapObject || this.selectedObject instanceof DroppedMapItem)
+            ? this.selectedObject : null;
+        this.container?.gameMap?.objectHighlightOverlay?.set(highlightable);
+
         // Notify parent UI of selection change
         this.parent.onSelectionChanged(this.selectedObject);
     }

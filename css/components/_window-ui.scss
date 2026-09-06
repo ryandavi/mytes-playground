@@ -2480,6 +2480,17 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
         overflow-x: hidden;
     }
 
+    // The Navigator already scrolls inside its own site list (see below); the
+    // Properties view had no such box, so a selection with a long property
+    // list just grew the whole floating window instead. Same sunken box, same
+    // ceiling instead of a fixed height — the primary action row lives in the
+    // footer (see BuildInspector#setFooterActions), not in here, so it stays
+    // reachable no matter how far the list scrolls.
+    .build-inspector-properties {
+        @include inset-scroll-box(360px);
+        padding: var(--space-sm);
+    }
+
     .build-navigator-tree,
     .build-navigator-tree ul,
     .build-navigator-tree li {

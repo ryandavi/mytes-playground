@@ -15,10 +15,38 @@ class RoomPlanStore extends BuildRecordStore {
         return String(record.id);
     }
 
+    // The id is a stable internal key (`room_painted_3`, `room_7`) that has to
+    // stay unique and never rename itself out from under a save file — but it
+    // was also the only thing a room without an authored name ever showed a
+    // player, whether that room came from the paint tool's "New Room" brush,
+    // splitting an island, or an imported map with no `displayName` property.
+    // "Room 3" is the same number without the internal id showing through;
+    // anything that doesn't match the minted-id shape (a custom or authored
+    // id like `zone_kitchen`) is left as-is rather than guessed at.
+    //
+    // Two independent counters (`room_N` for auto-detected rooms, `room_
+    // painted_N` for painted ones) can mint the same N, so the id's own
+    // number is only a starting point — this still has to check for a
+    // "Room N" already in use and count up past it.
+    defaultDisplayName(id) {
+        const match = /^room(?:_painted)?_(\d+)$/.exec(id || '');
+        if (!match) return id || 'Room';
+        const taken = new Set(this.values().map(room => room.displayName));
+        let number = Number(match[1]);
+        while (taken.has(`Room ${number}`)) number++;
+        return `Room ${number}`;
+    }
+
     normalize(record, key) {
         const id = String(record?.id || key || '');
         if (!id) throw new Error('Room plans require an id');
-        const displayName = String(record.displayName || record.authoredDisplayName || id);
+        // A displayName that is literally the id string is the same "nobody
+        // named this" case as a missing one — it's what every one of these
+        // paths wrote before there was a nicer default, not a name a player
+        // ever typed — so it gets the same treatment rather than needing
+        // each room renamed by hand to pick up the fix.
+        const rawName = record.displayName || record.authoredDisplayName;
+        const displayName = String((rawName && rawName !== id) ? rawName : this.defaultDisplayName(id));
         const origin = RoomPlanStore.ORIGINS.includes(record.origin) ? record.origin : 'authored';
         return {
             id,

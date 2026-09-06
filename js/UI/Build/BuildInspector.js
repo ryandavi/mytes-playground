@@ -48,7 +48,34 @@ class BuildInspector extends ModalWindow {
             tab.setAttribute('aria-selected', String(selected));
         }
         for (const view of this.views) view.hidden = view.dataset.buildInspectorView !== name;
+        this.updateFooterVisibility();
         return true;
+    }
+
+    get footer() {
+        return this.modalElement?.querySelector('[data-build-inspector-footer]') || null;
+    }
+
+    /**
+     * The one action row that answers "what can I do with this selection" —
+     * pinned below the scrolling properties list instead of living inside it,
+     * so it never scrolls out of reach the way it used to when a selection
+     * had a long property list above it. Secondary, contextual action rows
+     * (the Roof editor's own "Paint roof" row, say) stay inline: this is only
+     * for the one row that speaks for the whole selection.
+     */
+    setFooterActions(actions) {
+        const footer = this.footer;
+        if (!footer) return;
+        this._footerHasActions = Array.isArray(actions) && actions.length > 0;
+        footer.replaceChildren(...(this._footerHasActions ? [this.actionRow(actions)] : []));
+        this.updateFooterVisibility();
+    }
+
+    updateFooterVisibility() {
+        const footer = this.footer;
+        if (!footer) return;
+        footer.hidden = !this._footerHasActions || this.activeTab !== 'properties';
     }
 
     render() {
@@ -240,6 +267,7 @@ class BuildInspector extends ModalWindow {
         const root = this.modalElement?.querySelector('[data-build-inspector-view="properties"]');
         if (!root) return;
         root.replaceChildren();
+        this.setFooterActions(null);
         const selection = this.parent.buildSelection.current;
         if (!selection) {
             root.append(BuildInspector.message('Select a building, room, wall, surface, or object.'));
@@ -259,7 +287,7 @@ class BuildInspector extends ModalWindow {
             // button that answers with a message when you press it.
             const parts = marquee.buildingComponents(selection.id).length;
             const selectedBuildings = marquee.selectedBuildingIds().length;
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Move', () => this.beginBuildingMove()],
                 ['Duplicate', () => marquee.duplicateSelection()],
                 ['Separate', () => marquee.separateBuilding(), null,
@@ -267,7 +295,7 @@ class BuildInspector extends ModalWindow {
                 ['Merge', () => marquee.mergeSelectedBuildings(), null,
                     selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
                 ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'roof') {
@@ -290,11 +318,11 @@ class BuildInspector extends ModalWindow {
             root.append(this.roomBuildingEditor(room));
             const region = map.regionManager?.get('room', room.id);
             if (region) root.append(this.needsRow(this.roomNeeds(region)));
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
                 ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
                 ['Paint walls', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'wall')]
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'wall' && selection.id === 'unassigned') {
@@ -328,11 +356,11 @@ class BuildInspector extends ModalWindow {
                 Building: (wall.buildingId && map.buildDocument.buildings.get(wall.buildingId)?.displayName) || 'Unassigned',
                 Finish: map.wallBuilder?.resolveSurfaceFinishId({ ...wall }, 'south', null, 0) || '—'
             }));
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Paint', () => this.parent.changeToolMode(UIToolModes.SURFACE)],
                 ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
                 ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
-            ]));
+            ]);
             return;
         }
         if (selection.kind === 'atom') {
@@ -350,13 +378,13 @@ class BuildInspector extends ModalWindow {
             const paint = this.parent.surfaceCustomizePanel;
             const unavailable = surface ? null : 'Click a wall face to choose one';
             // The same three answers the stage bar gives, in the same words.
-            root.append(this.actionRow([
+            this.setFooterActions([
                 ['Paint section', () => paint.openWallSurface(surface, 'stretch'), null, unavailable],
                 surface?.roomId
                     ? ['Paint the room', () => paint.openWallSurface(surface, 'room'), null, unavailable]
                     : ['Paint outside', () => paint.openWallSurface(surface, 'roomExterior'), null, unavailable],
                 ['Select structure', () => surface && marquee.selectWallAt(surface.cell, 'cell'), null, unavailable]
-            ]));
+            ]);
             return;
         }
         const details = document.createElement('dl');

@@ -305,7 +305,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.wallHighlights.forEach(element => element.remove());
         this.wallHighlights = [];
         const builder = this.container?.gameMap?.wallBuilder;
-        const layer = this.container?.gameMap?.layers?.objects;
+        const layer = this.container?.gameMap?.frontLayer;
         if (!builder || !layer) return;
         for (const cell of this.selectedWallCells) {
             const element = document.createElement('div');

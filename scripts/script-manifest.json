@@ -646,6 +646,9 @@
     "src": "js/UI/Map/BuildFootprintOverlay.js"
   },
   {
+    "src": "js/UI/Map/ObjectHighlightOverlay.js"
+  },
+  {
     "src": "js/UI/Map/BuildMarqueeSelection.js"
   },
   {
