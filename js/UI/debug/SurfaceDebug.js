@@ -248,7 +248,7 @@ const SurfaceDebug = {
 		const map = this._map();
 		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
 		const grid = map.buildTransaction?.cache?.grid;
-		const cellsByRoom = footprints ?? BuildFootprintOverlay.cellsByRoom(grid);
+		const blocksByRoom = footprints ?? BuildFootprintOverlay.blocksByRoom(grid);
 		const inspect = (cellX, cellY) => {
 			const key = BuildKeys.cell(cellX, cellY);
 			const neighbouringRooms = new Set();
@@ -261,8 +261,9 @@ const SurfaceDebug = {
 				wall: map.wallBuilder?.cells?.has(key) ?? false,
 				authored: plans.filter(room => room.seedCells.includes(key)).map(room => room.id),
 				neighbouringRooms: [...neighbouringRooms].sort(),
-				footprintRooms: [...cellsByRoom]
-					.filter(([, cells]) => cells.some(([x, y]) => x === cellX && y === cellY))
+				footprintRooms: [...blocksByRoom]
+					.filter(([, blocks]) => blocks.some(([x, y]) =>
+						Math.floor(x / 2) === cellX && Math.floor(y / 2) === cellY))
 					.map(([id]) => id).sort(),
 				legacyWholeCellOwner: grid?.ownerOfCell(cellX, cellY) ?? null,
 				floorOwnership: this.floorPlan(cellX, cellY, ownerByBlock)
@@ -278,22 +279,25 @@ const SurfaceDebug = {
 
 	/**
 	 * Audit the ownership data consumed by the bottom-bar Show Rooms overlay.
-	 * Shared wall cells are listed because one whole-cell winner cannot describe
-	 * both rooms meeting the wall; these are the likely notch coordinates.
+	 * Shared wall cells and wall-free split cells are listed separately because
+	 * the former meet at a wall centreline while the latter retain their exact
+	 * quarter-cell boundary.
 	 */
 	footprintAudit() {
 		const map = this._map();
 		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
 		const grid = map.buildTransaction?.cache?.grid;
 		const ownerByBlock = this._floorPlanOwners();
-		const footprints = BuildFootprintOverlay.cellsByRoom(grid);
+		const footprints = BuildFootprintOverlay.blocksByRoom(grid);
 		const width = map.gridSystem?.gridWidth ?? 0;
 		const height = map.gridSystem?.gridHeight ?? 0;
 		const sharedWallCells = [];
+		const sharedOpenCells = [];
 		const missingAuthoredCells = [];
 		for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
 			const cell = this.footprintAt(x, y, ownerByBlock, footprints, false).selected;
 			if (cell.wall && cell.neighbouringRooms.length > 1) sharedWallCells.push(cell);
+			if (!cell.wall && cell.footprintRooms.length > 1) sharedOpenCells.push(cell);
 			for (const roomId of cell.authored) {
 				if (!cell.footprintRooms.includes(roomId)) {
 					missingAuthoredCells.push({ cell: cell.cell, roomId, footprintRooms: cell.footprintRooms });
@@ -305,6 +309,7 @@ const SurfaceDebug = {
 			overlayVisible: map.footprintOverlay?.visible === true,
 			overlayCanvas: map.footprintOverlay?.canvas?.isConnected === true,
 			sharedWallCells,
+			sharedOpenCells,
 			missingAuthoredCells
 		};
 		console.log('[SurfaceDebug] Show Rooms footprint audit', JSON.stringify(report, null, 2));

@@ -346,11 +346,21 @@
 				<button type="button" class="segment-btn" role="tab" data-build-inspector-tab="properties" aria-selected="false">Properties</button>
 				<button type="button" class="segment-btn" role="tab" data-build-inspector-tab="palette" aria-selected="false">Palette</button>
 			</div>
-			<div class="build-inspector-view build-inspector-navigator" data-build-inspector-view="navigator"></div>
-			<div class="build-inspector-view build-inspector-properties" data-build-inspector-view="properties" hidden></div>
-			<div class="build-inspector-view build-inspector-palette" data-build-inspector-view="palette" hidden></div>
+			<div class="build-inspector-heading" data-build-inspector-heading="navigator">
+				<strong>Site</strong>
+				<span>Build plan</span>
+			</div>
+			<div class="build-inspector-heading" data-build-inspector-heading="properties" hidden>
+				<strong>Selection</strong>
+				<span hidden></span>
+			</div>
+			<div class="build-inspector-heading" data-build-inspector-heading="palette" hidden>
+				<strong>Build tools</strong>
+			</div>
+			<div class="panel-list build-inspector-view build-inspector-navigator" data-build-inspector-view="navigator"></div>
+			<div class="panel-list build-inspector-view build-inspector-properties" data-build-inspector-view="properties" hidden></div>
+			<div class="panel-list build-inspector-view build-inspector-palette" data-build-inspector-view="palette" hidden></div>
 		</div>
-		<div class="window-panel__footer build-inspector-footer" data-build-inspector-footer hidden></div>
 	</div>
 	<!-- END BUILD INSPECTOR -->
 
@@ -928,7 +938,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=6809ecfbbc63"></script>
+	<script src="js/bundle.js?v=1ae2c512f4fd"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

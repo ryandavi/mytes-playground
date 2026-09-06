@@ -1086,6 +1086,14 @@ body[data-build-cursor="refused"] .app-stage {
     flex: 0 1 auto;
     gap: var(--space-xs);
     padding: var(--space-sm);
+
+    &[hidden] {
+        display: none;
+    }
+
+    > * {
+        flex: 0 0 auto;
+    }
 }
 
 // A list nobody has put anything in yet. Centred and quiet: it is a prompt, not

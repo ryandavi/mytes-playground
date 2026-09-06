@@ -11,9 +11,9 @@
  *
  * The floor grid remains quarter-cell data here. Collapsing a shared wall cell
  * to one `ownerOfCell` winner makes the losing room detour around that whole
- * tile. Instead, each room gets its own cell footprint: owning any quarter of
- * a cell includes that cell in that room's contour. Shared masonry can therefore
- * sit in two room footprints without changing exclusive floor-pixel ownership.
+ * tile, while promoting any owned quarter to a whole cell hides legitimate
+ * half-tile boundaries at wall-free thresholds. Tracing the 2x2 block grid
+ * directly preserves both cases without inventing another ownership rule.
  *
  * Every room draws only its own edge, inset a few pixels into its own cells
  * rather than sitting exactly on the shared cell boundary — the boundary is
@@ -50,6 +50,8 @@ class BuildFootprintOverlay {
     // enough to still read as "this cell's border", large enough that two
     // rooms sharing a wall never touch, whatever the line width.
     static INSET = 3;
+    static LINE_WIDTH = 3;
+    static UNDERLAY_WIDTH = 7;
 
     constructor(gameMap) {
         this.gameMap = gameMap;
@@ -122,67 +124,63 @@ class BuildFootprintOverlay {
         const context = canvas.getContext('2d');
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        const owners = BuildFootprintOverlay.cellsByRoom(grid);
-
-        // A wall record's cell is a full cellSize×cellSize footprint, and the
-        // wall itself — whatever its rendered thickness — sits centred inside
-        // it (see WallGeometry: a piece's baseline is `(row + 0.5) * cellSize
-        // + thickness / 2`, i.e. thickness straddles the row's own centre).
-        // So the wall's true centreline, regardless of thickness, is simply
-        // the centre of whichever cell holds it — not the cell's edge, which
-        // is what this drew before and is why it hugged the outside of the
-        // wall instead of running through it.
-        const walls = this.gameMap?.buildDocument?.level?.()?.walls;
-        const hasWall = (x, y) => (x < 0 || y < 0 || x >= width || y >= height)
-            ? false : !!walls?.get?.(BuildKeys.cell(x, y));
+        const owners = BuildFootprintOverlay.blocksByRoom(grid);
+        const block = cell / FloorRenderer.BLOCKS_PER_CELL;
 
         const inset = BuildFootprintOverlay.INSET;
-        context.lineWidth = 2;
         context.lineJoin = 'miter';
-        for (const [id, cells] of owners) {
-            context.strokeStyle = RoomPanel.roomColour(id, 0.85);
-            const ownedSet = new Set(cells.map(([x, y]) => `${x},${y}`));
-            const loops = BuildFootprintOverlay.traceLoops(ownedSet);
-            context.beginPath();
-            for (const loop of loops) {
-                const polygon = BuildFootprintOverlay.insetLoop(loop, cell, inset, hasWall);
-                if (polygon.length < 2) continue;
-                context.moveTo(polygon[0][0], polygon[0][1]);
-                for (let i = 1; i < polygon.length; i++) context.lineTo(polygon[i][0], polygon[i][1]);
-                context.closePath();
+        const contours = [...owners].map(([id, blocks]) => {
+            const ownedSet = new Set(blocks.map(([x, y]) => BuildKeys.block(x, y)));
+            return {
+                id,
+                polygons: BuildFootprintOverlay.traceLoops(ownedSet)
+                    .map(loop => BuildFootprintOverlay.insetLoop(loop, block, inset, () => false))
+                    .filter(polygon => polygon.length >= 2)
+            };
+        });
+        const strokeContours = (lineWidth, colourOf) => {
+            context.lineWidth = lineWidth;
+            for (const contour of contours) {
+                context.strokeStyle = colourOf(contour.id);
+                context.beginPath();
+                for (const polygon of contour.polygons) {
+                    context.moveTo(polygon[0][0], polygon[0][1]);
+                    for (let i = 1; i < polygon.length; i++) context.lineTo(polygon[i][0], polygon[i][1]);
+                    context.closePath();
+                }
+                context.stroke();
             }
-            context.stroke();
-        }
+        };
+        const underlay = getComputedStyle(document.documentElement)
+            .getPropertyValue('--text-on-accent').trim() || 'white';
+        // All underlays must exist before any colour is drawn. Otherwise the
+        // next room's white stroke can cover a coloured neighbour at a shared
+        // wall or junction.
+        strokeContours(BuildFootprintOverlay.UNDERLAY_WIDTH, () => underlay);
+        strokeContours(BuildFootprintOverlay.LINE_WIDTH, id => RoomPanel.roomColour(id, 0.95));
 
-        this.renderLabels(owners, cell);
+        this.renderLabels(owners, block);
 
         this.renders++;
         return owners.size;
     }
 
     /**
-     * Whole cells touched by each room's quarter-cell floor footprint. Unlike
-     * `ownerOfCell`, this is intentionally non-exclusive: a wall split between
-     * two rooms belongs in both perimeter contours.
+     * The exact quarter-cell blocks owned by each room. A shared wall or open
+     * threshold can therefore divide a tile without either room losing it.
      */
-    static cellsByRoom(grid) {
+    static blocksByRoom(grid) {
         const owners = new Map();
         if (!grid) return owners;
         for (let blockY = 0; blockY < grid.blockHeight; blockY++) {
             for (let blockX = 0; blockX < grid.blockWidth; blockX++) {
                 const id = grid.ownerAt(blockX, blockY);
                 if (id === null) continue;
-                if (!owners.has(id)) owners.set(id, new Set());
-                owners.get(id).add(BuildKeys.cell(Math.floor(blockX / 2), Math.floor(blockY / 2)));
+                if (!owners.has(id)) owners.set(id, []);
+                owners.get(id).push([blockX, blockY]);
             }
         }
-        return new Map([...owners].map(([id, cells]) => [
-            id,
-            [...cells].map(key => {
-                const { x, y } = BuildKeys.parseCell(key);
-                return [x, y];
-            })
-        ]));
+        return owners;
     }
 
     // Walks a room's owned cells into one or more closed rings of unit
@@ -296,13 +294,13 @@ class BuildFootprintOverlay {
         return polygon;
     }
 
-    // One clickable name per room, centred on the cells it owns — opens the
+    // One clickable name per room, centred on the blocks it owns — opens the
     // same Room panel the Build Inspector's Navigator entry does.
-    renderLabels(owners, cell) {
+    renderLabels(owners, unit) {
         if (!this.labelContainer) return;
         const level = this.gameMap?.buildDocument?.level?.();
         const seen = new Set();
-        for (const [id, cells] of owners) {
+        for (const [id, blocks] of owners) {
             seen.add(id);
             let button = this.labelButtons.get(id);
             if (!button) {
@@ -319,9 +317,9 @@ class BuildFootprintOverlay {
             const room = level?.rooms?.get?.(id);
             button.textContent = room?.displayName || id;
             let sumX = 0, sumY = 0;
-            for (const [x, y] of cells) { sumX += x; sumY += y; }
-            const centreX = (sumX / cells.length + 0.5) * cell;
-            const centreY = (sumY / cells.length + 0.5) * cell;
+            for (const [x, y] of blocks) { sumX += x; sumY += y; }
+            const centreX = (sumX / blocks.length + 0.5) * unit;
+            const centreY = (sumY / blocks.length + 0.5) * unit;
             button.style.left = `${centreX}px`;
             button.style.top = `${centreY}px`;
         }

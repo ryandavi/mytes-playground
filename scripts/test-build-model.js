@@ -428,9 +428,9 @@ function runGeometryContracts(core) {
         blockHeight: 2,
         ownerAt: (x, y) => y === 0 ? 'A' : 'B'
     };
-    const splitFootprints = core.BuildFootprintOverlay.cellsByRoom(splitCellGrid);
-    assertEqual(splitFootprints.get('A'), [[0, 0]], 'top room includes a shared whole cell from its quarters');
-    assertEqual(splitFootprints.get('B'), [[0, 0]], 'bottom room independently includes the same shared whole cell');
+    const splitFootprints = core.BuildFootprintOverlay.blocksByRoom(splitCellGrid);
+    assertEqual(splitFootprints.get('A'), [[0, 0], [1, 0]], 'top room keeps the top half of a shared cell');
+    assertEqual(splitFootprints.get('B'), [[0, 1], [1, 1]], 'bottom room keeps the bottom half of a shared cell');
 
     return 17;
 }

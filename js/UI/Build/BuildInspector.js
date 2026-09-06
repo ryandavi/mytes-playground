@@ -20,6 +20,7 @@ class BuildInspector extends ModalWindow {
         if (!this.modalElement) return;
         this.tabs = [...this.modalElement.querySelectorAll('[data-build-inspector-tab]')];
         this.views = [...this.modalElement.querySelectorAll('[data-build-inspector-view]')];
+        this.headings = [...this.modalElement.querySelectorAll('[data-build-inspector-heading]')];
         for (const tab of this.tabs) tab.addEventListener('click', () => this.showTab(tab.dataset.buildInspectorTab));
         this.unsubscribeSelection = this.parent.buildSelection.subscribe(selection => {
             this.activeTab = selection ? 'properties' : 'navigator';
@@ -48,34 +49,8 @@ class BuildInspector extends ModalWindow {
             tab.setAttribute('aria-selected', String(selected));
         }
         for (const view of this.views) view.hidden = view.dataset.buildInspectorView !== name;
-        this.updateFooterVisibility();
+        for (const heading of this.headings) heading.hidden = heading.dataset.buildInspectorHeading !== name;
         return true;
-    }
-
-    get footer() {
-        return this.modalElement?.querySelector('[data-build-inspector-footer]') || null;
-    }
-
-    /**
-     * The one action row that answers "what can I do with this selection" —
-     * pinned below the scrolling properties list instead of living inside it,
-     * so it never scrolls out of reach the way it used to when a selection
-     * had a long property list above it. Secondary, contextual action rows
-     * (the Roof editor's own "Paint roof" row, say) stay inline: this is only
-     * for the one row that speaks for the whole selection.
-     */
-    setFooterActions(actions) {
-        const footer = this.footer;
-        if (!footer) return;
-        this._footerHasActions = Array.isArray(actions) && actions.length > 0;
-        footer.replaceChildren(...(this._footerHasActions ? [this.actionRow(actions)] : []));
-        this.updateFooterVisibility();
-    }
-
-    updateFooterVisibility() {
-        const footer = this.footer;
-        if (!footer) return;
-        footer.hidden = !this._footerHasActions || this.activeTab !== 'properties';
     }
 
     render() {
@@ -97,22 +72,10 @@ class BuildInspector extends ModalWindow {
         }
         const tree = document.createElement('ul');
         tree.className = 'build-navigator-tree';
-        const site = document.createElement('li');
-        site.className = 'build-navigator-node build-navigator-node--site';
-        const siteLabel = document.createElement('strong');
-        siteLabel.textContent = 'Site';
-        site.append(siteLabel);
-        const children = document.createElement('ul');
         for (const building of documentModel.buildings.values()) {
             const node = document.createElement('li');
             const button = this.nodeButton('building', building.id, `Building: ${building.displayName}`);
             const rooms = level.rooms.values().filter(room => room.buildingId === building.id);
-            const walls = level.walls.values().filter(wall => wall.buildingId === building.id).length;
-            // What it is made of, at a glance: a building with no walls is a
-            // row you would otherwise have to click to understand.
-            button.append(BuildInspector.badge(
-                `${rooms.length} room${rooms.length === 1 ? '' : 's'} · ${walls} wall${walls === 1 ? '' : 's'}`
-            ));
             node.append(button);
             if (rooms.length) {
                 const roomList = document.createElement('ul');
@@ -120,14 +83,12 @@ class BuildInspector extends ModalWindow {
                     const roomNode = document.createElement('li');
                     const label = `Room: ${room.displayName}`;
                     const roomButton = this.nodeButton('room', room.id, label);
-                    const badge = this.roomBadge(room);
-                    if (badge) roomButton.append(BuildInspector.badge(badge));
                     roomNode.append(roomButton);
                     roomList.append(roomNode);
                 }
                 node.append(roomList);
             }
-            children.append(node);
+            tree.append(node);
         }
         const outdoor = level.rooms.values().filter(room => !room.buildingId);
         if (outdoor.length) {
@@ -142,17 +103,15 @@ class BuildInspector extends ModalWindow {
                 list.append(node);
             }
             areas.append(list);
-            children.append(areas);
+            tree.append(areas);
         }
         const unassigned = level.walls.values().filter(wall => !wall.buildingId).length;
         if (unassigned) {
             const node = document.createElement('li');
             const button = this.nodeButton('wall', 'unassigned', `Unassigned walls (${unassigned})`);
             node.append(button);
-            children.append(node);
+            tree.append(node);
         }
-        site.append(children);
-        tree.append(site);
         root.append(tree);
     }
 
@@ -171,12 +130,12 @@ class BuildInspector extends ModalWindow {
         return button;
     }
 
-    roomBadge(room) {
+    roomStatus(room) {
         if (room.seedCells.length === 0) return 'Empty';
         const state = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.planStates?.get(room.id);
         if ((state?.componentIds?.length || 0) > 1) return 'Disconnected';
         if (!state?.indoor) return 'Open';
-        return this.hasEntrance(room.id) ? null : 'No entrance';
+        return 'Enclosed';
     }
 
     /** The kinds of opening that reach this room: 'door', 'window', … */
@@ -267,19 +226,26 @@ class BuildInspector extends ModalWindow {
         const root = this.modalElement?.querySelector('[data-build-inspector-view="properties"]');
         if (!root) return;
         root.replaceChildren();
-        this.setFooterActions(null);
         const selection = this.parent.buildSelection.current;
         if (!selection) {
-            root.append(BuildInspector.message('Select a building, room, wall, surface, or object.'));
+            this.setPropertyHeading('Selection');
+            root.append(BuildInspector.emptyState('Select a building, room, wall, surface, or object.'));
             return;
         }
+        this.setPropertyHeading(selection.kind, selection.id);
         const map = this.parent?.parent?.gameMap;
         const level = map?.buildDocument?.level?.();
         if (selection.kind === 'building') {
             const plan = map.buildDocument.buildings.get(selection.id);
             if (!plan) return root.append(BuildInspector.message('This building no longer exists.'));
             const marquee = this.parent.buildMarqueeSelection;
-            root.append(this.propertyHeading(plan.displayName, 'Building'));
+            this.setPropertyHeading('Building');
+            const rooms = level.rooms.values().filter(room => room.buildingId === plan.id);
+            const walls = level.walls.values().filter(wall => wall.buildingId === plan.id);
+            root.append(this.detailsList({
+                Rooms: rooms.length,
+                Walls: `${walls.length} cell${walls.length === 1 ? '' : 's'}`
+            }));
             root.append(this.nameEditor(plan.displayName, value => marquee.renameBuilding(value)));
             root.append(this.buildingTypeEditor(plan));
             root.append(this.roofEditor(plan.id));
@@ -287,7 +253,7 @@ class BuildInspector extends ModalWindow {
             // button that answers with a message when you press it.
             const parts = marquee.buildingComponents(selection.id).length;
             const selectedBuildings = marquee.selectedBuildingIds().length;
-            this.setFooterActions([
+            root.append(this.actionRow([
                 ['Move', () => this.beginBuildingMove()],
                 ['Duplicate', () => marquee.duplicateSelection()],
                 ['Separate', () => marquee.separateBuilding(), null,
@@ -295,40 +261,44 @@ class BuildInspector extends ModalWindow {
                 ['Merge', () => marquee.mergeSelectedBuildings(), null,
                     selectedBuildings > 1 ? null : 'Select walls from another building to merge it in'],
                 ['Demolish', () => marquee.confirmDemolition(), 'is-danger']
-            ]);
+            ]));
             return;
         }
         if (selection.kind === 'roof') {
             const roof = level.roofs.get(selection.id);
             if (!roof) return root.append(BuildInspector.message('This roof no longer exists.'));
             const building = map.buildDocument.buildings.get(roof.buildingId);
-            root.append(this.propertyHeading(building?.displayName || roof.buildingId, 'Roof'));
+            this.setPropertyHeading('Roof', building?.displayName || roof.buildingId);
             root.append(this.roofEditor(roof.buildingId));
             return;
         }
         if (selection.kind === 'room') {
             const room = level.rooms.get(selection.id);
             if (!room) return root.append(BuildInspector.message('This room no longer exists.'));
-            root.append(this.propertyHeading(room.displayName, room.buildingId ? 'Room' : 'Area'));
+            this.setPropertyHeading(room.buildingId ? 'Room' : 'Area');
+            root.append(this.detailsList({
+                Size: `${room.seedCells.length} tile${room.seedCells.length === 1 ? '' : 's'}`,
+                Status: this.roomStatus(room)
+            }));
+            const region = map.regionManager?.get('room', room.id);
+            if (region) root.append(this.analysisGroup(this.roomNeeds(region)));
             root.append(this.nameEditor(room.displayName, value => this.parent.roomPanel.commitRoom(
                 room.id, { name: value }, `Rename ${room.displayName}`
             )));
             root.append(this.roomTypeEditor(room));
             root.append(this.roomColourEditor(room));
             root.append(this.roomBuildingEditor(room));
-            const region = map.regionManager?.get('room', room.id);
-            if (region) root.append(this.needsRow(this.roomNeeds(region)));
-            this.setFooterActions([
+            root.append(this.actionRow([
                 ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
                 ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
                 ['Paint walls', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'wall')]
-            ]);
+            ]));
             return;
         }
         if (selection.kind === 'wall' && selection.id === 'unassigned') {
             const walls = level.walls.values().filter(wall => !wall.buildingId);
             if (walls.length === 0) return root.append(BuildInspector.message('Every wall belongs to a building.'));
-            root.append(this.propertyHeading(`${walls.length} wall cells`, 'Unassigned walls'));
+            this.setPropertyHeading('Unassigned walls', `${walls.length} cells`);
             // Walls with no building cannot be selected as one, renamed, merged
             // or roofed. Authored maps can still carry them, so the Navigator
             // node is also where they get adopted.
@@ -343,7 +313,7 @@ class BuildInspector extends ModalWindow {
                 level.walls.get(BuildKeys.cell(cells[0].x, cells[0].y)));
             if (!wall) return root.append(BuildInspector.message('This wall no longer exists.'));
             const scope = cells.length > 1 ? `${cells.length} cells` : selection.id;
-            root.append(this.propertyHeading(scope, 'Wall'));
+            this.setPropertyHeading('Wall', scope);
             root.append(this.wallConstructionEditor(wall, cells));
             root.append(this.detailsList({
                 // Read-only on purpose: the construction's own art decides how
@@ -356,11 +326,11 @@ class BuildInspector extends ModalWindow {
                 Building: (wall.buildingId && map.buildDocument.buildings.get(wall.buildingId)?.displayName) || 'Unassigned',
                 Finish: map.wallBuilder?.resolveSurfaceFinishId({ ...wall }, 'south', null, 0) || '—'
             }));
-            this.setFooterActions([
+            root.append(this.actionRow([
                 ['Paint', () => this.parent.changeToolMode(UIToolModes.SURFACE)],
                 ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
                 ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
-            ]);
+            ]));
             return;
         }
         if (selection.kind === 'atom') {
@@ -369,7 +339,7 @@ class BuildInspector extends ModalWindow {
             // Named the way Paint names it: whose wall this is, then which face
             // of it. "south half 2" is an address, and nobody points at an
             // address.
-            root.append(this.propertyHeading(details.Where, details.Surface));
+            this.setPropertyHeading(details.Surface, details.Where);
             delete details.Surface;
             delete details.Where;
             root.append(this.detailsList(details));
@@ -378,25 +348,17 @@ class BuildInspector extends ModalWindow {
             const paint = this.parent.surfaceCustomizePanel;
             const unavailable = surface ? null : 'Click a wall face to choose one';
             // The same three answers the stage bar gives, in the same words.
-            this.setFooterActions([
+            root.append(this.actionRow([
                 ['Paint section', () => paint.openWallSurface(surface, 'stretch'), null, unavailable],
                 surface?.roomId
                     ? ['Paint the room', () => paint.openWallSurface(surface, 'room'), null, unavailable]
                     : ['Paint outside', () => paint.openWallSurface(surface, 'roomExterior'), null, unavailable],
                 ['Select structure', () => surface && marquee.selectWallAt(surface.cell, 'cell'), null, unavailable]
-            ]);
+            ]));
             return;
         }
-        const details = document.createElement('dl');
-        details.className = 'build-inspector-details';
-        for (const [label, value] of Object.entries(selection.details || { Type: selection.kind, ID: selection.id })) {
-            const term = document.createElement('dt');
-            term.textContent = label;
-            const description = document.createElement('dd');
-            description.textContent = value == null ? '—' : String(value);
-            details.append(term, description);
-        }
-        root.append(details);
+        this.setPropertyHeading(selection.kind, selection.id);
+        root.append(this.detailsList(selection.details || { Type: selection.kind, ID: selection.id }));
     }
 
     /**
@@ -667,21 +629,24 @@ class BuildInspector extends ModalWindow {
         return committed;
     }
 
-    needsRow(needs) {
-        // Not a `.setting-hint`: that is a two-column grid for an icon and a
-        // paragraph, and the second badge in the row was being stretched across
-        // the whole 1fr column by it.
-        const row = document.createElement('div');
-        row.className = 'build-inspector-needs';
-        if (needs.length === 0) {
-            const done = document.createElement('span');
-            done.className = 'build-inspector-needs__done';
-            done.textContent = 'Nothing missing.';
-            row.append(done);
-            return row;
+    analysisGroup(issues) {
+        const group = this.propertyGroup('Analysis');
+        const list = document.createElement('ul');
+        list.className = 'build-inspector-analysis';
+        if (issues.length === 0) {
+            const clear = document.createElement('li');
+            clear.className = 'build-inspector-analysis__empty';
+            clear.textContent = 'No issues found.';
+            list.append(clear);
+        } else {
+            for (const issue of issues) {
+                const item = document.createElement('li');
+                item.textContent = issue;
+                list.append(item);
+            }
         }
-        for (const need of needs) row.append(BuildInspector.badge(need));
-        return row;
+        group.append(list);
+        return group;
     }
 
     beginBuildingMove() {
@@ -795,17 +760,34 @@ class BuildInspector extends ModalWindow {
         return room?.properties?.displayName || room?.id || null;
     }
 
+    propertyGroup(titleText) {
+        const group = document.createElement('section');
+        group.className = 'settings-group build-inspector-property-group';
+        const title = document.createElement('h3');
+        title.className = 'settings-group-title';
+        title.textContent = titleText;
+        group.append(title);
+        return group;
+    }
+
     detailsList(values) {
+        const group = this.propertyGroup('Details');
         const details = document.createElement('dl');
         details.className = 'build-inspector-details';
-        for (const [label, value] of Object.entries(values)) {
+        const entries = Object.entries(values || {});
+        if (entries.length === 0) {
+            group.append(BuildInspector.emptyState('No details available.'));
+            return group;
+        }
+        for (const [label, value] of entries) {
             const term = document.createElement('dt');
             term.textContent = label;
             const description = document.createElement('dd');
             description.textContent = value == null ? '—' : String(value);
             details.append(term, description);
         }
-        return details;
+        group.append(details);
+        return group;
     }
 
     renderPalette() {
@@ -819,15 +801,14 @@ class BuildInspector extends ModalWindow {
         ]));
     }
 
-    propertyHeading(name, kind) {
-        const heading = document.createElement('div');
-        heading.className = 'build-inspector-heading';
-        const title = document.createElement('strong');
-        title.textContent = name;
-        const type = document.createElement('span');
-        type.textContent = kind;
-        heading.append(title, type);
-        return heading;
+    setPropertyHeading(name, context = null) {
+        const heading = this.modalElement?.querySelector('[data-build-inspector-heading="properties"]');
+        if (!heading) return;
+        heading.querySelector('strong').textContent = name;
+        const secondary = heading.querySelector('span');
+        if (!secondary) return;
+        secondary.textContent = context || '';
+        secondary.hidden = !context;
     }
 
     nameEditor(value, commit) {
@@ -886,18 +867,15 @@ class BuildInspector extends ModalWindow {
         return select;
     }
 
-    static badge(text) {
-        const badge = document.createElement('span');
-        badge.className = 'build-navigator-badge';
-        badge.textContent = text;
-        return badge;
+    static message(text, variant = 'persistent') {
+        return HintNotes.create(text, { variant });
     }
 
-    static message(text) {
-        const message = document.createElement('p');
-        message.className = 'setting-hint setting-hint--persistent';
-        message.textContent = text;
-        return message;
+    static emptyState(text) {
+        const empty = document.createElement('p');
+        empty.className = 'panel-list__empty';
+        empty.textContent = text;
+        return empty;
     }
 
     dispose() {
