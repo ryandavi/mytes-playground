@@ -9,8 +9,11 @@
  * answer on screen. This draws the answer: the owned footprint, per plan, on
  * the grid, so paint edges stop being something you infer from a half-tile.
  *
- * Cell ownership, not blocks: the question is which cells belong to the room,
- * and `grid.ownerOfCell` is the majority answer the rest of the build tools use.
+ * The floor grid remains quarter-cell data here. Collapsing a shared wall cell
+ * to one `ownerOfCell` winner makes the losing room detour around that whole
+ * tile. Instead, each room gets its own cell footprint: owning any quarter of
+ * a cell includes that cell in that room's contour. Shared masonry can therefore
+ * sit in two room footprints without changing exclusive floor-pixel ownership.
  *
  * Every room draws only its own edge, inset a few pixels into its own cells
  * rather than sitting exactly on the shared cell boundary — the boundary is
@@ -119,16 +122,7 @@ class BuildFootprintOverlay {
         const context = canvas.getContext('2d');
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        const owners = new Map();
-        const ownerGrid = new Array(width * height).fill(null);
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const id = grid.ownerOfCell(x, y);
-            if (id === null) continue;
-            ownerGrid[y * width + x] = id;
-            if (!owners.has(id)) owners.set(id, []);
-            owners.get(id).push([x, y]);
-        }
-        const ownerAt = (x, y) => (x < 0 || y < 0 || x >= width || y >= height) ? null : ownerGrid[y * width + x];
+        const owners = BuildFootprintOverlay.cellsByRoom(grid);
 
         // A wall record's cell is a full cellSize×cellSize footprint, and the
         // wall itself — whatever its rendered thickness — sits centred inside
@@ -164,6 +158,31 @@ class BuildFootprintOverlay {
 
         this.renders++;
         return owners.size;
+    }
+
+    /**
+     * Whole cells touched by each room's quarter-cell floor footprint. Unlike
+     * `ownerOfCell`, this is intentionally non-exclusive: a wall split between
+     * two rooms belongs in both perimeter contours.
+     */
+    static cellsByRoom(grid) {
+        const owners = new Map();
+        if (!grid) return owners;
+        for (let blockY = 0; blockY < grid.blockHeight; blockY++) {
+            for (let blockX = 0; blockX < grid.blockWidth; blockX++) {
+                const id = grid.ownerAt(blockX, blockY);
+                if (id === null) continue;
+                if (!owners.has(id)) owners.set(id, new Set());
+                owners.get(id).add(BuildKeys.cell(Math.floor(blockX / 2), Math.floor(blockY / 2)));
+            }
+        }
+        return new Map([...owners].map(([id, cells]) => [
+            id,
+            [...cells].map(key => {
+                const { x, y } = BuildKeys.parseCell(key);
+                return [x, y];
+            })
+        ]));
     }
 
     // Walks a room's owned cells into one or more closed rings of unit

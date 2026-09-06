@@ -38226,7 +38226,13 @@ class RoomRegionProjection {
                 layer: 'room',
                 shape: {
                     kind: 'tilemask',
-                    cells: grid.cellsOf(String(plan.id)),
+                    // A room is the tile mask the player authored. The ownership
+                    // grid deliberately extends that mask into wall and threshold
+                    // blocks so floors can bleed beneath masonry and wall faces can
+                    // find the room beside them. Collapsing those contested blocks
+                    // back into whole cells makes adjacent rooms steal corner and
+                    // junction tiles from one another.
+                    cells: [...plan.seedCells],
                     cellSize
                 },
                 properties: {
@@ -45904,7 +45910,8 @@ class FloorOwnershipResolver {
         return FloorOwnershipResolver.createGrid({
             width, height, blockWidth, blockHeight, owners,
             revision: Number(input?.revision) || 0,
-            planIds: plans.map(plan => plan.id)
+            planIds: plans.map(plan => plan.id),
+            planStats: new Map(plans.map(plan => [plan.id, { priority: plan.priority, seedCount: plan.seedCells.length }]))
         });
     }
 
@@ -45978,6 +45985,7 @@ class FloorOwnershipResolver {
 
     static createGrid(data) {
         const owner = Object.freeze(data.owners.slice());
+        const planStats = data.planStats || new Map();
         const ownerAt = (bx, by) => FloorOwnershipResolver.inBounds(bx, by, data.blockWidth, data.blockHeight)
             ? owner[by * data.blockWidth + bx] : null;
         const blocksOf = planId => {
@@ -45987,13 +45995,47 @@ class FloorOwnershipResolver {
             }
             return blocks;
         };
+        // A cell whose 4 sub-blocks split between two or more rooms is a
+        // genuine junction — real architecture, three or more walls meeting
+        // at a point — that a single indivisible cell can't represent
+        // exactly, so something has to give it to one room. Block count
+        // alone decided that before, which handed the whole cell to whichever
+        // neighbour's wall geometry happened to claim one more sub-block —
+        // and at a T-junction that is systematically the *larger*, more
+        // sprawling room, because its edge runs straight past the corner
+        // while the smaller room only reaches it diagonally from its own
+        // corner-most seed. Proximity to a seed doesn't fix this either: a
+        // big room's edge is often the literally closest thing to its small
+        // neighbour's own corner. What actually distinguishes them is size —
+        // the small room is the one this corner structurally belongs to —
+        // which is exactly what `comparePlans` already uses to settle
+        // equally-reachable claims during the flood-fill itself (smaller
+        // seed count wins, id order only as a last resort). Reusing it here
+        // means a cell's final owner and the flood-fill's own tie-breaking
+        // agree, instead of the fill preferring one room and the vote
+        // handing the cell to a different one anyway.
+        const comparePlans = (aId, bId) => {
+            const a = planStats.get(aId) || { priority: 0, seedCount: 0 };
+            const b = planStats.get(bId) || { priority: 0, seedCount: 0 };
+            return (b.priority - a.priority) || (a.seedCount - b.seedCount) || aId.localeCompare(bId);
+        };
         const ownerOfCell = (x, y) => {
             const counts = new Map();
             for (const [bx, by] of BuildKeys.blocksOfCell(x, y)) {
                 const id = ownerAt(bx, by);
                 if (id !== null) counts.set(id, (counts.get(id) || 0) + 1);
             }
-            return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
+            const candidates = [...counts.entries()];
+            if (candidates.length <= 1) return candidates[0]?.[0] ?? null;
+            // Size only settles a genuinely close contest — 2 of 4 blocks or
+            // fewer each, nobody holding real majority of the cell. A room
+            // that actually holds 3 or 4 of the 4 blocks isn't in a junction
+            // dispute at all, just legitimately most of this cell, and a
+            // smaller neighbour touching its one remaining corner shouldn't
+            // out-rank that outright majority.
+            const leader = [...candidates].sort((a, b) => b[1] - a[1])[0];
+            if (leader[1] >= 3) return leader[0];
+            return candidates.sort((a, b) => comparePlans(a[0], b[0]))[0][0];
         };
         const cellsOf = planId => {
             const cells = [];
@@ -73069,8 +73111,11 @@ class BuildSelection {
  * answer on screen. This draws the answer: the owned footprint, per plan, on
  * the grid, so paint edges stop being something you infer from a half-tile.
  *
- * Cell ownership, not blocks: the question is which cells belong to the room,
- * and `grid.ownerOfCell` is the majority answer the rest of the build tools use.
+ * The floor grid remains quarter-cell data here. Collapsing a shared wall cell
+ * to one `ownerOfCell` winner makes the losing room detour around that whole
+ * tile. Instead, each room gets its own cell footprint: owning any quarter of
+ * a cell includes that cell in that room's contour. Shared masonry can therefore
+ * sit in two room footprints without changing exclusive floor-pixel ownership.
  *
  * Every room draws only its own edge, inset a few pixels into its own cells
  * rather than sitting exactly on the shared cell boundary — the boundary is
@@ -73179,16 +73224,7 @@ class BuildFootprintOverlay {
         const context = canvas.getContext('2d');
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        const owners = new Map();
-        const ownerGrid = new Array(width * height).fill(null);
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const id = grid.ownerOfCell(x, y);
-            if (id === null) continue;
-            ownerGrid[y * width + x] = id;
-            if (!owners.has(id)) owners.set(id, []);
-            owners.get(id).push([x, y]);
-        }
-        const ownerAt = (x, y) => (x < 0 || y < 0 || x >= width || y >= height) ? null : ownerGrid[y * width + x];
+        const owners = BuildFootprintOverlay.cellsByRoom(grid);
 
         // A wall record's cell is a full cellSize×cellSize footprint, and the
         // wall itself — whatever its rendered thickness — sits centred inside
@@ -73224,6 +73260,31 @@ class BuildFootprintOverlay {
 
         this.renders++;
         return owners.size;
+    }
+
+    /**
+     * Whole cells touched by each room's quarter-cell floor footprint. Unlike
+     * `ownerOfCell`, this is intentionally non-exclusive: a wall split between
+     * two rooms belongs in both perimeter contours.
+     */
+    static cellsByRoom(grid) {
+        const owners = new Map();
+        if (!grid) return owners;
+        for (let blockY = 0; blockY < grid.blockHeight; blockY++) {
+            for (let blockX = 0; blockX < grid.blockWidth; blockX++) {
+                const id = grid.ownerAt(blockX, blockY);
+                if (id === null) continue;
+                if (!owners.has(id)) owners.set(id, new Set());
+                owners.get(id).add(BuildKeys.cell(Math.floor(blockX / 2), Math.floor(blockY / 2)));
+            }
+        }
+        return new Map([...owners].map(([id, cells]) => [
+            id,
+            [...cells].map(key => {
+                const { x, y } = BuildKeys.parseCell(key);
+                return [x, y];
+            })
+        ]));
     }
 
     // Walks a room's owned cells into one or more closed rings of unit
@@ -83020,6 +83081,8 @@ window.__build = Object.freeze({ stats: map => BuildDebug.stats(map) });
 // Usage from DevTools console:
 //   __surfaces.cell(12, 3)          // wall: mask, faces, and every painted slice
 //   __surfaces.floor(14, 0)         // floor: which room owns each quarter of a cell
+//   __surfaces.footprintAudit()     // authored rooms vs the Show Rooms ownership grid
+//   __surfaces.pickFootprint()      // click a visible notch; copies its 3x3 report
 //   __surfaces.stretch(12, 3, 4)    // what one paint stroke at that pixel would cover
 //   __surfaces.audit()              // every quarter-cell two rooms both claim, or neither
 //   __surfaces.overlay()            // draw all of the above ON the map
@@ -83246,6 +83309,100 @@ const SurfaceDebug = {
 				}];
 			}))
 		};
+	},
+
+	/**
+	 * The answers involved in the bottom-bar Show Rooms outline around one cell:
+	 * authored room membership, the exclusive whole-cell winner the overlay
+	 * traces, and the four quarter-cell owners that produced that winner.
+	 */
+	footprintAt(x, y, ownerByBlock = this._floorPlanOwners(), footprints = null, includeNeighbourhood = true) {
+		const map = this._map();
+		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
+		const grid = map.buildTransaction?.cache?.grid;
+		const cellsByRoom = footprints ?? BuildFootprintOverlay.cellsByRoom(grid);
+		const inspect = (cellX, cellY) => {
+			const key = BuildKeys.cell(cellX, cellY);
+			const neighbouringRooms = new Set();
+			for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+				const neighbour = BuildKeys.cell(cellX + dx, cellY + dy);
+				for (const room of plans) if (room.seedCells.includes(neighbour)) neighbouringRooms.add(room.id);
+			}
+			return {
+				cell: key,
+				wall: map.wallBuilder?.cells?.has(key) ?? false,
+				authored: plans.filter(room => room.seedCells.includes(key)).map(room => room.id),
+				neighbouringRooms: [...neighbouringRooms].sort(),
+				footprintRooms: [...cellsByRoom]
+					.filter(([, cells]) => cells.some(([x, y]) => x === cellX && y === cellY))
+					.map(([id]) => id).sort(),
+				legacyWholeCellOwner: grid?.ownerOfCell(cellX, cellY) ?? null,
+				floorOwnership: this.floorPlan(cellX, cellY, ownerByBlock)
+			};
+		};
+		const report = { selected: inspect(x, y) };
+		if (includeNeighbourhood) {
+			report.neighbourhood = [-1, 0, 1]
+				.flatMap(dy => [-1, 0, 1].map(dx => inspect(x + dx, y + dy)));
+		}
+		return report;
+	},
+
+	/**
+	 * Audit the ownership data consumed by the bottom-bar Show Rooms overlay.
+	 * Shared wall cells are listed because one whole-cell winner cannot describe
+	 * both rooms meeting the wall; these are the likely notch coordinates.
+	 */
+	footprintAudit() {
+		const map = this._map();
+		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
+		const grid = map.buildTransaction?.cache?.grid;
+		const ownerByBlock = this._floorPlanOwners();
+		const footprints = BuildFootprintOverlay.cellsByRoom(grid);
+		const width = map.gridSystem?.gridWidth ?? 0;
+		const height = map.gridSystem?.gridHeight ?? 0;
+		const sharedWallCells = [];
+		const missingAuthoredCells = [];
+		for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+			const cell = this.footprintAt(x, y, ownerByBlock, footprints, false).selected;
+			if (cell.wall && cell.neighbouringRooms.length > 1) sharedWallCells.push(cell);
+			for (const roomId of cell.authored) {
+				if (!cell.footprintRooms.includes(roomId)) {
+					missingAuthoredCells.push({ cell: cell.cell, roomId, footprintRooms: cell.footprintRooms });
+				}
+			}
+		}
+		const report = {
+			mapId: map.id,
+			overlayVisible: map.footprintOverlay?.visible === true,
+			overlayCanvas: map.footprintOverlay?.canvas?.isConnected === true,
+			sharedWallCells,
+			missingAuthoredCells
+		};
+		console.log('[SurfaceDebug] Show Rooms footprint audit', JSON.stringify(report, null, 2));
+		return report;
+	},
+
+	/** Arm one click on a visible Show Rooms notch and copy its local report. */
+	pickFootprint() {
+		const container = MyteCore.instance?.getFirstContainer?.();
+		const input = container?.inputHandler;
+		if (!input?.screenToWorldCoordinates) {
+			throw new Error('[SurfaceDebug] Container input is not ready');
+		}
+		const handler = event => {
+			const point = input.screenToWorldCoordinates(event.clientX, event.clientY);
+			const x = Math.floor(point.x / this.cellSize);
+			const y = Math.floor(point.y / this.cellSize);
+			const report = this.footprintAt(x, y);
+			this.lastFootprintPick = report;
+			console.log('[SurfaceDebug] Show Rooms footprint pick', JSON.stringify(report, null, 2));
+			navigator.clipboard?.writeText(JSON.stringify(report, null, 2)).catch(() => {});
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		};
+		document.addEventListener('pointerdown', handler, { capture: true, once: true });
+		return 'picker armed — click a visible room-outline notch; its 3x3 report will be logged and copied';
 	},
 
 	/** Arm one click on the map and copy a focused floor ownership report. */

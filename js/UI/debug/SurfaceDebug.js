@@ -9,6 +9,8 @@
 // Usage from DevTools console:
 //   __surfaces.cell(12, 3)          // wall: mask, faces, and every painted slice
 //   __surfaces.floor(14, 0)         // floor: which room owns each quarter of a cell
+//   __surfaces.footprintAudit()     // authored rooms vs the Show Rooms ownership grid
+//   __surfaces.pickFootprint()      // click a visible notch; copies its 3x3 report
 //   __surfaces.stretch(12, 3, 4)    // what one paint stroke at that pixel would cover
 //   __surfaces.audit()              // every quarter-cell two rooms both claim, or neither
 //   __surfaces.overlay()            // draw all of the above ON the map
@@ -235,6 +237,100 @@ const SurfaceDebug = {
 				}];
 			}))
 		};
+	},
+
+	/**
+	 * The answers involved in the bottom-bar Show Rooms outline around one cell:
+	 * authored room membership, the exclusive whole-cell winner the overlay
+	 * traces, and the four quarter-cell owners that produced that winner.
+	 */
+	footprintAt(x, y, ownerByBlock = this._floorPlanOwners(), footprints = null, includeNeighbourhood = true) {
+		const map = this._map();
+		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
+		const grid = map.buildTransaction?.cache?.grid;
+		const cellsByRoom = footprints ?? BuildFootprintOverlay.cellsByRoom(grid);
+		const inspect = (cellX, cellY) => {
+			const key = BuildKeys.cell(cellX, cellY);
+			const neighbouringRooms = new Set();
+			for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+				const neighbour = BuildKeys.cell(cellX + dx, cellY + dy);
+				for (const room of plans) if (room.seedCells.includes(neighbour)) neighbouringRooms.add(room.id);
+			}
+			return {
+				cell: key,
+				wall: map.wallBuilder?.cells?.has(key) ?? false,
+				authored: plans.filter(room => room.seedCells.includes(key)).map(room => room.id),
+				neighbouringRooms: [...neighbouringRooms].sort(),
+				footprintRooms: [...cellsByRoom]
+					.filter(([, cells]) => cells.some(([x, y]) => x === cellX && y === cellY))
+					.map(([id]) => id).sort(),
+				legacyWholeCellOwner: grid?.ownerOfCell(cellX, cellY) ?? null,
+				floorOwnership: this.floorPlan(cellX, cellY, ownerByBlock)
+			};
+		};
+		const report = { selected: inspect(x, y) };
+		if (includeNeighbourhood) {
+			report.neighbourhood = [-1, 0, 1]
+				.flatMap(dy => [-1, 0, 1].map(dx => inspect(x + dx, y + dy)));
+		}
+		return report;
+	},
+
+	/**
+	 * Audit the ownership data consumed by the bottom-bar Show Rooms overlay.
+	 * Shared wall cells are listed because one whole-cell winner cannot describe
+	 * both rooms meeting the wall; these are the likely notch coordinates.
+	 */
+	footprintAudit() {
+		const map = this._map();
+		const plans = map.buildDocument?.level?.().rooms.values() ?? [];
+		const grid = map.buildTransaction?.cache?.grid;
+		const ownerByBlock = this._floorPlanOwners();
+		const footprints = BuildFootprintOverlay.cellsByRoom(grid);
+		const width = map.gridSystem?.gridWidth ?? 0;
+		const height = map.gridSystem?.gridHeight ?? 0;
+		const sharedWallCells = [];
+		const missingAuthoredCells = [];
+		for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+			const cell = this.footprintAt(x, y, ownerByBlock, footprints, false).selected;
+			if (cell.wall && cell.neighbouringRooms.length > 1) sharedWallCells.push(cell);
+			for (const roomId of cell.authored) {
+				if (!cell.footprintRooms.includes(roomId)) {
+					missingAuthoredCells.push({ cell: cell.cell, roomId, footprintRooms: cell.footprintRooms });
+				}
+			}
+		}
+		const report = {
+			mapId: map.id,
+			overlayVisible: map.footprintOverlay?.visible === true,
+			overlayCanvas: map.footprintOverlay?.canvas?.isConnected === true,
+			sharedWallCells,
+			missingAuthoredCells
+		};
+		console.log('[SurfaceDebug] Show Rooms footprint audit', JSON.stringify(report, null, 2));
+		return report;
+	},
+
+	/** Arm one click on a visible Show Rooms notch and copy its local report. */
+	pickFootprint() {
+		const container = MyteCore.instance?.getFirstContainer?.();
+		const input = container?.inputHandler;
+		if (!input?.screenToWorldCoordinates) {
+			throw new Error('[SurfaceDebug] Container input is not ready');
+		}
+		const handler = event => {
+			const point = input.screenToWorldCoordinates(event.clientX, event.clientY);
+			const x = Math.floor(point.x / this.cellSize);
+			const y = Math.floor(point.y / this.cellSize);
+			const report = this.footprintAt(x, y);
+			this.lastFootprintPick = report;
+			console.log('[SurfaceDebug] Show Rooms footprint pick', JSON.stringify(report, null, 2));
+			navigator.clipboard?.writeText(JSON.stringify(report, null, 2)).catch(() => {});
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		};
+		document.addEventListener('pointerdown', handler, { capture: true, once: true });
+		return 'picker armed — click a visible room-outline notch; its 3x3 report will be logged and copied';
 	},
 
 	/** Arm one click on the map and copy a focused floor ownership report. */

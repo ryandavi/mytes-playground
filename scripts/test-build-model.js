@@ -11,6 +11,7 @@ const sourceFiles = [
     'js/Map/Build/WallSurfaceAtomStore.js',
     'js/Map/Walls/WallGeometry.js',
     'js/Map/Floors/FloorOwnershipResolver.js',
+    'js/UI/Map/BuildFootprintOverlay.js',
     'js/Map/Walls/WallSurfaceRuns.js',
     'js/Map/Walls/WallFaceResolver.js'
 ];
@@ -20,7 +21,7 @@ function loadCore() {
     for (const relative of sourceFiles) {
         vm.runInContext(fs.readFileSync(path.join(repoRoot, relative), 'utf8'), context, { filename: relative });
     }
-    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, WallFaceResolver, WallSurfaceRuns })', context);
+    return vm.runInContext('({ BuildKeys, WallSurfaceAtomStore, WallGeometry, FloorOwnershipResolver, BuildFootprintOverlay, WallFaceResolver, WallSurfaceRuns })', context);
 }
 
 function parseFixture(filePath) {
@@ -422,7 +423,16 @@ function runGeometryContracts(core) {
     assertEqual(crossWest.map(section => section.atoms), [['1,0/west/1'], ['1,1/west/0', '1,2/west/0']],
         'a junction post takes the southern half of its run');
 
-    return 15;
+    const splitCellGrid = {
+        blockWidth: 2,
+        blockHeight: 2,
+        ownerAt: (x, y) => y === 0 ? 'A' : 'B'
+    };
+    const splitFootprints = core.BuildFootprintOverlay.cellsByRoom(splitCellGrid);
+    assertEqual(splitFootprints.get('A'), [[0, 0]], 'top room includes a shared whole cell from its quarters');
+    assertEqual(splitFootprints.get('B'), [[0, 0]], 'bottom room independently includes the same shared whole cell');
+
+    return 17;
 }
 
 function main() {

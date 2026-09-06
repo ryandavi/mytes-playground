@@ -67,7 +67,8 @@ class FloorOwnershipResolver {
         return FloorOwnershipResolver.createGrid({
             width, height, blockWidth, blockHeight, owners,
             revision: Number(input?.revision) || 0,
-            planIds: plans.map(plan => plan.id)
+            planIds: plans.map(plan => plan.id),
+            planStats: new Map(plans.map(plan => [plan.id, { priority: plan.priority, seedCount: plan.seedCells.length }]))
         });
     }
 
@@ -141,6 +142,7 @@ class FloorOwnershipResolver {
 
     static createGrid(data) {
         const owner = Object.freeze(data.owners.slice());
+        const planStats = data.planStats || new Map();
         const ownerAt = (bx, by) => FloorOwnershipResolver.inBounds(bx, by, data.blockWidth, data.blockHeight)
             ? owner[by * data.blockWidth + bx] : null;
         const blocksOf = planId => {
@@ -150,13 +152,47 @@ class FloorOwnershipResolver {
             }
             return blocks;
         };
+        // A cell whose 4 sub-blocks split between two or more rooms is a
+        // genuine junction — real architecture, three or more walls meeting
+        // at a point — that a single indivisible cell can't represent
+        // exactly, so something has to give it to one room. Block count
+        // alone decided that before, which handed the whole cell to whichever
+        // neighbour's wall geometry happened to claim one more sub-block —
+        // and at a T-junction that is systematically the *larger*, more
+        // sprawling room, because its edge runs straight past the corner
+        // while the smaller room only reaches it diagonally from its own
+        // corner-most seed. Proximity to a seed doesn't fix this either: a
+        // big room's edge is often the literally closest thing to its small
+        // neighbour's own corner. What actually distinguishes them is size —
+        // the small room is the one this corner structurally belongs to —
+        // which is exactly what `comparePlans` already uses to settle
+        // equally-reachable claims during the flood-fill itself (smaller
+        // seed count wins, id order only as a last resort). Reusing it here
+        // means a cell's final owner and the flood-fill's own tie-breaking
+        // agree, instead of the fill preferring one room and the vote
+        // handing the cell to a different one anyway.
+        const comparePlans = (aId, bId) => {
+            const a = planStats.get(aId) || { priority: 0, seedCount: 0 };
+            const b = planStats.get(bId) || { priority: 0, seedCount: 0 };
+            return (b.priority - a.priority) || (a.seedCount - b.seedCount) || aId.localeCompare(bId);
+        };
         const ownerOfCell = (x, y) => {
             const counts = new Map();
             for (const [bx, by] of BuildKeys.blocksOfCell(x, y)) {
                 const id = ownerAt(bx, by);
                 if (id !== null) counts.set(id, (counts.get(id) || 0) + 1);
             }
-            return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
+            const candidates = [...counts.entries()];
+            if (candidates.length <= 1) return candidates[0]?.[0] ?? null;
+            // Size only settles a genuinely close contest — 2 of 4 blocks or
+            // fewer each, nobody holding real majority of the cell. A room
+            // that actually holds 3 or 4 of the 4 blocks isn't in a junction
+            // dispute at all, just legitimately most of this cell, and a
+            // smaller neighbour touching its one remaining corner shouldn't
+            // out-rank that outright majority.
+            const leader = [...candidates].sort((a, b) => b[1] - a[1])[0];
+            if (leader[1] >= 3) return leader[0];
+            return candidates.sort((a, b) => comparePlans(a[0], b[0]))[0][0];
         };
         const cellsOf = planId => {
             const cells = [];

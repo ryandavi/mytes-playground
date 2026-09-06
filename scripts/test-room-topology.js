@@ -60,8 +60,26 @@ function testProposalAndProjectionData() {
     const regionManager = new core.RegionManager(null, { cellSize: 32 });
     const regions = core.RoomRegionProjection.sync(regionManager, proposal.plans, grid, topology, 32);
     assert(regions.length === 1 && regions[0].shape.kind === 'tilemask', 'projection publishes one tilemask region per plan');
+    assert([...regions[0].shape.cells].join(' ') === proposal.plans[0].seedCells.join(' '),
+        'projection preserves the authored room mask instead of wall-block ownership');
     assert(regions[0].properties.indoor === true && regions[0].properties.displayName === 'Living',
         'projection carries derived state and persisted identity');
+}
+
+function testProjectionDoesNotClaimSharedWallCells() {
+    const rows = ['#####', '#A#B#', '#A#B#', '#A#B#', '#####'];
+    const geometry = core.WallGeometry.compute(wallsFrom(rows));
+    const plans = [
+        { id: 'A', buildingId: 'house', seedCells: ['1,1', '1,2', '1,3'] },
+        { id: 'B', buildingId: 'house', seedCells: ['3,1', '3,2', '3,3'] }
+    ];
+    const grid = ownership(5, 5, geometry, plans);
+    const topology = core.RoomTopology.compute({ width: 5, height: 5, geometry, plans, grid });
+    const regions = core.RoomRegionProjection.records(plans, grid, topology, 32);
+    assert(regions[0].shape.cells.join(' ') === '1,1 1,2 1,3', 'left room keeps its exact tile mask');
+    assert(regions[1].shape.cells.join(' ') === '3,1 3,2 3,3', 'right room keeps its exact tile mask');
+    assert(!regions.some(room => room.shape.cells.some(key => key.startsWith('2,'))),
+        'neither room claims the shared wall as room area');
 }
 
 function testSplitCreatesStablePlan() {
@@ -127,6 +145,7 @@ function testRoofableFootprintIgnoresExteriorOwnership() {
 // makes "draw four walls, get a room" work.
 
 testProposalAndProjectionData();
+testProjectionDoesNotClaimSharedWallCells();
 testSplitCreatesStablePlan();
 testPaintedPlanDoesNotGrowIntoEnclosure();
 testOpeningAdjacency();

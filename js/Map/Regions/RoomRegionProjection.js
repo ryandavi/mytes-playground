@@ -8,7 +8,13 @@ class RoomRegionProjection {
                 layer: 'room',
                 shape: {
                     kind: 'tilemask',
-                    cells: grid.cellsOf(String(plan.id)),
+                    // A room is the tile mask the player authored. The ownership
+                    // grid deliberately extends that mask into wall and threshold
+                    // blocks so floors can bleed beneath masonry and wall faces can
+                    // find the room beside them. Collapsing those contested blocks
+                    // back into whole cells makes adjacent rooms steal corner and
+                    // junction tiles from one another.
+                    cells: [...plan.seedCells],
                     cellSize
                 },
                 properties: {
